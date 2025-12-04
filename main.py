@@ -1,5 +1,12 @@
 from fasthtml.common import *
 from page.components import create_page
+from page.gallery_components import (
+    get_gallery_carousel_styles,
+    get_gallery_carousel_scripts,
+    portfolio_carousel_section,
+    before_after_carousel_section,
+    instagram_section as instagram_section_module
+)
 from starlette.staticfiles import StaticFiles
 from starlette.responses import Response
 from tools.instagram import get_cached_posts
@@ -580,6 +587,30 @@ def trusted_by_section():
             cls="container"
         ),
         cls="trusted-by-section"
+    )
+
+
+@rt('/gallery')
+def gallery():
+    """Gallery page with Portfolio, Before/After, and Instagram sections"""
+    content = Div(
+        portfolio_carousel_section(title="Portfolio", alt_bg=False),
+        before_after_carousel_section(title="Before and After", alt_bg=True),
+        instagram_section_module(alt_bg=False),
+        cls="gallery-content"
+    )
+
+    # Combine gallery carousel styles with any additional styles
+    additional_styles = get_gallery_carousel_styles()
+    additional_scripts = get_gallery_carousel_scripts()
+
+    return create_page(
+        "Portfolio | Astra Staging",
+        content,
+        additional_styles=additional_styles,
+        additional_scripts=additional_scripts,
+        description="View our portfolio of professional home staging projects, before and after transformations, and latest Instagram posts.",
+        keywords="home staging portfolio, staging before after, home staging photos, real estate staging gallery"
     )
 
 
