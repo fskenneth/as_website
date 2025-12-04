@@ -1524,6 +1524,34 @@ def get_shared_styles():
     .form-submit-btn:active {
         transform: translateY(0);
     }
+    .form-submit-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    /* Form Status Messages */
+    .form-status {
+        margin-top: 15px;
+        padding: 0;
+        border-radius: 8px;
+        text-align: center;
+    }
+    .form-status p {
+        margin: 0;
+        padding: 15px;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+    .form-status.success p {
+        background: rgba(34, 197, 94, 0.15);
+        color: #22c55e;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+    .form-status.error p {
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
 
     @media (min-width: 768px) {
         .general-inquiry-popup {
@@ -2225,9 +2253,11 @@ def general_inquiry_modal():
                     Textarea(id="inquiry-message", name="message", cls="form-textarea form-input", placeholder="Tell us about your staging needs...", required=True),
                     cls="form-group"
                 ),
-                Button("Send Inquiry", type="submit", cls="form-submit-btn"),
+                Button("Send Inquiry", type="submit", cls="form-submit-btn", id="inquiry-submit-btn"),
+                Div(id="inquiry-form-status", cls="form-status"),
                 cls="inquiry-form",
-                id="general-inquiry-form"
+                id="general-inquiry-form",
+                onsubmit="return submitGeneralInquiry(event)"
             ),
             cls="popup-content"
         ),
@@ -2292,6 +2322,67 @@ def get_floating_elements_script():
             }
         }
     });
+
+    // Submit general inquiry form
+    async function submitGeneralInquiry(event) {
+        event.preventDefault();
+
+        const form = document.getElementById('general-inquiry-form');
+        const submitBtn = document.getElementById('inquiry-submit-btn');
+        const statusDiv = document.getElementById('inquiry-form-status');
+
+        // Disable button and show loading state
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending...';
+        statusDiv.innerHTML = '';
+        statusDiv.className = 'form-status';
+
+        // Collect form data
+        const formData = new FormData(form);
+        const data = {
+            name: formData.get('name'),
+            email: formData.get('email'),
+            phone: formData.get('phone') || '',
+            subject: 'General Inquiry' + (formData.get('address') ? ' - ' + formData.get('address') : ''),
+            message: formData.get('message')
+        };
+
+        try {
+            const response = await fetch('/api/contact', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                statusDiv.innerHTML = '<p>✓ Thank you! Your inquiry has been sent. We will get back to you within 24 hours.</p>';
+                statusDiv.className = 'form-status success';
+                form.reset();
+                // Close modal after 3 seconds
+                setTimeout(function() {
+                    closeGeneralInquiryForm();
+                    statusDiv.innerHTML = '';
+                    statusDiv.className = 'form-status';
+                }, 3000);
+            } else {
+                statusDiv.innerHTML = '<p>✗ Sorry, there was an error. Please try again or call us at 1-888-744-4078</p>';
+                statusDiv.className = 'form-status error';
+            }
+        } catch (error) {
+            statusDiv.innerHTML = '<p>✗ Connection error. Please try again or call us at 1-888-744-4078</p>';
+            statusDiv.className = 'form-status error';
+        }
+
+        // Re-enable button
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send Inquiry';
+
+        return false;
+    }
 
     // Initialize scroll listener
     window.addEventListener('scroll', function() {

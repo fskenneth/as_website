@@ -24,8 +24,11 @@ from starlette.staticfiles import StaticFiles
 from starlette.responses import Response
 from tools.instagram import get_cached_posts
 from tools.google_reviews import fetch_google_reviews
+from tools.email_service import send_inquiry_emails
+from starlette.requests import Request
 import httpx
 import hashlib
+import json
 
 app, rt = fast_app(live=True)
 
@@ -98,6 +101,45 @@ def get_proxied_image_url(image_url: str) -> str:
     """Generate a proxied URL for an Instagram image"""
     url_hash = hashlib.md5(image_url.encode()).hexdigest()[:16]
     return f"/api/instagram-image/{url_hash}"
+
+
+@rt('/api/contact', methods=['POST'])
+async def contact_api(request: Request):
+    """Handle contact form submission - sends confirmation and notification emails"""
+    try:
+        data = await request.json()
+
+        customer_data = {
+            'name': data.get('name', ''),
+            'email': data.get('email', ''),
+            'phone': data.get('phone', ''),
+            'subject': data.get('subject', 'General Inquiry'),
+            'message': data.get('message', '')
+        }
+
+        # Validate required fields
+        if not customer_data['name'] or not customer_data['email'] or not customer_data['message']:
+            return Response(
+                content=json.dumps({'success': False, 'error': 'Missing required fields'}),
+                media_type='application/json',
+                status_code=400
+            )
+
+        # Send emails to sales@astrastaging.com
+        result = send_inquiry_emails(customer_data)
+
+        return Response(
+            content=json.dumps({'success': result['success']}),
+            media_type='application/json'
+        )
+
+    except Exception as e:
+        print(f"Contact form error: {e}")
+        return Response(
+            content=json.dumps({'success': False, 'error': str(e)}),
+            media_type='application/json',
+            status_code=500
+        )
 
 
 # =============================================================================

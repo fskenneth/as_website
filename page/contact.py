@@ -162,6 +162,47 @@ def get_contact_page_styles():
         opacity: 0.8;
     }
 
+    .form-submit-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    /* Form Status Messages */
+    .form-status {
+        margin-top: 15px;
+        padding: 0;
+        border-radius: 8px;
+        text-align: center;
+    }
+
+    .form-status p {
+        margin: 0;
+        padding: 15px;
+        border-radius: 8px;
+    }
+
+    .form-status.success p {
+        background: rgba(34, 197, 94, 0.1);
+        color: #16a34a;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .form-status.error p {
+        background: rgba(239, 68, 68, 0.1);
+        color: #dc2626;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    [data-theme="dark"] .form-status.success p {
+        background: rgba(34, 197, 94, 0.15);
+        color: #4ade80;
+    }
+
+    [data-theme="dark"] .form-status.error p {
+        background: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+    }
+
     /* Map Section */
     .map-section {
         padding: 40px 15px;
@@ -340,7 +381,7 @@ def contact_info_section():
 
 
 def contact_form_section():
-    """Contact form section"""
+    """Contact form section with API submission"""
     return Section(
         Div(
             H2("Send Us A Message", cls="section-title"),
@@ -374,16 +415,69 @@ def contact_form_section():
                         Textarea(id="message", name="message", placeholder="Tell us about your project...", cls="form-textarea", required=True),
                         cls="form-group"
                     ),
-                    Button("Send Message", type="submit", cls="form-submit-btn"),
+                    Button("Send Message", type="submit", cls="form-submit-btn", id="submit-btn"),
+                    Div(id="form-status", cls="form-status"),
                     cls="contact-form",
-                    action="mailto:sales@astrastaging.com",
-                    method="post",
-                    enctype="text/plain"
+                    id="contact-form",
+                    onsubmit="return submitContactForm(event)"
                 ),
                 cls="contact-form-wrapper"
             ),
             cls="container"
         ),
+        Script("""
+            async function submitContactForm(event) {
+                event.preventDefault();
+
+                const form = document.getElementById('contact-form');
+                const submitBtn = document.getElementById('submit-btn');
+                const statusDiv = document.getElementById('form-status');
+
+                // Disable button and show loading state
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Sending...';
+                statusDiv.innerHTML = '';
+                statusDiv.className = 'form-status';
+
+                // Collect form data
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData.entries());
+                // Default subject to "Contact Us" if not provided
+                if (!data.subject || data.subject.trim() === '') {
+                    data.subject = 'Contact Us';
+                }
+
+                try {
+                    const response = await fetch('/api/contact', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(data)
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        statusDiv.innerHTML = '<p>✓ Thank you! Your message has been sent successfully. We will get back to you within 24 hours.</p>';
+                        statusDiv.className = 'form-status success';
+                        form.reset();
+                    } else {
+                        statusDiv.innerHTML = '<p>✗ Sorry, there was an error sending your message. Please try again or contact us directly at sales@astrastaging.com</p>';
+                        statusDiv.className = 'form-status error';
+                    }
+                } catch (error) {
+                    statusDiv.innerHTML = '<p>✗ Connection error. Please try again or contact us directly at sales@astrastaging.com</p>';
+                    statusDiv.className = 'form-status error';
+                }
+
+                // Re-enable button
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Send Message';
+
+                return false;
+            }
+        """),
         cls="contact-form-section"
     )
 
