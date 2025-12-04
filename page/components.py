@@ -159,6 +159,25 @@ def get_shared_styles():
         transition: opacity 0.3s ease;
     }
 
+    /* Logo text styling - matches the icon font */
+    .logo-text {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 16px;
+        font-weight: 400;
+        letter-spacing: 3px;
+        color: #666;
+        white-space: nowrap;
+        display: flex;
+        flex-direction: row;
+        gap: 8px;
+    }
+    .logo-text-line {
+        display: inline;
+    }
+    [data-theme="dark"] .logo-text {
+        color: #999;
+    }
+
     /* Theme Toggle Button */
     .theme-toggle {
         background: none;
@@ -217,18 +236,6 @@ def get_shared_styles():
         height: 2px;
         background: var(--color-primary);
         margin: 5px 0;
-        transition: all 0.3s ease;
-    }
-
-    /* Menu toggle animation when active */
-    .menu-toggle.active span:nth-child(1) {
-        transform: rotate(45deg) translate(5px, 5px);
-    }
-    .menu-toggle.active span:nth-child(2) {
-        opacity: 0;
-    }
-    .menu-toggle.active span:nth-child(3) {
-        transform: rotate(-45deg) translate(5px, -5px);
     }
 
     /* Navigation Overlay */
@@ -330,10 +337,261 @@ def get_shared_styles():
         margin: 0 auto;
     }
     .section-title {
-        font-size: clamp(36px, 6vw, 72px);
+        font-size: clamp(24px, 4vw, 36px);
         font-weight: 700;
-        margin-bottom: 60px;
+        margin-bottom: 30px;
         text-align: center;
+    }
+
+    /* Welcome Section */
+    .welcome-section {
+        padding: 60px 40px;
+        background: var(--bg-primary);
+    }
+    .welcome-text {
+        font-size: 18px;
+        line-height: 1.8;
+        color: var(--color-secondary);
+        text-align: justify;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    @media (max-width: 767px) {
+        .welcome-section {
+            padding: 40px 20px;
+        }
+        .welcome-text {
+            font-size: 16px;
+            line-height: 1.7;
+        }
+    }
+
+    /* Hero Section */
+    .hero-section {
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        text-align: center;
+        padding: 40px 0px 60px;
+        margin: 0;
+        position: relative;
+        min-height: 400px;
+        height: 400px;
+        overflow: visible;
+    }
+
+    /* Background image constrained to 960px max-width using pseudo-element */
+    .hero-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 100%;
+        max-width: 960px;
+        height: 100%;
+        background-image: var(--hero-bg-image);
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        z-index: 0;
+    }
+
+    .hero-section > * { position: relative; z-index: 1; }
+    .hero-content {
+        width: 100%;
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 0 20px;
+        box-sizing: border-box;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+    }
+
+    .hero-title {
+        font-family: 'Barlow Condensed', sans-serif;
+        font-size: 32px;
+        font-weight: 600;
+        margin-bottom: 2px;
+        line-height: 1.1;
+        margin-top: 35px;
+        padding-top: 10px;
+        letter-spacing: -0.5px;
+        text-transform: uppercase;
+        text-align: center;
+        width: 100%;
+        color: black;
+    }
+    [data-theme="dark"] .hero-title {
+        color: white;
+    }
+    .hero-title .hero-line {
+        display: block !important;
+        text-align: center !important;
+        width: 100%;
+    }
+
+    /* Booking Form - Mobile Base */
+    .hero-booking {
+        margin-top: 25px;
+        margin-bottom: 0;
+        margin-left: 20px;
+        margin-right: 20px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+    }
+
+    /* Button glow animations */
+    @keyframes dynamic-glow {
+        0%, 100% {
+            transform: scale(1);
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.35);
+            box-shadow:
+                0 4px 20px rgba(255, 255, 255, 0.15),
+                0 8px 40px rgba(255, 255, 255, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+        50% {
+            transform: scale(1.03);
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.6);
+            box-shadow:
+                0 8px 35px rgba(255, 255, 255, 0.35),
+                0 16px 70px rgba(255, 255, 255, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.25);
+        }
+    }
+
+    @keyframes dynamic-glow-light {
+        0%, 100% {
+            transform: scale(1);
+            background: rgba(0, 0, 0, 0.06);
+            border-color: rgba(0, 0, 0, 0.2);
+            box-shadow:
+                0 4px 20px rgba(0, 0, 0, 0.08),
+                0 8px 40px rgba(0, 0, 0, 0.04),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+        50% {
+            transform: scale(1.03);
+            background: rgba(0, 0, 0, 0.15);
+            border-color: rgba(0, 0, 0, 0.4);
+            box-shadow:
+                0 8px 35px rgba(0, 0, 0, 0.2),
+                0 16px 70px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.5);
+        }
+    }
+
+    .start-search-btn,
+    .general-inquiry-btn {
+        display: inline-block;
+        background: rgba(0, 0, 0, 0.06);
+        color: #000000;
+        border: 2px solid rgba(0, 0, 0, 0.2);
+        padding: 12px 24px;
+        border-radius: 30px;
+        font-size: 16px;
+        font-weight: 700;
+        cursor: pointer;
+        white-space: nowrap;
+        text-decoration: none;
+        text-align: center;
+        min-width: 180px;
+        backdrop-filter: blur(20px) saturate(150%);
+        -webkit-backdrop-filter: blur(20px) saturate(150%);
+        box-shadow:
+            0 4px 20px rgba(0, 0, 0, 0.08),
+            0 8px 40px rgba(0, 0, 0, 0.04),
+            inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        transition: all 0.3s ease;
+    }
+
+    .start-search-btn {
+        animation: dynamic-glow-light 2s ease-in-out infinite;
+    }
+
+    .general-inquiry-btn {
+        margin-bottom: 16px;
+    }
+
+    .start-search-btn:hover,
+    .general-inquiry-btn:hover {
+        transform: translateY(-3px) scale(1.05) !important;
+        background: rgba(0, 0, 0, 0.15) !important;
+        border-color: rgba(0, 0, 0, 0.4) !important;
+        animation: none;
+        box-shadow:
+            0 8px 30px rgba(0, 0, 0, 0.2),
+            0 16px 60px rgba(0, 0, 0, 0.12),
+            inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    }
+
+    .start-search-btn:active,
+    .general-inquiry-btn:active {
+        transform: translateY(-1px) scale(1.02) !important;
+        animation: none;
+    }
+
+    [data-theme="dark"] .start-search-btn,
+    [data-theme="dark"] .general-inquiry-btn {
+        background: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+        box-shadow:
+            0 4px 20px rgba(255, 255, 255, 0.15),
+            0 8px 40px rgba(255, 255, 255, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+
+    [data-theme="dark"] .start-search-btn {
+        animation: dynamic-glow 2s ease-in-out infinite;
+    }
+
+    [data-theme="dark"] .start-search-btn:hover,
+    [data-theme="dark"] .general-inquiry-btn:hover {
+        transform: translateY(-3px) scale(1.05) !important;
+        background: rgba(255, 255, 255, 0.3) !important;
+        border-color: rgba(255, 255, 255, 0.7) !important;
+        animation: none;
+        box-shadow:
+            0 8px 35px rgba(255, 255, 255, 0.3),
+            0 16px 70px rgba(255, 255, 255, 0.18),
+            inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+
+    [data-theme="dark"] .start-search-btn:active,
+    [data-theme="dark"] .general-inquiry-btn:active {
+        transform: translateY(-1px) scale(1.02) !important;
+        animation: none;
+    }
+
+    /* Mobile hero adjustments */
+    @media (max-width: 767px) {
+        .hero-section {
+            min-height: 300px;
+            height: 300px;
+            padding: 20px 0px 40px;
+        }
+        .hero-title {
+            font-size: 24px;
+            margin-top: 20px;
+        }
+        .hero-booking {
+            margin-left: 0;
+            margin-right: 0;
+        }
+        .start-search-btn,
+        .general-inquiry-btn {
+            font-size: 14px;
+            padding: 10px 20px;
+            min-width: 150px;
+        }
     }
 
     /* Mobile styles - 767px and below */
@@ -353,28 +611,39 @@ def get_shared_styles():
             min-height: 47px;
         }
         .logo {
-            flex: 1;
+            flex: 0 0 auto;
             display: flex;
+            flex-direction: row;
+            align-items: center;
             justify-content: flex-start;
+            gap: 6px !important;
         }
         .logo img {
             height: 40px !important;
         }
+        .logo-text {
+            font-size: 11px;
+            letter-spacing: 1.5px;
+            flex-direction: column;
+            gap: 0;
+            line-height: 1.3;
+        }
         .nav-phone {
-            font-size: 16px !important;
-            flex: 1;
+            font-size: 14px !important;
+            flex: 0;
             text-align: center;
             white-space: nowrap;
             display: flex;
             justify-content: center;
-            padding-left: 20px;
+            padding-left: 0;
+            margin: 0 auto;
         }
         .phone-prefix {
             display: none;
         }
         .nav-actions {
             gap: 8px;
-            flex: 1;
+            flex: 0 0 auto;
             display: flex;
             justify-content: flex-end;
         }
@@ -603,9 +872,14 @@ def navigation():
             A(
                 Img(src="/static/images/as_logo.png", alt="Astra Staging", cls="logo-light", style="height: 60px; width: auto;"),
                 Img(src="/static/images/as_logo.png", alt="Astra Staging", cls="logo-dark", style="height: 60px; width: auto; display: none;"),
+                Span(
+                    Span("ASTRA", cls="logo-text-line"),
+                    Span("STAGING", cls="logo-text-line"),
+                    cls="logo-text"
+                ),
                 href="/",
                 cls="logo",
-                style="display: flex; align-items: center; text-decoration: none;"
+                style="display: flex; align-items: center; text-decoration: none; gap: 10px;"
             ),
             # Phone number - different display for mobile and desktop
             A(
@@ -738,7 +1012,7 @@ def create_page(title, content, additional_styles="", additional_scripts="",
             Meta(name='viewport', content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'),
             Meta(name='description', content=description),
             Meta(name='keywords', content=keywords),
-            Link(href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap', rel='stylesheet'),
+            Link(href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500&family=Barlow+Condensed:wght@400;500;600;700&display=swap', rel='stylesheet'),
             Link(rel='icon', type='image/x-icon', href='/static/favicon.ico'),
             Style(get_shared_styles() + additional_styles),
             NotStr(theme_init_script)
