@@ -608,8 +608,8 @@ def contact_form_section():
 
 def map_section():
     """Google Maps embed section"""
-    # Google Maps embed URL for 3600A Laird Rd, Unit 12, Mississauga, ON L5L 0A3
-    map_embed_url = "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2889.2!2d-79.708!3d43.52!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x882b41a0b1c6b0e5%3A0x1234567890abcdef!2s3600A%20Laird%20Rd%2C%20Mississauga%2C%20ON%20L5L%200A3!5e0!3m2!1sen!2sca!4v1234567890"
+    # Google Maps embed URL - search for Astra Staging business
+    map_embed_url = "https://www.google.com/maps?q=Astra+Staging+Mississauga&output=embed"
 
     return Section(
         Div(
