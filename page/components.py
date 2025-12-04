@@ -2352,6 +2352,19 @@ def get_floating_elements_script():
         }
     }
 
+    // Track if a valid address was selected from autocomplete
+    let inquiryAddressSelected = false;
+
+    // Validate address: must be selected from autocomplete if not empty
+    function validateInquiryAddress(input) {
+        const value = input.value.trim();
+        if (value && !inquiryAddressSelected) {
+            input.classList.add('error');
+        } else {
+            input.classList.remove('error');
+        }
+    }
+
     // Initialize Google Places Autocomplete for inquiry form (Canada only)
     function initInquiryAutocomplete() {
         const addressInput = document.getElementById('inquiry-address');
@@ -2367,7 +2380,19 @@ def get_floating_elements_script():
             const place = autocomplete.getPlace();
             if (place.formatted_address) {
                 addressInput.value = place.formatted_address;
+                inquiryAddressSelected = true;
+                addressInput.classList.remove('error');
             }
+        });
+
+        // Reset addressSelected when user types
+        addressInput.addEventListener('input', function() {
+            inquiryAddressSelected = false;
+        });
+
+        // Validate on blur
+        addressInput.addEventListener('blur', function() {
+            validateInquiryAddress(this);
         });
     }
 

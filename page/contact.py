@@ -490,6 +490,19 @@ def contact_form_section():
                 }
             }
 
+            // Track if a valid address was selected from autocomplete
+            let addressSelected = false;
+
+            // Validate address: must be selected from autocomplete if not empty
+            function validateAddress(input) {
+                const value = input.value.trim();
+                if (value && !addressSelected) {
+                    input.classList.add('error');
+                } else {
+                    input.classList.remove('error');
+                }
+            }
+
             // Initialize Google Places Autocomplete for Canada only
             function initContactAutocomplete() {
                 const addressInput = document.getElementById('address');
@@ -505,7 +518,19 @@ def contact_form_section():
                     const place = autocomplete.getPlace();
                     if (place.formatted_address) {
                         addressInput.value = place.formatted_address;
+                        addressSelected = true;
+                        addressInput.classList.remove('error');
                     }
+                });
+
+                // Reset addressSelected when user types
+                addressInput.addEventListener('input', function() {
+                    addressSelected = false;
+                });
+
+                // Validate on blur
+                addressInput.addEventListener('blur', function() {
+                    validateAddress(this);
                 });
             }
 
