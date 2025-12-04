@@ -1,5 +1,10 @@
+import os
+from dotenv import load_dotenv
 from fasthtml.common import *
 from page.footer import comprehensive_footer, get_footer_styles
+
+load_dotenv()
+GOOGLE_PLACES_API_KEY = os.getenv('GOOGLE_PLACES_API_KEY', '')
 
 # Shared CSS styles for all pages
 def get_shared_styles():
@@ -2281,6 +2286,79 @@ def get_floating_elements_script():
         }
     }
 
+    // Format name: capitalize first letter of each word
+    function formatInquiryName(input) {
+        const value = input.value.trim().replace(/\\s+/g, ' ');
+        if (value) {
+            input.value = value.split(' ').map(word =>
+                word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+            ).join(' ');
+        }
+    }
+
+    // Format email: lowercase, no spaces
+    function formatInquiryEmail(input) {
+        const value = input.value.trim().toLowerCase().replace(/\\s+/g, '');
+        input.value = value;
+        const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+        if (value && !emailRegex.test(value)) {
+            input.setCustomValidity('Please enter a valid email address');
+        } else {
+            input.setCustomValidity('');
+        }
+    }
+
+    // Format phone: Canadian format
+    function formatInquiryPhone(input) {
+        let value = input.value.replace(/\\D/g, '');
+        if (value.startsWith('1') && value.length === 11) {
+            value = '1 (' + value.substring(1, 4) + ') ' + value.substring(4, 7) + '-' + value.substring(7);
+        } else if (value.length === 10) {
+            value = '(' + value.substring(0, 3) + ') ' + value.substring(3, 6) + '-' + value.substring(6);
+        } else if (value.length > 10 && !value.startsWith('1')) {
+            const originalValue = input.value.trim();
+            if (originalValue.startsWith('+')) {
+                value = '+' + value;
+            }
+        }
+        input.value = value;
+    }
+
+    // Initialize Google Places Autocomplete for inquiry form (Canada only)
+    function initInquiryAutocomplete() {
+        const addressInput = document.getElementById('inquiry-address');
+        if (!addressInput || typeof google === 'undefined') return;
+
+        const autocomplete = new google.maps.places.Autocomplete(addressInput, {
+            types: ['address'],
+            componentRestrictions: { country: 'ca' },
+            fields: ['formatted_address']
+        });
+
+        autocomplete.addListener('place_changed', function() {
+            const place = autocomplete.getPlace();
+            if (place.formatted_address) {
+                addressInput.value = place.formatted_address;
+            }
+        });
+    }
+
+    // Add event listeners for inquiry form formatting
+    document.addEventListener('DOMContentLoaded', function() {
+        const nameInput = document.getElementById('inquiry-name');
+        const emailInput = document.getElementById('inquiry-email');
+        const phoneInput = document.getElementById('inquiry-phone');
+
+        if (nameInput) nameInput.addEventListener('blur', function() { formatInquiryName(this); });
+        if (emailInput) emailInput.addEventListener('blur', function() { formatInquiryEmail(this); });
+        if (phoneInput) phoneInput.addEventListener('blur', function() { formatInquiryPhone(this); });
+
+        // Initialize autocomplete if Google Maps is available
+        if (typeof google !== 'undefined') {
+            initInquiryAutocomplete();
+        }
+    });
+
     // General inquiry modal functions
     function showGeneralInquiryForm() {
         const popup = document.getElementById('general-inquiry-popup');
@@ -2479,6 +2557,9 @@ def create_page(title, content, additional_styles="", additional_scripts="",
     # Combine all scripts
     all_scripts = get_shared_scripts() + get_floating_elements_script() + homepage_scroll_script + (str(additional_scripts) if additional_scripts else "")
 
+    # Google Maps Places script for address autocomplete
+    google_maps_script = f'https://maps.googleapis.com/maps/api/js?key={GOOGLE_PLACES_API_KEY}&libraries=places'
+
     return Html(
         Head(
             Title(title),
@@ -2489,6 +2570,7 @@ def create_page(title, content, additional_styles="", additional_scripts="",
             Link(href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500&family=Barlow+Condensed:wght@400;500;600;700&display=swap', rel='stylesheet'),
             Link(rel='icon', type='image/x-icon', href='/static/favicon.ico'),
             Style(get_shared_styles() + get_footer_styles() + additional_styles),
+            Script(src=google_maps_script, defer=True, **{"async": True}),
             NotStr(theme_init_script)
         ),
         Body(

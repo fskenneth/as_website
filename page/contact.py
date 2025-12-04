@@ -406,8 +406,8 @@ def contact_form_section():
                         cls="form-group"
                     ),
                     Div(
-                        Label("Subject", cls="form-label", for_="subject"),
-                        Input(type="text", id="subject", name="subject", placeholder="How can we help?", cls="form-input"),
+                        Label("Property Address", cls="form-label", for_="address"),
+                        Input(type="text", id="address", name="address", placeholder="Property address (optional)", cls="form-input"),
                         cls="form-group"
                     ),
                     Div(
@@ -426,6 +426,79 @@ def contact_form_section():
             cls="container"
         ),
         Script("""
+            // Format name: capitalize first letter of each word
+            function formatName(input) {
+                const value = input.value.trim().replace(/\\s+/g, ' ');
+                if (value) {
+                    input.value = value.split(' ').map(word =>
+                        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                    ).join(' ');
+                }
+            }
+
+            // Format email: lowercase, no spaces
+            function formatEmail(input) {
+                const value = input.value.trim().toLowerCase().replace(/\\s+/g, '');
+                input.value = value;
+                const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+                if (value && !emailRegex.test(value)) {
+                    input.setCustomValidity('Please enter a valid email address');
+                } else {
+                    input.setCustomValidity('');
+                }
+            }
+
+            // Format phone: Canadian format
+            function formatPhone(input) {
+                let value = input.value.replace(/\\D/g, '');
+                if (value.startsWith('1') && value.length === 11) {
+                    value = '1 (' + value.substring(1, 4) + ') ' + value.substring(4, 7) + '-' + value.substring(7);
+                } else if (value.length === 10) {
+                    value = '(' + value.substring(0, 3) + ') ' + value.substring(3, 6) + '-' + value.substring(6);
+                } else if (value.length > 10 && !value.startsWith('1')) {
+                    const originalValue = input.value.trim();
+                    if (originalValue.startsWith('+')) {
+                        value = '+' + value;
+                    }
+                }
+                input.value = value;
+            }
+
+            // Initialize Google Places Autocomplete for Canada only
+            function initContactAutocomplete() {
+                const addressInput = document.getElementById('address');
+                if (!addressInput || typeof google === 'undefined') return;
+
+                const autocomplete = new google.maps.places.Autocomplete(addressInput, {
+                    types: ['address'],
+                    componentRestrictions: { country: 'ca' },
+                    fields: ['formatted_address']
+                });
+
+                autocomplete.addListener('place_changed', function() {
+                    const place = autocomplete.getPlace();
+                    if (place.formatted_address) {
+                        addressInput.value = place.formatted_address;
+                    }
+                });
+            }
+
+            // Add event listeners for formatting
+            document.addEventListener('DOMContentLoaded', function() {
+                const nameInput = document.getElementById('name');
+                const emailInput = document.getElementById('email');
+                const phoneInput = document.getElementById('phone');
+
+                if (nameInput) nameInput.addEventListener('blur', function() { formatName(this); });
+                if (emailInput) emailInput.addEventListener('blur', function() { formatEmail(this); });
+                if (phoneInput) phoneInput.addEventListener('blur', function() { formatPhone(this); });
+
+                // Initialize autocomplete when Google Maps is loaded
+                if (typeof google !== 'undefined') {
+                    initContactAutocomplete();
+                }
+            });
+
             async function submitContactForm(event) {
                 event.preventDefault();
 
@@ -442,10 +515,8 @@ def contact_form_section():
                 // Collect form data
                 const formData = new FormData(form);
                 const data = Object.fromEntries(formData.entries());
-                // Default subject to "Contact Us" if not provided
-                if (!data.subject || data.subject.trim() === '') {
-                    data.subject = 'Contact Us';
-                }
+                // Build subject: "Contact Us" + property address if provided
+                data.subject = 'Contact Us' + (data.address && data.address.trim() ? ' - ' + data.address.trim() : '');
 
                 try {
                     const response = await fetch('/api/contact', {
