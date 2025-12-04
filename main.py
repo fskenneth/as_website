@@ -3,6 +3,7 @@ from page.components import create_page
 from starlette.staticfiles import StaticFiles
 from starlette.responses import Response
 from tools.instagram import get_cached_posts
+from tools.google_reviews import fetch_google_reviews
 import httpx
 import base64
 import hashlib
@@ -105,7 +106,7 @@ def hero_section():
             cls="hero-content"
         ),
         cls="hero-section",
-        style="--hero-bg-image: url('/static/images/banner 20240201-1200x800-1.jpg');"
+        style="--hero-bg-image: url('/static/images/banner_hero.jpg');"
     )
 
 
@@ -258,6 +259,178 @@ def why_astra_section():
     )
 
 
+def reviews_section():
+    """Google Reviews section"""
+    reviews_data = fetch_google_reviews()
+    GOOGLE_REVIEWS_URL = "https://www.google.com/maps/place/Astra+Staging/@43.5196939,-79.7069249,17z"
+
+    # Create star rating display
+    def create_stars(count=5):
+        return Span(*["⭐" for _ in range(count)], cls="stars")
+
+    # Function to truncate text and add read more
+    def create_review_text(text, review_id, max_chars=150):
+        if len(text) <= max_chars:
+            return P(text, cls="review-text", id=f"review-text-{review_id}", data_full_text=text)
+
+        truncated = text[:max_chars].rsplit(' ', 1)[0] + '...'
+        return P(truncated, cls="review-text truncated", id=f"review-text-{review_id}", data_full_text=text)
+
+    # Sort reviews by recency
+    time_order = {
+        '1 week ago': 1,
+        '2 weeks ago': 2,
+        '3 weeks ago': 3,
+        '1 month ago': 4,
+        'a month ago': 4,
+        '2 months ago': 5,
+        '3 months ago': 6,
+        '4 months ago': 7,
+        '5 months ago': 8,
+        '6 months ago': 9
+    }
+
+    # Filter 5-star reviews and sort by recency
+    five_star_reviews = [r for r in reviews_data["reviews"] if r.get("rating", 0) == 5]
+    sorted_five_star_reviews = sorted(five_star_reviews,
+                                      key=lambda r: time_order.get(r.get('time', ''), 99))
+
+    # Get the 12 most recent 5-star reviews
+    recent_five_star_reviews = sorted_five_star_reviews[:12]
+
+    # Create the initial display - first 6 for desktop
+    initial_desktop_reviews = recent_five_star_reviews[:6]
+    additional_desktop_reviews = recent_five_star_reviews[6:12]
+
+    return Section(
+        Div(
+            Div(
+                H2("Our Clients Love Us", cls="section-title"),
+                Div(
+                    Div(
+                        Img(src="/static/images/logo_google.png", alt="Google", cls="google-logo-rating"),
+                        Span(f"{reviews_data['rating']} ", cls="rating-number"),
+                        create_stars(5),
+                        cls="rating-display"
+                    ),
+                    Div(
+                        Span("We Received "),
+                        Span(f"{reviews_data['total_reviews']}", style="font-weight: 700;"),
+                        Span(" Google Reviews"),
+                        cls="total-reviews section-subtitle"
+                    ),
+                    cls="reviews-header"
+                ),
+                Div(
+                    Div(
+                        # First 6 reviews (all visible on desktop, only first 4 on mobile/tablet)
+                        *[
+                            Div(
+                                Div(
+                                    Div(
+                                        Span(review["author_name"], cls="reviewer-name"),
+                                        create_stars(review["rating"]),
+                                        cls="review-header"
+                                    ),
+                                    create_review_text(review["text"], f"review-{idx}"),
+                                    Div(
+                                        Span(review["time"], cls="review-time"),
+                                        Span("Read more", cls="read-more-btn", onclick=f"expandReview('review-{idx}')", tabindex="0") if len(review["text"]) > 150 else None,
+                                        cls="review-footer"
+                                    ),
+                                    cls="review-content"
+                                ),
+                                cls=f"review-card{' mobile-tablet-hidden' if idx >= 4 else ''}"
+                            )
+                            for idx, review in enumerate(initial_desktop_reviews)
+                        ],
+                        # Reviews 7-12 (hidden by default on all devices)
+                        *[
+                            Div(
+                                Div(
+                                    Div(
+                                        Span(review["author_name"], cls="reviewer-name"),
+                                        create_stars(review["rating"]),
+                                        cls="review-header"
+                                    ),
+                                    create_review_text(review["text"], f"review-{idx+6}"),
+                                    Div(
+                                        Span(review["time"], cls="review-time"),
+                                        Span("Read more", cls="read-more-btn", onclick=f"expandReview('review-{idx+6}')", tabindex="0") if len(review["text"]) > 150 else None,
+                                        cls="review-footer"
+                                    ),
+                                    cls="review-content"
+                                ),
+                                cls="review-card additional-review mobile-tablet-hidden desktop-hidden"
+                            )
+                            for idx, review in enumerate(additional_desktop_reviews)
+                        ],
+                        cls="reviews-row"
+                    ),
+                    cls="reviews-grid",
+                    id="reviews-grid"
+                ),
+                Div(
+                    A("More Reviews", href=GOOGLE_REVIEWS_URL, target="_blank", cls="more-reviews-btn"),
+                    cls="more-reviews-wrapper"
+                ),
+                cls="section-container"
+            ),
+            cls="container"
+        ),
+        Script("""
+            function expandReview(reviewId) {
+                const textElement = document.getElementById('review-text-' + reviewId);
+                const btnElement = document.querySelector(`[onclick="expandReview('${reviewId}')"]`);
+                const fullText = textElement.getAttribute('data-full-text');
+
+                if (textElement.classList.contains('truncated')) {
+                    textElement.textContent = fullText;
+                    textElement.classList.remove('truncated');
+                    btnElement.textContent = 'Read less';
+                } else {
+                    const truncatedText = fullText.substring(0, 150).lastIndexOf(' ');
+                    textElement.textContent = fullText.substring(0, truncatedText) + '...';
+                    textElement.classList.add('truncated');
+                    btnElement.textContent = 'Read more';
+                }
+            }
+
+            function toggleMoreReviews() {
+                const moreBtn = document.querySelector('.more-reviews-btn');
+                const isExpanded = moreBtn.textContent === 'Less Reviews';
+
+                const isMobileTablet = window.matchMedia('(max-width: 1023px)').matches;
+                const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+
+                if (isMobileTablet) {
+                    const mobileHiddenReviews = document.querySelectorAll('.mobile-tablet-hidden');
+                    mobileHiddenReviews.forEach(review => {
+                        if (isExpanded) {
+                            review.classList.remove('show-mobile');
+                        } else {
+                            review.classList.add('show-mobile');
+                        }
+                    });
+                } else if (isDesktop) {
+                    const additionalReviews = document.querySelectorAll('.additional-review');
+                    additionalReviews.forEach(review => {
+                        if (isExpanded) {
+                            review.classList.add('desktop-hidden');
+                        } else {
+                            review.classList.remove('desktop-hidden');
+                        }
+                    });
+                }
+
+                moreBtn.textContent = isExpanded ? 'More Reviews' : 'Less Reviews';
+            }
+        """),
+        cls="reviews-section",
+        id="reviews"
+    )
+
+
 def instagram_section():
     """Instagram feed section showing latest posts"""
     INSTAGRAM_USERNAME = "astra_home_staging_gta"
@@ -361,6 +534,7 @@ def home():
         why_astra_section(),
         pricing_section(),
         instagram_section(),
+        reviews_section(),
         cls="home-content"
     )
     return create_page("Astra Staging", content, is_homepage=True)

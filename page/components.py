@@ -708,6 +708,225 @@ def get_shared_styles():
         }
     }
 
+    /* Google Reviews Section */
+    .reviews-section {
+        padding: 60px 40px;
+        background: var(--bg-primary);
+    }
+    .reviews-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    .rating-display {
+        font-size: 20px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+    }
+    .stars {
+        letter-spacing: 2px;
+        font-size: 16px;
+    }
+    .rating-number {
+        font-weight: 700;
+        color: var(--color-primary);
+        font-size: 24px;
+        border: 2px solid var(--color-primary);
+        border-radius: 8px;
+        padding: 4px 12px;
+        background: var(--bg-primary);
+    }
+    .google-logo-rating {
+        height: 32px;
+        width: auto;
+        object-fit: contain;
+    }
+    .total-reviews {
+        font-size: 18px;
+        color: var(--color-secondary);
+    }
+    .reviews-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+    }
+    .reviews-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 30px;
+        align-items: stretch;
+    }
+    .reviews-row .review-card {
+        flex: 1 1 calc(33.333% - 20px);
+        max-width: calc(33.333% - 20px);
+    }
+    .review-card {
+        background: var(--bg-secondary);
+        padding: 30px;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        transition: all 0.3s ease;
+        height: 100%;
+        min-height: 280px;
+        display: flex;
+        align-items: stretch;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    [data-theme="dark"] .review-card {
+        box-shadow: 0 2px 8px rgba(255, 255, 255, 0.05);
+    }
+    .review-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+    [data-theme="dark"] .review-card:hover {
+        box-shadow: 0 10px 30px rgba(255, 255, 255, 0.05);
+    }
+    .review-content {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        padding: 4px;
+    }
+    .review-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .reviewer-name {
+        font-weight: 600;
+        font-size: 18px;
+        color: var(--color-primary);
+    }
+    .review-header .stars {
+        font-size: 14px;
+        letter-spacing: 2px;
+    }
+    .review-text {
+        color: var(--color-secondary);
+        line-height: 1.7;
+        margin-bottom: 15px;
+        font-size: 15px;
+        flex-grow: 1;
+    }
+    .review-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: auto;
+        gap: 10px;
+    }
+    .read-more-btn {
+        color: var(--color-accent);
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        transition: opacity 0.2s ease;
+    }
+    .read-more-btn:hover {
+        opacity: 0.7;
+    }
+    .review-time {
+        font-size: 14px;
+        color: var(--color-accent);
+        opacity: 0.7;
+    }
+    .more-reviews-wrapper {
+        display: block;
+        text-align: right;
+        margin-top: 20px;
+    }
+    .more-reviews-btn {
+        color: var(--color-accent);
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 600;
+        transition: opacity 0.2s ease;
+        text-decoration: underline;
+    }
+    .more-reviews-btn:hover {
+        opacity: 0.7;
+    }
+    .mobile-tablet-hidden {
+        display: flex;
+    }
+    .desktop-hidden {
+        display: none;
+    }
+    .additional-review.desktop-hidden {
+        display: none;
+    }
+
+    /* Reviews Mobile */
+    @media (max-width: 767px) {
+        .reviews-section {
+            padding: 40px 20px;
+        }
+        .rating-display {
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        .stars {
+            font-size: 14px;
+        }
+        .rating-number {
+            font-size: 18px;
+            padding: 2px 8px;
+        }
+        .google-logo-rating {
+            height: 24px;
+        }
+        .total-reviews {
+            font-size: 16px;
+        }
+        .reviews-grid {
+            gap: 15px;
+        }
+        .reviews-row {
+            gap: 15px;
+        }
+        .reviews-row .review-card {
+            flex: 1 1 100%;
+            max-width: 100%;
+        }
+        .review-card {
+            padding: 20px;
+            min-height: auto;
+        }
+        .review-header {
+            margin-bottom: 10px;
+        }
+        .reviewer-name {
+            font-size: 16px;
+        }
+        .review-header .stars {
+            font-size: 12px;
+        }
+        .review-text {
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 10px;
+        }
+        .read-more-btn,
+        .review-time {
+            font-size: 12px;
+        }
+        .more-reviews-btn {
+            font-size: 14px;
+        }
+        .mobile-tablet-hidden {
+            display: none !important;
+        }
+        .mobile-tablet-hidden.show-mobile {
+            display: flex !important;
+        }
+    }
+
     /* Back to Top Button - Glass Morphism Style */
     .back-to-top {
         position: fixed;
@@ -1728,8 +1947,8 @@ def navigation():
     return Nav(
         Div(
             A(
-                Img(src="/static/images/as_logo.png", alt="Astra Staging", cls="logo-light", style="height: 60px; width: auto;"),
-                Img(src="/static/images/as_logo.png", alt="Astra Staging", cls="logo-dark", style="height: 60px; width: auto; display: none;"),
+                Img(src="/static/images/logo_astra.png", alt="Astra Staging", cls="logo-light", style="height: 60px; width: auto;"),
+                Img(src="/static/images/logo_astra.png", alt="Astra Staging", cls="logo-dark", style="height: 60px; width: auto; display: none;"),
                 Span(
                     Span("ASTRA", cls="logo-text-line"),
                     Span("STAGING", cls="logo-text-line"),
