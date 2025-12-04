@@ -525,6 +525,64 @@ def instagram_section():
     return Section(content, cls="instagram-section")
 
 
+def awards_section():
+    """Consumer Choice Award section"""
+    return Section(
+        Div(
+            H2("Accreditation", cls="section-title"),
+            P(
+                "Astra Staging is honoured to have received the Consumers' Choice Award (CCA) for Home Staging in the Greater Toronto Area.",
+                cls="awards-text"
+            ),
+            Div(
+                Img(src="/static/images/logo_cca_2024.png", alt="Consumer Choice Award 2024", cls="award-badge"),
+                Img(src="/static/images/logo_cca_2025.png", alt="Consumer Choice Award 2025", cls="award-badge"),
+                cls="awards-badges"
+            ),
+            cls="container"
+        ),
+        cls="awards-section"
+    )
+
+
+def trusted_by_section():
+    """Trusted By real estate companies section"""
+    logos = [
+        ("logo_remax.jpg", "RE/MAX"),
+        ("logo_homelife.jpg", "HomeLife"),
+        ("logo_sutton.jpg", "Sutton"),
+        ("logo_keller_williams.jpg", "Keller Williams"),
+        ("logo_royal_lepage.png", "Royal LePage"),
+        ("logo_sothebys.png", "Sotheby's International Realty"),
+        ("logo_century21.png", "Century 21"),
+        ("logo_right_at_home.png", "Right at Home Realty"),
+        ("logo_exp.jpg", "eXp Realty"),
+        ("logo_cityscape.png", "Cityscape Real Estate"),
+        ("logo_kingsway.png", "Kingsway Real Estate"),
+        ("logo_forest_hill.png", "Forest Hill Real Estate"),
+    ]
+
+    logo_items = [
+        Div(
+            Img(src=f"/static/images/{filename}", alt=name, cls="partner-logo"),
+            cls="logo-item"
+        )
+        for filename, name in logos
+    ]
+
+    return Section(
+        Div(
+            H2("Trusted By", cls="section-title"),
+            Div(
+                *logo_items,
+                cls="logos-grid"
+            ),
+            cls="container"
+        ),
+        cls="trusted-by-section"
+    )
+
+
 @rt('/')
 def home():
     """Home page with hero banner"""
@@ -535,6 +593,8 @@ def home():
         pricing_section(),
         instagram_section(),
         reviews_section(),
+        awards_section(),
+        trusted_by_section(),
         cls="home-content"
     )
     return create_page("Astra Staging", content, is_homepage=True)

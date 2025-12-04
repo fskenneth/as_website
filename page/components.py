@@ -927,6 +927,124 @@ def get_shared_styles():
         }
     }
 
+    /* Awards Section */
+    .awards-section {
+        padding: 60px 20px;
+        background: var(--bg-primary);
+        text-align: center;
+    }
+    .awards-text {
+        font-size: 1.25rem;
+        line-height: 1.6;
+        color: var(--text-primary);
+        max-width: 800px;
+        margin: 0 auto 40px;
+        font-weight: 500;
+    }
+    .awards-badges {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 40px;
+        flex-wrap: wrap;
+    }
+    .award-badge {
+        max-width: 200px;
+        height: auto;
+        transition: transform 0.3s ease;
+    }
+    .award-badge:hover {
+        transform: scale(1.05);
+    }
+    @media (max-width: 768px) {
+        .awards-section {
+            padding: 40px 15px;
+        }
+        .awards-text {
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+        }
+        .award-badge {
+            max-width: 150px;
+        }
+        .awards-badges {
+            gap: 20px;
+        }
+    }
+
+    /* Trusted By Section */
+    .trusted-by-section {
+        padding: 60px 20px;
+        background: var(--bg-secondary);
+    }
+    .trusted-by-section .section-title {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+    .logos-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 30px;
+        max-width: 1000px;
+        margin: 0 auto;
+        align-items: center;
+        justify-items: center;
+    }
+    .logo-item {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px;
+        background: var(--bg-primary);
+        border-radius: 12px;
+        transition: all 0.3s ease;
+        width: 100%;
+        height: 160px;
+    }
+    .logo-item:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+    }
+    .partner-logo {
+        max-width: 100%;
+        max-height: 140px;
+        object-fit: contain;
+        filter: grayscale(0%);
+        transition: filter 0.3s ease;
+    }
+    @media (max-width: 992px) {
+        .logos-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+    @media (max-width: 768px) {
+        .trusted-by-section {
+            padding: 40px 15px;
+        }
+        .logos-grid {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        .logo-item {
+            height: 120px;
+            padding: 8px;
+        }
+        .partner-logo {
+            max-height: 90px;
+        }
+    }
+    @media (max-width: 480px) {
+        .logos-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .logo-item {
+            height: 110px;
+        }
+        .partner-logo {
+            max-height: 80px;
+        }
+    }
+
     /* Back to Top Button - Glass Morphism Style */
     .back-to-top {
         position: fixed;
