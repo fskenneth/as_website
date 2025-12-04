@@ -52,6 +52,77 @@ def welcome_section():
     )
 
 
+def pricing_section():
+    """Pricing section with three package cards"""
+    return Section(
+        Div(
+            H2("Pricing", cls="pricing-title"),
+            Div(
+                # Starter Package
+                Div(
+                    H3("Starter Package", cls="pricing-card-title"),
+                    P("Accessories+Accent Furniture", cls="pricing-card-subtitle"),
+                    P("Staging Cost:", cls="pricing-card-cost"),
+                    P("$1,200-$3,500", cls="pricing-card-price"),
+                    Ul(
+                        Li("Wall Arts"),
+                        Li("Area Rugs"),
+                        Li("Lamps/Decors"),
+                        Li("Beddings/Cushions"),
+                        Li("Accent Chairs"),
+                        Li("End Tables"),
+                        Li("Console Tables"),
+                        cls="pricing-card-list"
+                    ),
+                    cls="pricing-card"
+                ),
+                # Complete Package
+                Div(
+                    H3("Complete Package", cls="pricing-card-title"),
+                    P("Accessories+Large Furniture", cls="pricing-card-subtitle"),
+                    P("Staging Cost:", cls="pricing-card-cost"),
+                    P("$1,600-$5,200", cls="pricing-card-price"),
+                    Ul(
+                        Li("Accessories"),
+                        Li("Accent Furniture"),
+                        Li("Working Desk"),
+                        Li("Sofa/Loveseat/Sectional"),
+                        Li("Dining Table Set"),
+                        Li("Beds/Night Tables"),
+                        cls="pricing-card-list"
+                    ),
+                    cls="pricing-card"
+                ),
+                # Add-On Service
+                Div(
+                    H3("Add-On Service", cls="pricing-card-title"),
+                    Div(
+                        P("Furniture Moving Service", cls="pricing-service-title"),
+                        Ul(
+                            Li("$150/hr (2 movers) for relocation to garage, basement, or off-site storage"),
+                            cls="pricing-card-list"
+                        ),
+                        cls="pricing-service-group"
+                    ),
+                    Div(
+                        P("Professional Photography Service (up to 2500 sqft with basement)", cls="pricing-service-title"),
+                        Ul(
+                            Li("$189 for photos and slideshow"),
+                            Li("$259 for photos, slideshow, and 3D virtual tour"),
+                            cls="pricing-card-list"
+                        ),
+                        cls="pricing-service-group"
+                    ),
+                    cls="pricing-card"
+                ),
+                cls="pricing-cards"
+            ),
+            cls="container"
+        ),
+        cls="pricing-section"
+    )
+
+
 def why_astra_section():
     """Why choose Astra Staging section with three feature cards"""
     return Section(
@@ -122,6 +193,7 @@ def home():
         hero_section(),
         welcome_section(),
         why_astra_section(),
+        pricing_section(),
         cls="home-content"
     )
     return create_page("Astra Staging", content)

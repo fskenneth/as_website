@@ -468,6 +468,117 @@ def get_shared_styles():
         }
     }
 
+    /* Pricing Section */
+    .pricing-section {
+        padding: 60px 40px;
+        background: var(--bg-primary);
+    }
+    .pricing-title {
+        font-family: 'Inter', sans-serif;
+        font-size: clamp(24px, 4vw, 36px);
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 50px;
+        color: var(--color-primary);
+    }
+    .pricing-cards {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        gap: 30px;
+        max-width: 960px;
+        margin: 0 auto;
+    }
+    .pricing-card {
+        flex: 1;
+        max-width: 300px;
+        background: var(--bg-primary);
+        border: 2px solid var(--border-color);
+        border-radius: 12px;
+        padding: 30px 25px;
+        transition: all 0.3s ease;
+    }
+    .pricing-card:hover {
+        border-color: var(--border-hover);
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+    [data-theme="dark"] .pricing-card:hover {
+        box-shadow: 0 10px 30px rgba(255, 255, 255, 0.05);
+    }
+    .pricing-card-title {
+        font-family: 'Inter', sans-serif;
+        font-size: 22px;
+        font-weight: 700;
+        color: #e75480;
+        margin-bottom: 15px;
+    }
+    .pricing-card-subtitle {
+        font-family: 'Inter', sans-serif;
+        font-size: 16px;
+        color: var(--color-secondary);
+        margin-bottom: 20px;
+    }
+    .pricing-card-cost {
+        font-family: 'Inter', sans-serif;
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--color-primary);
+        margin-bottom: 5px;
+    }
+    .pricing-card-price {
+        font-family: 'Inter', sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--color-primary);
+        margin-bottom: 15px;
+    }
+    .pricing-card-list {
+        list-style: disc;
+        padding-left: 20px;
+        margin: 0;
+    }
+    .pricing-card-list li {
+        font-family: 'Inter', sans-serif;
+        font-size: 15px;
+        color: var(--color-secondary);
+        margin-bottom: 8px;
+        line-height: 1.5;
+    }
+    .pricing-service-group {
+        margin-bottom: 20px;
+    }
+    .pricing-service-group:last-child {
+        margin-bottom: 0;
+    }
+    .pricing-service-title {
+        font-family: 'Inter', sans-serif;
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--color-primary);
+        margin-bottom: 10px;
+    }
+
+    /* Mobile: vertical layout */
+    @media (max-width: 767px) {
+        .pricing-section {
+            padding: 40px 20px;
+        }
+        .pricing-title {
+            font-size: 24px;
+            margin-bottom: 30px;
+        }
+        .pricing-cards {
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .pricing-card {
+            max-width: 100%;
+            width: 100%;
+        }
+    }
+
     /* Hero Section */
     .hero-section {
         display: flex;
