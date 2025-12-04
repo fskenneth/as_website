@@ -337,6 +337,7 @@ def get_shared_styles():
         margin: 0 auto;
     }
     .section-title {
+        font-family: 'Inter', sans-serif;
         font-size: clamp(24px, 4vw, 36px);
         font-weight: 700;
         margin-bottom: 30px;
@@ -361,6 +362,107 @@ def get_shared_styles():
             padding: 40px 20px;
         }
         .welcome-text {
+            font-size: 16px;
+            line-height: 1.7;
+        }
+    }
+
+    /* Why Astra Section */
+    .why-astra-section {
+        padding: 60px 40px;
+        background: var(--bg-secondary);
+    }
+    .why-astra-title {
+        font-family: 'Inter', sans-serif;
+        font-size: clamp(24px, 4vw, 36px);
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 50px;
+        color: var(--color-primary);
+        line-height: 1.3;
+    }
+    .why-astra-title-line {
+        display: block;
+    }
+    .why-astra-features {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        gap: 60px;
+        max-width: 960px;
+        margin: 0 auto;
+    }
+    .feature-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        flex: 1;
+        max-width: 280px;
+    }
+    .feature-icon {
+        width: 80px;
+        height: 80px;
+        margin-bottom: 20px;
+        font-size: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .feature-title {
+        font-family: 'Inter', sans-serif;
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: var(--color-primary);
+    }
+    .feature-description {
+        font-family: 'Inter', sans-serif;
+        font-size: 18px;
+        line-height: 1.8;
+        color: var(--color-secondary);
+    }
+    .feature-description p {
+        margin: 4px 0;
+    }
+
+    /* Mobile: vertical layout */
+    @media (max-width: 767px) {
+        .why-astra-section {
+            padding: 40px 20px;
+        }
+        .why-astra-title {
+            font-size: 24px;
+            margin-bottom: 40px;
+        }
+        .why-astra-features {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 30px;
+            padding-left: 20px;
+        }
+        .feature-card {
+            flex-direction: row;
+            align-items: flex-start;
+            text-align: left;
+            max-width: 100%;
+            gap: 20px;
+        }
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            flex-shrink: 0;
+            margin-bottom: 0;
+            font-size: 45px;
+        }
+        .feature-content {
+            flex: 1;
+        }
+        .feature-title {
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+        .feature-description {
             font-size: 16px;
             line-height: 1.7;
         }

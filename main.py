@@ -52,12 +52,76 @@ def welcome_section():
     )
 
 
+def why_astra_section():
+    """Why choose Astra Staging section with three feature cards"""
+    return Section(
+        Div(
+            H2(
+                Span("When Use Astra Staging", cls="why-astra-title-line"),
+                Span("Home Sells Faster with Higher Price", cls="why-astra-title-line"),
+                cls="why-astra-title"
+            ),
+            Div(
+                # Reasonable Pricing card
+                Div(
+                    Div("💰", cls="feature-icon"),
+                    Div(
+                        H3("Reasonable Pricing", cls="feature-title"),
+                        Div(
+                            P("Free consultation (GTA)"),
+                            P("Occupied property from $800"),
+                            P("Vacant property from $1600"),
+                            cls="feature-description"
+                        ),
+                        cls="feature-content"
+                    ),
+                    cls="feature-card"
+                ),
+                # Responsive and Fast card
+                Div(
+                    Div("⚡", cls="feature-icon"),
+                    Div(
+                        H3("Responsive and Fast", cls="feature-title"),
+                        Div(
+                            P("Quote within hours"),
+                            P("Stage in 2-5 Days"),
+                            P("Complete in 1 day"),
+                            cls="feature-description"
+                        ),
+                        cls="feature-content"
+                    ),
+                    cls="feature-card"
+                ),
+                # Preview Chosen Furniture card
+                Div(
+                    Div("🖼️", cls="feature-icon"),
+                    Div(
+                        H3("Preview Chosen Furniture", cls="feature-title"),
+                        Div(
+                            P("Visualize before staging"),
+                            P("Delivery exact as promised"),
+                            P("Flexible with changing"),
+                            cls="feature-description"
+                        ),
+                        cls="feature-content"
+                    ),
+                    cls="feature-card"
+                ),
+                cls="why-astra-features"
+            ),
+            cls="container"
+        ),
+        cls="why-astra-section"
+    )
+
+
 @rt('/')
 def home():
     """Home page with hero banner"""
     content = Div(
         hero_section(),
         welcome_section(),
+        why_astra_section(),
         cls="home-content"
     )
     return create_page("Astra Staging", content)
