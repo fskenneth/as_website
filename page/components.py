@@ -1,4 +1,5 @@
 from fasthtml.common import *
+from page.footer import comprehensive_footer, get_footer_styles
 
 # Shared CSS styles for all pages
 def get_shared_styles():
@@ -728,6 +729,7 @@ def get_shared_styles():
     .stars {
         letter-spacing: 2px;
         font-size: 16px;
+        color: #FFD700;
     }
     .rating-number {
         font-weight: 700;
@@ -930,7 +932,7 @@ def get_shared_styles():
     /* Awards Section */
     .awards-section {
         padding: 60px 20px;
-        background: var(--bg-primary);
+        background: var(--bg-secondary);
         text-align: center;
     }
     .awards-text {
@@ -975,7 +977,7 @@ def get_shared_styles():
     /* Trusted By Section */
     .trusted-by-section {
         padding: 60px 20px;
-        background: var(--bg-secondary);
+        background: var(--bg-primary);
     }
     .trusted-by-section .section-title {
         text-align: center;
@@ -2395,13 +2397,13 @@ def create_page(title, content, additional_styles="", additional_scripts="",
             Meta(name='keywords', content=keywords),
             Link(href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500&family=Barlow+Condensed:wght@400;500;600;700&display=swap', rel='stylesheet'),
             Link(rel='icon', type='image/x-icon', href='/static/favicon.ico'),
-            Style(get_shared_styles() + additional_styles),
+            Style(get_shared_styles() + get_footer_styles() + additional_styles),
             NotStr(theme_init_script)
         ),
         Body(
             navigation(),
             Main(content),
-            footer(),
+            comprehensive_footer(),
             # Floating elements - always present on all pages
             back_to_top_button(),
             whatsapp_button(),
