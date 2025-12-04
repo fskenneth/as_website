@@ -552,6 +552,112 @@ def awards_section():
     )
 
 
+def about_hero_section():
+    """About page hero section"""
+    return Section(
+        Div(
+            H1("About Astra Staging", cls="about-hero-title"),
+            P(
+                "We're more than just a home staging service – we're your partner in transforming your home and making it truly shine.",
+                cls="about-hero-subtitle"
+            ),
+            cls="container"
+        ),
+        cls="about-hero-section"
+    )
+
+
+def our_story_section():
+    """Our Story section for About page"""
+    return Section(
+        Div(
+            H2("Our Story", cls="section-title"),
+            P(
+                "Astra Staging was established to address the scheduling challenges homeowners face when preparing their properties for sale. We understand the demands of busy lives – juggling work, family, and countless responsibilities while trying to sell your home.",
+                cls="story-text"
+            ),
+            P(
+                "That's why we created Astra Staging: to simplify the home staging process and take the stress out of preparing your property for the market. Our team is dedicated to providing professional, efficient service that fits seamlessly into your schedule.",
+                cls="story-text"
+            ),
+            cls="container"
+        ),
+        cls="our-story-section"
+    )
+
+
+def our_commitment_section():
+    """Our Commitment section for About page"""
+    return Section(
+        Div(
+            H2("Our Commitment", cls="section-title"),
+            P(
+                "From the moment you connect with us, you become the hero of your home-selling journey. Our dedicated team guides you through every step of the staging process, ensuring a smooth and stress-free experience.",
+                cls="commitment-text"
+            ),
+            P(
+                "We pride ourselves on quick responses, transparent communication, and outstanding results. Your success is our success, and we're committed to helping you achieve the best possible outcome when selling your home.",
+                cls="commitment-text"
+            ),
+            cls="container"
+        ),
+        cls="our-commitment-section"
+    )
+
+
+def why_choose_section():
+    """Why Choose Astra Staging section for About page"""
+    return Section(
+        Div(
+            H2("Why Choose Astra Staging", cls="section-title"),
+            Div(
+                # Affordability card
+                Div(
+                    Div("💰", cls="choose-icon"),
+                    Div(
+                        H3("Affordability", cls="choose-title"),
+                        P(
+                            "Free consultations with budget-friendly rates and a transparent pricing structure. No hidden fees – what you see is what you get.",
+                            cls="choose-description"
+                        ),
+                        cls="choose-content"
+                    ),
+                    cls="choose-card"
+                ),
+                # Reliability card
+                Div(
+                    Div("⭐", cls="choose-icon"),
+                    Div(
+                        H3("Reliability", cls="choose-title"),
+                        P(
+                            "Professional, creative designs backed by 5-star Google reviews. Our outstanding reputation speaks to our commitment to excellence.",
+                            cls="choose-description"
+                        ),
+                        cls="choose-content"
+                    ),
+                    cls="choose-card"
+                ),
+                # Speed card
+                Div(
+                    Div("⚡", cls="choose-icon"),
+                    Div(
+                        H3("Speed", cls="choose-title"),
+                        P(
+                            "Quick inquiry responses, 24-hour call returns, and prompt customer service. We accommodate tight timelines to meet your needs.",
+                            cls="choose-description"
+                        ),
+                        cls="choose-content"
+                    ),
+                    cls="choose-card"
+                ),
+                cls="choose-cards"
+            ),
+            cls="container"
+        ),
+        cls="why-choose-section"
+    )
+
+
 def trusted_by_section():
     """Trusted By real estate companies section"""
     logos = [
@@ -636,6 +742,200 @@ def staging_pricing():
         additional_scripts=additional_scripts,
         description="Professional home staging pricing packages. Starter package from $1,200, Complete package from $1,600. Free consultation in GTA.",
         keywords="home staging pricing, staging cost, staging packages, home staging rates, GTA staging prices"
+    )
+
+
+def get_about_page_styles():
+    """CSS styles specific to the about page"""
+    return """
+    /* About Hero Section */
+    .about-hero-section {
+        padding: 80px 40px 60px;
+        background: var(--bg-secondary);
+        text-align: center;
+    }
+    .about-hero-title {
+        font-family: 'Inter', sans-serif;
+        font-size: clamp(32px, 5vw, 48px);
+        font-weight: 700;
+        color: var(--color-primary);
+        margin-bottom: 20px;
+    }
+    .about-hero-subtitle {
+        font-size: 20px;
+        line-height: 1.6;
+        color: var(--color-secondary);
+        max-width: 700px;
+        margin: 0 auto;
+    }
+    @media (max-width: 767px) {
+        .about-hero-section {
+            padding: 60px 20px 40px;
+        }
+        .about-hero-subtitle {
+            font-size: 18px;
+        }
+    }
+
+    /* Our Story Section */
+    .our-story-section {
+        padding: 60px 40px;
+        background: var(--bg-primary);
+    }
+    .story-text {
+        font-size: 18px;
+        line-height: 1.8;
+        color: var(--color-secondary);
+        max-width: 800px;
+        margin: 0 auto 20px;
+        text-align: justify;
+    }
+    .story-text:last-child {
+        margin-bottom: 0;
+    }
+    @media (max-width: 767px) {
+        .our-story-section {
+            padding: 40px 20px;
+        }
+        .story-text {
+            font-size: 16px;
+            line-height: 1.7;
+        }
+    }
+
+    /* Our Commitment Section */
+    .our-commitment-section {
+        padding: 60px 40px;
+        background: var(--bg-secondary);
+    }
+    .commitment-text {
+        font-size: 18px;
+        line-height: 1.8;
+        color: var(--color-secondary);
+        max-width: 800px;
+        margin: 0 auto 20px;
+        text-align: justify;
+    }
+    .commitment-text:last-child {
+        margin-bottom: 0;
+    }
+    @media (max-width: 767px) {
+        .our-commitment-section {
+            padding: 40px 20px;
+        }
+        .commitment-text {
+            font-size: 16px;
+            line-height: 1.7;
+        }
+    }
+
+    /* Why Choose Section */
+    .why-choose-section {
+        padding: 60px 40px;
+        background: var(--bg-primary);
+    }
+    .choose-cards {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        gap: 40px;
+        max-width: 960px;
+        margin: 0 auto;
+    }
+    .choose-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        flex: 1;
+        max-width: 280px;
+        padding: 30px 20px;
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        transition: all 0.3s ease;
+    }
+    .choose-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+    [data-theme="dark"] .choose-card:hover {
+        box-shadow: 0 10px 30px rgba(255, 255, 255, 0.05);
+    }
+    .choose-icon {
+        width: 70px;
+        height: 70px;
+        margin-bottom: 20px;
+        font-size: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .choose-title {
+        font-family: 'Inter', sans-serif;
+        font-size: 22px;
+        font-weight: 600;
+        margin-bottom: 15px;
+        color: var(--color-primary);
+    }
+    .choose-description {
+        font-size: 16px;
+        line-height: 1.6;
+        color: var(--color-secondary);
+    }
+    @media (max-width: 767px) {
+        .why-choose-section {
+            padding: 40px 20px;
+        }
+        .choose-cards {
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .choose-card {
+            max-width: 100%;
+            width: 100%;
+            padding: 25px 20px;
+        }
+        .choose-icon {
+            width: 60px;
+            height: 60px;
+            font-size: 40px;
+        }
+        .choose-title {
+            font-size: 20px;
+        }
+        .choose-description {
+            font-size: 15px;
+        }
+    }
+
+    /* Override awards section background for about page */
+    .about-content .awards-section {
+        background: var(--bg-secondary);
+    }
+    """
+
+
+@rt('/about-us')
+def about_us():
+    """About page with company story, commitment, and why choose us"""
+    content = Div(
+        about_hero_section(),
+        our_story_section(),
+        our_commitment_section(),
+        why_choose_section(),
+        awards_section(),
+        reviews_section(),
+        trusted_by_section(),
+        cls="about-content"
+    )
+
+    return create_page(
+        "About Us | Astra Staging",
+        content,
+        additional_styles=get_about_page_styles(),
+        description="Learn about Astra Staging - your partner in professional home staging services in the Greater Toronto Area. Award-winning, reliable, and affordable.",
+        keywords="about astra staging, home staging company, staging services GTA, professional stagers"
     )
 
 

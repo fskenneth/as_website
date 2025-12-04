@@ -994,20 +994,20 @@ def get_shared_styles():
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 10px;
-        background: var(--bg-primary);
+        padding: 0;
+        background: #fff;
         border-radius: 12px;
         transition: all 0.3s ease;
         width: 100%;
-        height: 160px;
+        aspect-ratio: 1;
     }
     .logo-item:hover {
         transform: translateY(-3px);
         box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
     }
     .partner-logo {
-        max-width: 100%;
-        max-height: 140px;
+        max-width: 90%;
+        max-height: 90%;
         object-fit: contain;
         filter: grayscale(0%);
         transition: filter 0.3s ease;
@@ -1025,23 +1025,10 @@ def get_shared_styles():
             grid-template-columns: repeat(3, 1fr);
             gap: 15px;
         }
-        .logo-item {
-            height: 120px;
-            padding: 8px;
-        }
-        .partner-logo {
-            max-height: 90px;
-        }
     }
     @media (max-width: 480px) {
         .logos-grid {
             grid-template-columns: repeat(2, 1fr);
-        }
-        .logo-item {
-            height: 110px;
-        }
-        .partner-logo {
-            max-height: 80px;
         }
     }
 
@@ -2131,7 +2118,7 @@ def navigation():
                 Li(A("Home", href="/")),
                 Li(A("Pricing", href="/staging-pricing")),
                 Li(A("Portfolio", href="/gallery")),
-                Li(A("About", href="/about")),
+                Li(A("About Us", href="/about-us")),
                 Li(A("Services", href="/services")),
                 Li(A("Contact", href="/contact")),
                 cls="nav-menu"
