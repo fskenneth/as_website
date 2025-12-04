@@ -2129,6 +2129,7 @@ def navigation():
         Div(
             Ul(
                 Li(A("Home", href="/")),
+                Li(A("Pricing", href="/staging-pricing")),
                 Li(A("Portfolio", href="/gallery")),
                 Li(A("About", href="/about")),
                 Li(A("Services", href="/services")),

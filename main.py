@@ -614,6 +614,31 @@ def gallery():
     )
 
 
+@rt('/staging-pricing')
+def staging_pricing():
+    """Staging Pricing page with pricing packages, why astra, portfolio and instagram"""
+    content = Div(
+        pricing_section(),
+        why_astra_section(),
+        portfolio_carousel_section(title="Portfolio", alt_bg=True),
+        instagram_section_module(alt_bg=False),
+        cls="staging-pricing-content"
+    )
+
+    # Include gallery carousel styles and scripts
+    additional_styles = get_gallery_carousel_styles()
+    additional_scripts = get_gallery_carousel_scripts()
+
+    return create_page(
+        "Staging Pricing | Astra Staging",
+        content,
+        additional_styles=additional_styles,
+        additional_scripts=additional_scripts,
+        description="Professional home staging pricing packages. Starter package from $1,200, Complete package from $1,600. Free consultation in GTA.",
+        keywords="home staging pricing, staging cost, staging packages, home staging rates, GTA staging prices"
+    )
+
+
 @rt('/')
 def home():
     """Home page with hero banner"""
