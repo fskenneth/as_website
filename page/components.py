@@ -2352,9 +2352,11 @@ def get_floating_elements_script():
         if (nameInput) nameInput.addEventListener('blur', function() { formatInquiryName(this); });
         if (emailInput) emailInput.addEventListener('blur', function() { formatInquiryEmail(this); });
         if (phoneInput) phoneInput.addEventListener('blur', function() { formatInquiryPhone(this); });
+    });
 
-        // Initialize autocomplete if Google Maps is available
-        if (typeof google !== 'undefined') {
+    // Initialize autocomplete after Google Maps script loads (async/defer)
+    window.addEventListener('load', function() {
+        if (typeof google !== 'undefined' && google.maps && google.maps.places) {
             initInquiryAutocomplete();
         }
     });

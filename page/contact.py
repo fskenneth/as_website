@@ -492,9 +492,11 @@ def contact_form_section():
                 if (nameInput) nameInput.addEventListener('blur', function() { formatName(this); });
                 if (emailInput) emailInput.addEventListener('blur', function() { formatEmail(this); });
                 if (phoneInput) phoneInput.addEventListener('blur', function() { formatPhone(this); });
+            });
 
-                // Initialize autocomplete when Google Maps is loaded
-                if (typeof google !== 'undefined') {
+            // Initialize autocomplete after Google Maps script loads (async/defer)
+            window.addEventListener('load', function() {
+                if (typeof google !== 'undefined' && google.maps && google.maps.places) {
                     initContactAutocomplete();
                 }
             });
