@@ -196,7 +196,7 @@ def home():
         pricing_section(),
         cls="home-content"
     )
-    return create_page("Astra Staging", content)
+    return create_page("Astra Staging", content, is_homepage=True)
 
 
 if __name__ == "__main__":

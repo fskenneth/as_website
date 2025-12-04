@@ -579,6 +579,522 @@ def get_shared_styles():
         }
     }
 
+    /* Back to Top Button - Glass Morphism Style */
+    .back-to-top {
+        position: fixed;
+        bottom: 95px;
+        right: 30px;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        color: #fff;
+        font-size: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        opacity: 0;
+        visibility: hidden;
+        z-index: 1000;
+        padding: 0;
+        line-height: 1;
+    }
+    .back-to-top span {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        position: relative;
+        top: -1px;
+        left: 0px;
+    }
+    [data-theme="light"] .back-to-top {
+        color: #000;
+        border: 1px solid #000;
+    }
+    .back-to-top.visible {
+        opacity: 1;
+        visibility: visible;
+    }
+    .back-to-top:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: translateY(-5px);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+    }
+    .back-to-top:active {
+        transform: translateY(-2px);
+    }
+
+    /* WhatsApp Button */
+    .whatsapp-button {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: #25d366;
+        border: none;
+        box-shadow: 0 8px 32px rgba(37, 211, 102, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        z-index: 1000;
+        text-decoration: none;
+        opacity: 1;
+        visibility: visible;
+    }
+    .whatsapp-button svg {
+        width: 28px;
+        height: 28px;
+        fill: white;
+    }
+    .whatsapp-button:hover {
+        background: #20ba5a;
+        transform: translateY(-5px) scale(1.1);
+        box-shadow: 0 12px 40px rgba(37, 211, 102, 0.4);
+    }
+    .whatsapp-button:active {
+        transform: translateY(-2px) scale(1.05);
+    }
+
+    /* Floating buttons container */
+    .floating-buttons-container {
+        position: fixed;
+        bottom: 30px;
+        left: 20px;
+        right: 70px;
+        display: flex;
+        justify-content: space-between;
+        z-index: 999;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+    .floating-buttons-container.visible {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    /* Floating button animations */
+    @keyframes floating-glow {
+        0%, 100% {
+            transform: scale(1);
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.35);
+            box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15), 0 8px 40px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+        50% {
+            transform: scale(1.03);
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.6);
+            box-shadow: 0 8px 35px rgba(255, 255, 255, 0.35), 0 16px 70px rgba(255, 255, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+        }
+    }
+    @keyframes floating-glow-light {
+        0%, 100% {
+            transform: scale(1);
+            background: rgba(0, 0, 0, 0.06);
+            border-color: rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 8px 40px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+        50% {
+            transform: scale(1.03);
+            background: rgba(0, 0, 0, 0.15);
+            border-color: rgba(0, 0, 0, 0.4);
+            box-shadow: 0 8px 35px rgba(0, 0, 0, 0.2), 0 16px 70px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+        }
+    }
+
+    /* Floating Instant Quote Button */
+    .floating-select-dates-btn {
+        position: relative;
+        bottom: auto;
+        left: auto;
+        transform: none;
+        padding: 0 24px;
+        background: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+        border-radius: 30px;
+        font-size: 14px;
+        font-weight: 700;
+        text-decoration: none;
+        white-space: nowrap;
+        line-height: 1.2;
+        height: 45px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        backdrop-filter: blur(20px) saturate(150%);
+        -webkit-backdrop-filter: blur(20px) saturate(150%);
+        animation: floating-glow 2s ease-in-out infinite;
+        box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15), 0 8px 40px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    .floating-select-dates-btn:hover {
+        transform: translateY(-3px) scale(1.05) !important;
+        background: rgba(255, 255, 255, 0.3) !important;
+        border-color: rgba(255, 255, 255, 0.7) !important;
+        animation-play-state: paused;
+        box-shadow: 0 8px 35px rgba(255, 255, 255, 0.3), 0 16px 70px rgba(255, 255, 255, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+    .floating-select-dates-btn:active {
+        transform: translateY(-1px) scale(1.02) !important;
+        animation-play-state: paused;
+    }
+    [data-theme="light"] .floating-select-dates-btn {
+        background: rgba(0, 0, 0, 0.06);
+        color: #000000;
+        border: 2px solid rgba(0, 0, 0, 0.2);
+        animation: floating-glow-light 2s ease-in-out infinite;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 8px 40px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+    [data-theme="light"] .floating-select-dates-btn:hover {
+        transform: translateY(-3px) scale(1.05) !important;
+        background: rgba(0, 0, 0, 0.15) !important;
+        border-color: rgba(0, 0, 0, 0.4) !important;
+        animation-play-state: paused;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2), 0 16px 60px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    }
+
+    /* Floating Inquiry Button */
+    .floating-general-inquiry-btn {
+        position: relative;
+        bottom: auto;
+        left: auto;
+        transform: none;
+        padding: 0 16px;
+        background: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+        border-radius: 30px;
+        font-size: 14px;
+        font-weight: 700;
+        text-decoration: none;
+        white-space: nowrap;
+        line-height: 1.2;
+        height: 45px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        backdrop-filter: blur(20px) saturate(150%);
+        -webkit-backdrop-filter: blur(20px) saturate(150%);
+        box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15), 0 8px 40px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    .floating-general-inquiry-btn:hover {
+        transform: translateY(-3px) scale(1.05) !important;
+        background: rgba(255, 255, 255, 0.3) !important;
+        border-color: rgba(255, 255, 255, 0.7) !important;
+        box-shadow: 0 8px 35px rgba(255, 255, 255, 0.3), 0 16px 70px rgba(255, 255, 255, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+    .floating-general-inquiry-btn:active {
+        transform: translateY(-1px) scale(1.02) !important;
+    }
+    [data-theme="light"] .floating-general-inquiry-btn {
+        background: rgba(0, 0, 0, 0.06);
+        color: #000000;
+        border: 2px solid rgba(0, 0, 0, 0.2);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 8px 40px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+    [data-theme="light"] .floating-general-inquiry-btn:hover {
+        transform: translateY(-3px) scale(1.05) !important;
+        background: rgba(0, 0, 0, 0.15) !important;
+        border-color: rgba(0, 0, 0, 0.4) !important;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2), 0 16px 60px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    }
+
+    /* Desktop positioning for floating elements */
+    @media (min-width: 768px) {
+        .back-to-top {
+            right: max(30px, calc(50vw - 450px));
+        }
+        .whatsapp-button {
+            right: max(30px, calc(50vw - 450px));
+        }
+        .floating-buttons-container {
+            left: max(30px, calc(50vw - 450px));
+            right: max(80px, calc(50vw - 450px + 80px));
+            transform: none;
+        }
+        .floating-select-dates-btn {
+            height: 50px;
+            font-size: 18px;
+            padding: 0 36px;
+        }
+        .floating-general-inquiry-btn {
+            height: 50px;
+            font-size: 18px;
+            padding: 0 20px;
+        }
+    }
+
+    /* Mobile adjustments for floating elements */
+    @media (max-width: 767px) {
+        .back-to-top {
+            bottom: 75px;
+            right: 20px;
+            width: 45px;
+            height: 45px;
+            font-size: 20px;
+        }
+        .back-to-top span {
+            left: -2px;
+        }
+        .whatsapp-button {
+            bottom: 20px;
+            right: 20px;
+            width: 45px;
+            height: 45px;
+        }
+        .whatsapp-button svg {
+            width: 25px;
+            height: 25px;
+        }
+        .floating-buttons-container {
+            left: 10px;
+            right: 65px;
+            bottom: 20px;
+        }
+        .floating-select-dates-btn {
+            font-size: 12px;
+            height: 38px;
+            padding: 0 15px;
+        }
+        .floating-general-inquiry-btn {
+            font-size: 12px;
+            height: 38px;
+            padding: 0 12px;
+        }
+    }
+
+    /* Extra narrow screens */
+    @media (max-width: 380px) {
+        .floating-buttons-container {
+            left: 8px;
+            right: 60px;
+        }
+        .floating-select-dates-btn {
+            font-size: 11px;
+            height: 36px;
+            padding: 0 12px;
+        }
+        .floating-general-inquiry-btn {
+            font-size: 11px;
+            height: 36px;
+            padding: 0 10px;
+        }
+    }
+
+    /* General Inquiry Modal Styles */
+    .general-inquiry-popup {
+        display: none;
+        position: fixed;
+        top: 0 !important;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(to bottom, rgba(13, 27, 42, 0.95), rgba(27, 38, 59, 0.95), rgba(15, 23, 42, 0.98));
+        backdrop-filter: blur(12px) saturate(180%);
+        -webkit-backdrop-filter: blur(12px) saturate(180%);
+        z-index: 9998;
+        overflow-y: auto;
+        padding: 0 40px 40px 40px;
+    }
+    .general-inquiry-popup.active {
+        display: block;
+    }
+    .general-inquiry-popup.active .popup-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-top: 140px;
+        max-width: 960px;
+        margin: 0 auto;
+        width: 100%;
+    }
+    [data-theme="light"] .general-inquiry-popup {
+        background: linear-gradient(to bottom, rgba(248, 250, 252, 0.97), rgba(241, 245, 249, 0.97), rgba(248, 250, 252, 0.99));
+    }
+    .general-inquiry-popup .popup-header {
+        display: none !important;
+    }
+
+    /* Inquiry popup close button */
+    .general-inquiry-popup-close {
+        position: fixed;
+        top: 125px;
+        right: 40px;
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        color: #fff;
+        font-size: 28px;
+        font-weight: 300;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        opacity: 0;
+        visibility: hidden;
+        z-index: 9999;
+    }
+    .general-inquiry-popup-close.visible {
+        opacity: 1;
+        visibility: visible;
+    }
+    [data-theme="light"] .general-inquiry-popup-close {
+        color: #000;
+        border: 1px solid #000;
+    }
+    .general-inquiry-popup-close:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: scale(1.1);
+    }
+
+    /* Inquiry form styling */
+    .inquiry-title {
+        font-family: 'Inter', sans-serif;
+        font-size: clamp(24px, 4vw, 36px);
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 30px;
+        text-align: center;
+    }
+    [data-theme="light"] .inquiry-title {
+        color: #000;
+    }
+    .inquiry-form {
+        width: 100%;
+        max-width: 500px;
+    }
+    .form-group {
+        margin-bottom: 20px;
+    }
+    .form-label {
+        display: block;
+        font-family: 'Inter', sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.8);
+        margin-bottom: 8px;
+    }
+    [data-theme="light"] .form-label {
+        color: rgba(0, 0, 0, 0.7);
+    }
+    .form-input,
+    .form-textarea,
+    .form-select {
+        width: 100%;
+        padding: 14px 16px;
+        font-family: 'Inter', sans-serif;
+        font-size: 16px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        color: #fff;
+        outline: none;
+        transition: all 0.3s ease;
+        box-sizing: border-box;
+    }
+    [data-theme="light"] .form-input,
+    [data-theme="light"] .form-textarea,
+    [data-theme="light"] .form-select {
+        background: rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(0, 0, 0, 0.15);
+        color: #000;
+    }
+    .form-input:focus,
+    .form-textarea:focus,
+    .form-select:focus {
+        border-color: rgba(255, 255, 255, 0.5);
+        background: rgba(255, 255, 255, 0.15);
+    }
+    [data-theme="light"] .form-input:focus,
+    [data-theme="light"] .form-textarea:focus,
+    [data-theme="light"] .form-select:focus {
+        border-color: rgba(0, 0, 0, 0.3);
+        background: rgba(0, 0, 0, 0.08);
+    }
+    .form-input::placeholder,
+    .form-textarea::placeholder {
+        color: rgba(255, 255, 255, 0.5);
+    }
+    [data-theme="light"] .form-input::placeholder,
+    [data-theme="light"] .form-textarea::placeholder {
+        color: rgba(0, 0, 0, 0.4);
+    }
+    .form-textarea {
+        min-height: 120px;
+        resize: vertical;
+    }
+    .form-submit-btn {
+        width: 100%;
+        padding: 16px 32px;
+        font-family: 'Inter', sans-serif;
+        font-size: 16px;
+        font-weight: 700;
+        background: #e75480;
+        color: #fff;
+        border: none;
+        border-radius: 30px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    .form-submit-btn:hover {
+        background: #d14070;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(231, 84, 128, 0.4);
+    }
+    .form-submit-btn:active {
+        transform: translateY(0);
+    }
+
+    @media (min-width: 768px) {
+        .general-inquiry-popup {
+            padding: 0 60px 40px 60px;
+        }
+        .general-inquiry-popup.active .popup-content {
+            padding-top: 160px;
+        }
+    }
+
+    @media (max-width: 767px) {
+        .general-inquiry-popup {
+            padding: 0 20px 20px 20px;
+        }
+        .general-inquiry-popup.active .popup-content {
+            padding-top: 100px;
+        }
+        .general-inquiry-popup-close {
+            top: 80px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            font-size: 24px;
+        }
+    }
+
     /* Hero Section */
     .hero-section {
         display: flex;
@@ -1173,9 +1689,169 @@ def footer():
     )
 
 
+def back_to_top_button():
+    """Back to top button with glass morphism style"""
+    return Button(
+        Span("›", style="font-size: 40px; line-height: 1; font-weight: 300; transform: rotate(-90deg); display: inline-block; margin: 0; padding: 0;"),
+        cls="back-to-top",
+        id="back-to-top",
+        onclick="window.scrollTo({top: 0, behavior: 'smooth'})",
+        **{"aria-label": "Back to top"}
+    )
+
+
+def whatsapp_button():
+    """WhatsApp floating button"""
+    return A(
+        NotStr('''<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+        </svg>'''),
+        href="https://api.whatsapp.com/send?phone=16475585677",
+        target="_blank",
+        cls="whatsapp-button",
+        **{"aria-label": "Contact us on WhatsApp"}
+    )
+
+
+def floating_buttons():
+    """Floating inquiry and instant quote buttons"""
+    return Div(
+        Button(
+            "General Inquiry",
+            cls="floating-general-inquiry-btn",
+            onclick="showGeneralInquiryForm()"
+        ),
+        A(
+            "Instant Quote",
+            href="/quote",
+            cls="floating-select-dates-btn"
+        ),
+        cls="floating-buttons-container",
+        id="floating-buttons"
+    )
+
+
+def general_inquiry_modal():
+    """General inquiry popup modal"""
+    return Div(
+        Button(
+            "×",
+            cls="general-inquiry-popup-close",
+            id="general-inquiry-close",
+            onclick="closeGeneralInquiryForm()"
+        ),
+        Div(
+            H2("General Inquiry", cls="inquiry-title"),
+            Form(
+                Div(
+                    Label("Name *", cls="form-label", **{"for": "inquiry-name"}),
+                    Input(type="text", id="inquiry-name", name="name", cls="form-input", placeholder="Your name", required=True),
+                    cls="form-group"
+                ),
+                Div(
+                    Label("Email *", cls="form-label", **{"for": "inquiry-email"}),
+                    Input(type="email", id="inquiry-email", name="email", cls="form-input", placeholder="Your email", required=True),
+                    cls="form-group"
+                ),
+                Div(
+                    Label("Phone", cls="form-label", **{"for": "inquiry-phone"}),
+                    Input(type="tel", id="inquiry-phone", name="phone", cls="form-input", placeholder="Your phone number"),
+                    cls="form-group"
+                ),
+                Div(
+                    Label("Property Address", cls="form-label", **{"for": "inquiry-address"}),
+                    Input(type="text", id="inquiry-address", name="address", cls="form-input", placeholder="Property address"),
+                    cls="form-group"
+                ),
+                Div(
+                    Label("Message *", cls="form-label", **{"for": "inquiry-message"}),
+                    Textarea(id="inquiry-message", name="message", cls="form-textarea form-input", placeholder="Tell us about your staging needs...", required=True),
+                    cls="form-group"
+                ),
+                Button("Send Inquiry", type="submit", cls="form-submit-btn"),
+                cls="inquiry-form",
+                id="general-inquiry-form"
+            ),
+            cls="popup-content"
+        ),
+        cls="general-inquiry-popup",
+        id="general-inquiry-popup"
+    )
+
+
+def get_floating_elements_script():
+    """JavaScript for floating elements - back to top, modal, scroll behavior"""
+    return """
+    // Back to top button visibility
+    function updateBackToTopVisibility() {
+        const backToTop = document.getElementById('back-to-top');
+        if (backToTop) {
+            if (window.scrollY > 300) {
+                backToTop.classList.add('visible');
+            } else {
+                backToTop.classList.remove('visible');
+            }
+        }
+    }
+
+    // General inquiry modal functions
+    function showGeneralInquiryForm() {
+        const popup = document.getElementById('general-inquiry-popup');
+        const closeBtn = document.getElementById('general-inquiry-close');
+        if (popup) {
+            popup.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+        if (closeBtn) {
+            closeBtn.classList.add('visible');
+        }
+    }
+
+    function closeGeneralInquiryForm() {
+        const popup = document.getElementById('general-inquiry-popup');
+        const closeBtn = document.getElementById('general-inquiry-close');
+        if (popup) {
+            popup.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+        if (closeBtn) {
+            closeBtn.classList.remove('visible');
+        }
+    }
+
+    // Close modal on escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeGeneralInquiryForm();
+        }
+    });
+
+    // Close modal when clicking outside
+    document.addEventListener('click', function(e) {
+        const popup = document.getElementById('general-inquiry-popup');
+        if (popup && popup.classList.contains('active')) {
+            if (e.target === popup) {
+                closeGeneralInquiryForm();
+            }
+        }
+    });
+
+    // Initialize scroll listener
+    window.addEventListener('scroll', function() {
+        updateBackToTopVisibility();
+    });
+
+    // Initial check
+    document.addEventListener('DOMContentLoaded', function() {
+        updateBackToTopVisibility();
+    });
+    """
+
+
 def create_page(title, content, additional_styles="", additional_scripts="",
                 description="Astra Staging - Professional Home Staging Services",
-                keywords="home staging, furniture staging, real estate staging"):
+                keywords="home staging, furniture staging, real estate staging",
+                is_homepage=False):
     """Create a page with the shared layout and styles"""
 
     # Inline script to prevent theme flash - runs immediately
@@ -1218,6 +1894,43 @@ def create_page(title, content, additional_styles="", additional_scripts="",
     </script>
     """
 
+    # Homepage scroll script for floating buttons (only show when banner is scrolled out of view)
+    homepage_scroll_script = """
+    // Homepage-specific scroll behavior for floating buttons
+    function updateFloatingButtonsVisibility() {
+        const floatingButtons = document.getElementById('floating-buttons');
+        const heroSection = document.querySelector('.hero-section');
+
+        if (floatingButtons && heroSection) {
+            const heroBottom = heroSection.getBoundingClientRect().bottom;
+            if (heroBottom <= 0) {
+                floatingButtons.classList.add('visible');
+            } else {
+                floatingButtons.classList.remove('visible');
+            }
+        }
+    }
+
+    window.addEventListener('scroll', function() {
+        updateFloatingButtonsVisibility();
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        updateFloatingButtonsVisibility();
+    });
+    """ if is_homepage else """
+    // Non-homepage: always show floating buttons
+    document.addEventListener('DOMContentLoaded', function() {
+        const floatingButtons = document.getElementById('floating-buttons');
+        if (floatingButtons) {
+            floatingButtons.classList.add('visible');
+        }
+    });
+    """
+
+    # Combine all scripts
+    all_scripts = get_shared_scripts() + get_floating_elements_script() + homepage_scroll_script + (str(additional_scripts) if additional_scripts else "")
+
     return Html(
         Head(
             Title(title),
@@ -1234,7 +1947,12 @@ def create_page(title, content, additional_styles="", additional_scripts="",
             navigation(),
             Main(content),
             footer(),
-            Script(get_shared_scripts() + (str(additional_scripts) if additional_scripts else "")),
+            # Floating elements - always present on all pages
+            back_to_top_button(),
+            whatsapp_button(),
+            floating_buttons(),
+            general_inquiry_modal(),
+            Script(all_scripts),
             cls="page-wrapper"
         )
     )
