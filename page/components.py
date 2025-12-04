@@ -579,6 +579,135 @@ def get_shared_styles():
         }
     }
 
+    /* Instagram Section */
+    .instagram-section {
+        padding: 60px 40px;
+        background: var(--bg-secondary);
+    }
+    .instagram-title {
+        font-family: 'Inter', sans-serif;
+        font-size: clamp(24px, 4vw, 36px);
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 40px;
+        color: var(--color-primary);
+    }
+    .instagram-title a {
+        color: inherit;
+        text-decoration: none;
+        transition: opacity 0.3s ease;
+    }
+    .instagram-title a:hover {
+        opacity: 0.7;
+    }
+    .instagram-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+        max-width: 960px;
+        margin: 0 auto 30px;
+    }
+    .instagram-item {
+        position: relative;
+        aspect-ratio: 1;
+        overflow: hidden;
+        border-radius: 8px;
+        background: var(--bg-primary);
+    }
+    .instagram-item a {
+        display: block;
+        width: 100%;
+        height: 100%;
+    }
+    .instagram-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+    .instagram-item:hover img {
+        transform: scale(1.05);
+        opacity: 0.9;
+    }
+    .instagram-item .video-indicator {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .instagram-item .video-indicator svg {
+        width: 14px;
+        height: 14px;
+        fill: white;
+    }
+    .instagram-actions {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin-top: 30px;
+    }
+    .instagram-follow-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 28px;
+        background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+        color: white;
+        text-decoration: none;
+        border-radius: 30px;
+        font-size: 16px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+    }
+    .instagram-follow-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(220, 39, 67, 0.4);
+    }
+    .instagram-follow-btn svg {
+        width: 20px;
+        height: 20px;
+        fill: white;
+    }
+    .instagram-error {
+        text-align: center;
+        padding: 40px;
+        color: var(--color-secondary);
+    }
+    .instagram-error p {
+        margin-bottom: 20px;
+    }
+
+    /* Mobile: 3 columns */
+    @media (max-width: 767px) {
+        .instagram-section {
+            padding: 40px 20px;
+        }
+        .instagram-title {
+            font-size: 24px;
+            margin-bottom: 30px;
+        }
+        .instagram-grid {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .instagram-item {
+            border-radius: 6px;
+        }
+        .instagram-follow-btn {
+            font-size: 14px;
+            padding: 12px 24px;
+        }
+    }
+
     /* Back to Top Button - Glass Morphism Style */
     .back-to-top {
         position: fixed;
