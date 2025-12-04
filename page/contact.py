@@ -135,6 +135,16 @@ def get_contact_page_styles():
         border-color: var(--border-hover);
     }
 
+    .form-input.error {
+        border-color: #dc2626;
+        background: rgba(239, 68, 68, 0.05);
+    }
+
+    [data-theme="dark"] .form-input.error {
+        border-color: #f87171;
+        background: rgba(239, 68, 68, 0.1);
+    }
+
     .form-textarea {
         min-height: 150px;
         resize: vertical;
@@ -436,32 +446,48 @@ def contact_form_section():
                 }
             }
 
-            // Format email: lowercase, no spaces
+            // Format email: lowercase, no spaces, validate format
             function formatEmail(input) {
                 const value = input.value.trim().toLowerCase().replace(/\\s+/g, '');
                 input.value = value;
                 const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
                 if (value && !emailRegex.test(value)) {
+                    input.classList.add('error');
                     input.setCustomValidity('Please enter a valid email address');
                 } else {
+                    input.classList.remove('error');
                     input.setCustomValidity('');
                 }
             }
 
-            // Format phone: Canadian format
+            // Format phone: Canadian format, validate length
             function formatPhone(input) {
                 let value = input.value.replace(/\\D/g, '');
+                let isValid = false;
+
                 if (value.startsWith('1') && value.length === 11) {
                     value = '1 (' + value.substring(1, 4) + ') ' + value.substring(4, 7) + '-' + value.substring(7);
+                    isValid = true;
                 } else if (value.length === 10) {
                     value = '(' + value.substring(0, 3) + ') ' + value.substring(3, 6) + '-' + value.substring(6);
+                    isValid = true;
                 } else if (value.length > 10 && !value.startsWith('1')) {
                     const originalValue = input.value.trim();
                     if (originalValue.startsWith('+')) {
                         value = '+' + value;
+                        isValid = true; // International format
                     }
+                } else if (value.length === 0) {
+                    isValid = true; // Empty is OK (optional field)
                 }
+
                 input.value = value;
+
+                if (!isValid && value.length > 0) {
+                    input.classList.add('error');
+                } else {
+                    input.classList.remove('error');
+                }
             }
 
             // Initialize Google Places Autocomplete for Canada only
