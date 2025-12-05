@@ -541,9 +541,23 @@ def staging_inquiry_form_section():
     )
 
 
+def notification_banner():
+    """Sticky notification banner that updates based on selection state"""
+    return Div(
+        Div(
+            Div("Instant Quote", cls="banner-title", id="banner-title"),
+            Div("click a property type to start", cls="banner-subtitle", id="banner-subtitle"),
+            cls="banner-content"
+        ),
+        id="notification-banner",
+        cls="notification-banner"
+    )
+
+
 def property_type_selector():
     """Property type selector with 3 square buttons"""
     return Section(
+        notification_banner(),
         Div(
             # Property Type Row
             Div(
@@ -694,6 +708,22 @@ def property_type_selector():
                 playClickSound();
             }
 
+            function updateBanner(state) {
+                const title = document.getElementById('banner-title');
+                const subtitle = document.getElementById('banner-subtitle');
+
+                if (state === 'initial') {
+                    title.textContent = 'Instant Quote';
+                    subtitle.textContent = 'click a property type to start';
+                } else if (state === 'property-selected') {
+                    title.textContent = 'Instant Quote';
+                    subtitle.textContent = 'select property size and occupancy';
+                } else if (state === 'status-selected') {
+                    title.textContent = 'Instant Quote';
+                    subtitle.textContent = 'choose staging areas';
+                }
+            }
+
             const sizeOptions = {
                 condo: [
                     { line1: '< 1000', line2: 'sq ft', value: 'under-1000' },
@@ -735,6 +765,7 @@ def property_type_selector():
                     areaSelector.classList.add('hidden');
                     areaPlaceholder.classList.remove('hidden');
                     document.querySelectorAll('.area-btn').forEach(b => b.classList.remove('selected'));
+                    updateBanner('initial');
                 } else {
                     // Deselect all, select clicked one, dim others
                     allBtns.forEach(b => {
@@ -750,6 +781,7 @@ def property_type_selector():
 
                     // Show status options immediately
                     showStatusOptions();
+                    updateBanner('property-selected');
                 }
             }
 
@@ -818,6 +850,7 @@ def property_type_selector():
                     allStatusBtns.forEach(b => b.classList.remove('dimmed'));
                     areaSelector.classList.add('hidden');
                     areaPlaceholder.classList.remove('hidden');
+                    updateBanner('property-selected');
                 } else {
                     allStatusBtns.forEach(b => {
                         b.classList.remove('selected');
@@ -827,6 +860,7 @@ def property_type_selector():
                     btn.classList.remove('dimmed');
                     areaPlaceholder.classList.add('hidden');
                     areaSelector.classList.remove('hidden');
+                    updateBanner('status-selected');
                 }
             }
 
@@ -842,9 +876,48 @@ def property_type_selector():
 def get_property_selector_styles():
     """CSS for property type selector - Mobile first"""
     return """
+    /* Notification Banner */
+    .notification-banner {
+        position: sticky;
+        top: 59px;
+        z-index: 100;
+        color: var(--color-primary);
+        padding: 12px 15px;
+        text-align: center;
+    }
+
+    [data-theme="light"] .notification-banner {
+        background: rgba(255, 255, 255, 0.3);
+        backdrop-filter: blur(20px) saturate(150%);
+        -webkit-backdrop-filter: blur(20px) saturate(150%);
+    }
+
+    [data-theme="dark"] .notification-banner {
+        background: rgba(26, 26, 26, 0.3);
+        backdrop-filter: blur(20px) saturate(150%);
+        -webkit-backdrop-filter: blur(20px) saturate(150%);
+    }
+
+    .banner-content {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .banner-title {
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 2px;
+    }
+
+    .banner-subtitle {
+        font-size: 14px;
+        font-weight: 400;
+        opacity: 0.9;
+    }
+
     /* Property Type Section */
     .property-type-section {
-        padding: 20px 10px;
+        padding: 0 10px 20px;
         background: var(--bg-primary);
     }
 
