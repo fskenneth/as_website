@@ -35,7 +35,7 @@ def hero_section():
                 ),
                 A(
                     "Instant Quote",
-                    href="/quote",
+                    href="/staging-inquiry/",
                     cls="start-search-btn"
                 ),
                 cls="hero-booking"

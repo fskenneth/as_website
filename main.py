@@ -18,6 +18,7 @@ from page.services import (
     our_differences_page
 )
 from page.contact import contact_page
+from page.staging_inquiry import staging_inquiry_page
 from page.areas import AREAS, AREA_PAGE_FUNCTIONS
 from page.blog_listing import blog_listing_page, load_blog_metadata
 from starlette.staticfiles import StaticFiles
@@ -415,6 +416,12 @@ def our_differences():
 def contactus():
     """Contact page"""
     return contact_page()
+
+
+@rt('/staging-inquiry/')
+def staging_inquiry():
+    """Staging Inquiry page for instant quotes"""
+    return staging_inquiry_page()
 
 
 # =============================================================================

@@ -2225,7 +2225,7 @@ def floating_buttons():
         ),
         A(
             "Instant Quote",
-            href="/quote",
+            href="/staging-inquiry",
             cls="floating-select-dates-btn"
         ),
         cls="floating-buttons-container",
