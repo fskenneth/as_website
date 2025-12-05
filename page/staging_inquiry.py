@@ -646,6 +646,7 @@ def property_type_selector():
                 Div(
                     Button(Span("Basement", cls="size-line1"), Span("1st Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="basement-1st-bedroom", onclick="toggleArea(this)"),
                     Button(Span("Basement", cls="size-line1"), Span("2nd Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="basement-2nd-bedroom", onclick="toggleArea(this)"),
+                    Div(cls="property-btn-spacer"),
                     cls="property-selector"
                 ),
                 id="area-selector",
@@ -868,7 +869,7 @@ def get_property_selector_styles():
 
     .property-btn {
         flex: 1;
-        aspect-ratio: 1;
+        aspect-ratio: 3 / 2;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -905,10 +906,17 @@ def get_property_selector_styles():
         opacity: 0.4;
     }
 
+    .property-btn-spacer {
+        flex: 1;
+        aspect-ratio: 3 / 2;
+        visibility: hidden;
+    }
+
     .property-icon {
-        font-size: 52px;
+        font-size: calc((100vw - 40px) / 3 * 2 / 3 * 0.5);
         line-height: 1;
         filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+        margin-top: -12%;
     }
 
     .property-label {
@@ -956,7 +964,7 @@ def get_property_selector_styles():
     .placeholder-btn {
         flex: 1;
         aspect-ratio: auto;
-        height: calc((100vw - 40px) / 3);
+        height: calc((100vw - 40px) / 3 * 2 / 3);
         cursor: not-allowed;
         opacity: 0.5;
     }
@@ -972,7 +980,7 @@ def get_property_selector_styles():
     }
 
     .area-placeholder-btn {
-        height: calc(((100vw - 40px) / 3) * 4 + 30px);
+        height: calc(((100vw - 40px) / 3 * 2 / 3) * 7 + 60px);
     }
 
     /* Area Selector */
@@ -1004,7 +1012,7 @@ def get_property_selector_styles():
         }
 
         .property-icon {
-            font-size: 60px;
+            font-size: calc((500px - 30px) / 3 * 2 / 3 * 0.5);
         }
 
         .property-label {
@@ -1016,11 +1024,11 @@ def get_property_selector_styles():
         }
 
         .placeholder-btn {
-            height: calc((500px - 30px) / 3);
+            height: calc((500px - 30px) / 3 * 2 / 3);
         }
 
         .area-placeholder-btn {
-            height: calc(((500px - 30px) / 3) * 4 + 30px);
+            height: calc(((500px - 30px) / 3 * 2 / 3) * 7 + 60px);
         }
     }
 
@@ -1036,7 +1044,7 @@ def get_property_selector_styles():
         }
 
         .property-icon {
-            font-size: 68px;
+            font-size: calc((600px - 40px) / 3 * 2 / 3 * 0.5);
         }
 
         .property-label {
@@ -1044,11 +1052,11 @@ def get_property_selector_styles():
         }
 
         .placeholder-btn {
-            height: calc((600px - 40px) / 3);
+            height: calc((600px - 40px) / 3 * 2 / 3);
         }
 
         .area-placeholder-btn {
-            height: calc(((600px - 40px) / 3) * 4 + 40px);
+            height: calc(((600px - 40px) / 3 * 2 / 3) * 7 + 80px);
         }
     }
     """
