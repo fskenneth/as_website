@@ -2532,7 +2532,7 @@ def get_floating_elements_script():
 def create_page(title, content, additional_styles="", additional_scripts="",
                 description="Astra Staging - Professional Home Staging Services",
                 keywords="home staging, furniture staging, real estate staging",
-                is_homepage=False):
+                is_homepage=False, hide_floating_buttons=False):
     """Create a page with the shared layout and styles"""
 
     # Inline script to prevent theme flash - runs immediately
@@ -2632,11 +2632,11 @@ def create_page(title, content, additional_styles="", additional_scripts="",
             navigation(),
             Main(content),
             comprehensive_footer(),
-            # Floating elements - always present on all pages
+            # Floating elements
             back_to_top_button(),
             whatsapp_button(),
-            floating_buttons(),
-            general_inquiry_modal(),
+            floating_buttons() if not hide_floating_buttons else None,
+            general_inquiry_modal() if not hide_floating_buttons else None,
             Script(all_scripts),
             cls="page-wrapper"
         )

@@ -541,22 +541,309 @@ def staging_inquiry_form_section():
     )
 
 
+def property_type_selector():
+    """Property type selector with 3 square buttons"""
+    return Section(
+        Div(
+            # Property Type Row
+            Div(
+                Button(
+                    Span("🏢", cls="property-icon"),
+                    Span("Condo", cls="property-label"),
+                    cls="property-btn",
+                    data_type="condo",
+                    onclick="selectPropertyType(this)"
+                ),
+                Button(
+                    Span("🏘️", cls="property-icon"),
+                    Span("Townhouse", cls="property-label"),
+                    cls="property-btn",
+                    data_type="townhouse",
+                    onclick="selectPropertyType(this)"
+                ),
+                Button(
+                    Span("🏡", cls="property-icon"),
+                    Span("House", cls="property-label"),
+                    cls="property-btn",
+                    data_type="house",
+                    onclick="selectPropertyType(this)"
+                ),
+                cls="property-selector"
+            ),
+            # Property Size Row (hidden by default)
+            Div(
+                id="size-selector",
+                cls="property-selector size-selector hidden"
+            ),
+            cls="container"
+        ),
+        Script("""
+            // Haptic feedback (vibration) for mobile
+            function hapticFeedback() {
+                if ('vibrate' in navigator) {
+                    navigator.vibrate(10); // 10ms subtle vibration
+                }
+            }
+
+            // Click sound using Web Audio API - sharp tick
+            let audioContext = null;
+            function playClickSound() {
+                try {
+                    if (!audioContext) {
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+
+                    // Sharp tick/click sound
+                    oscillator.frequency.value = 3500;
+                    oscillator.type = 'square';
+
+                    gainNode.gain.setValueAtTime(0.08, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.02);
+
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.02);
+                } catch (e) {}
+            }
+
+            // Combined feedback
+            function buttonFeedback() {
+                hapticFeedback();
+                playClickSound();
+            }
+
+            const sizeOptions = {
+                condo: [
+                    { line1: '< 1000', line2: 'sq ft', value: 'under-1000' },
+                    { line1: '1000 - 2000', line2: 'sq ft', value: '1000-2000' },
+                    { line1: '2000 - 3000', line2: 'sq ft', value: '2000-3000' }
+                ],
+                townhouse: [
+                    { line1: '1000 - 2000', line2: 'sq ft', value: '1000-2000' },
+                    { line1: '2000 - 3000', line2: 'sq ft', value: '2000-3000' },
+                    { line1: '3000 - 4000', line2: 'sq ft', value: '3000-4000' }
+                ],
+                house: [
+                    { line1: '2000 - 3000', line2: 'sq ft', value: '2000-3000' },
+                    { line1: '3000 - 4000', line2: 'sq ft', value: '3000-4000' },
+                    { line1: '> 4000', line2: 'sq ft', value: 'over-4000' }
+                ]
+            };
+
+            function selectPropertyType(btn) {
+                buttonFeedback();
+                const allBtns = document.querySelectorAll('.property-btn:not(.size-btn)');
+                const sizeSelector = document.getElementById('size-selector');
+
+                if (btn.classList.contains('selected')) {
+                    // Toggle off if already selected
+                    btn.classList.remove('selected');
+                    sizeSelector.classList.add('hidden');
+                    sizeSelector.innerHTML = '';
+                } else {
+                    // Deselect all, select clicked one
+                    allBtns.forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+
+                    // Show size options for selected type
+                    const type = btn.getAttribute('data-type');
+                    showSizeOptions(type);
+                }
+            }
+
+            function showSizeOptions(type) {
+                const sizeSelector = document.getElementById('size-selector');
+                const options = sizeOptions[type];
+
+                sizeSelector.innerHTML = options.map(opt => `
+                    <button class="property-btn size-btn" data-size="${opt.value}" onclick="selectSize(this)">
+                        <span class="size-line1">${opt.line1}</span>
+                        <span class="size-line2">${opt.line2}</span>
+                    </button>
+                `).join('');
+
+                sizeSelector.classList.remove('hidden');
+            }
+
+            function selectSize(btn) {
+                buttonFeedback();
+                const allSizeBtns = document.querySelectorAll('.size-btn');
+
+                if (btn.classList.contains('selected')) {
+                    btn.classList.remove('selected');
+                } else {
+                    allSizeBtns.forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                }
+            }
+        """),
+        cls="property-type-section"
+    )
+
+
+def get_property_selector_styles():
+    """CSS for property type selector - Mobile first"""
+    return """
+    /* Property Type Section */
+    .property-type-section {
+        padding: 20px 10px;
+        background: var(--bg-primary);
+    }
+
+    .property-selector {
+        display: flex;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .size-selector {
+        margin-top: 10px;
+    }
+
+    .size-selector.hidden {
+        display: none;
+    }
+
+    .property-btn {
+        flex: 1;
+        aspect-ratio: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-secondary);
+        border: 2px solid var(--border-color);
+        border-radius: 16px;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Hover effect only for devices with hover capability */
+    @media (hover: hover) {
+        .property-btn:hover {
+            border-color: var(--border-hover);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+    }
+
+    .property-btn.selected {
+        border-color: var(--color-primary);
+        background: var(--bg-secondary);
+        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1), 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    [data-theme="dark"] .property-btn.selected {
+        border-color: #fff;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15), 0 4px 16px rgba(255, 255, 255, 0.05);
+    }
+
+    .property-icon {
+        font-size: 52px;
+        line-height: 1;
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+    }
+
+    .property-label {
+        position: absolute;
+        bottom: 10px;
+        left: 0;
+        right: 0;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--color-primary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        text-align: center;
+    }
+
+    /* Size button text styles */
+    .size-btn {
+        justify-content: center;
+        gap: 2px;
+    }
+
+    .size-line1 {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--color-primary);
+        line-height: 1.2;
+    }
+
+    .size-line2 {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--color-secondary);
+        text-transform: lowercase;
+    }
+
+    /* Tablet and up */
+    @media (min-width: 768px) {
+        .property-type-section {
+            padding: 30px 20px;
+        }
+
+        .property-selector {
+            gap: 15px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .property-icon {
+            font-size: 60px;
+        }
+
+        .property-label {
+            font-size: 13px;
+        }
+
+        .property-btn {
+            border-radius: 20px;
+        }
+    }
+
+    /* Desktop */
+    @media (min-width: 1024px) {
+        .property-type-section {
+            padding: 40px 30px;
+        }
+
+        .property-selector {
+            gap: 20px;
+            max-width: 600px;
+        }
+
+        .property-icon {
+            font-size: 68px;
+        }
+
+        .property-label {
+            font-size: 14px;
+        }
+    }
+    """
+
+
 def staging_inquiry_page():
     """Staging Inquiry page"""
     content = Div(
-        staging_inquiry_hero_section(),
-        staging_inquiry_form_section(),
-        reviews_section(),
-        trusted_by_section(),
+        property_type_selector(),
         cls="staging-inquiry-content"
     )
 
-    additional_styles = get_staging_inquiry_styles()
+    additional_styles = get_property_selector_styles()
 
     return create_page(
         "Get a Quote | Astra Staging",
         content,
         additional_styles=additional_styles,
         description="Get an instant staging quote from Astra Staging. Fill out our form with your property details and receive a customized quote within 24 hours.",
-        keywords="staging quote, home staging price, staging cost estimate, GTA staging services"
+        keywords="staging quote, home staging price, staging cost estimate, GTA staging services",
+        hide_floating_buttons=True
     )
