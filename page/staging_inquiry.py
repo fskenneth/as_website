@@ -570,10 +570,86 @@ def property_type_selector():
                 ),
                 cls="property-selector"
             ),
+            # Property Size Row - Placeholder shown by default
+            Div(
+                Button(Span("Property Size", cls="placeholder-text"), cls="property-btn placeholder-btn", disabled=True),
+                id="size-placeholder",
+                cls="property-selector placeholder-row"
+            ),
             # Property Size Row (hidden by default)
             Div(
                 id="size-selector",
                 cls="property-selector size-selector hidden"
+            ),
+            # Property Status Row - Placeholder shown by default
+            Div(
+                Button(Span("Vacant or Occupied", cls="placeholder-text"), cls="property-btn placeholder-btn", disabled=True),
+                id="status-placeholder",
+                cls="property-selector placeholder-row"
+            ),
+            # Property Status Row (hidden by default)
+            Div(
+                id="status-selector",
+                cls="property-selector status-selector hidden"
+            ),
+            # Area Placeholder (shown by default)
+            Div(
+                Button(Span("Staging Areas", cls="placeholder-text"), cls="property-btn placeholder-btn area-placeholder-btn", disabled=True),
+                id="area-placeholder",
+                cls="property-selector placeholder-row"
+            ),
+            # Area Selection Rows (hidden by default)
+            Div(
+                # Row 1: Living Room, Dining Room, Family Room
+                Div(
+                    Button(Span("Living", cls="size-line1"), Span("Room", cls="size-line2"), cls="property-btn area-btn", data_area="living-room", onclick="toggleArea(this)"),
+                    Button(Span("Dining", cls="size-line1"), Span("Room", cls="size-line2"), cls="property-btn area-btn", data_area="dining-room", onclick="toggleArea(this)"),
+                    Button(Span("Family", cls="size-line1"), Span("Room", cls="size-line2"), cls="property-btn area-btn", data_area="family-room", onclick="toggleArea(this)"),
+                    cls="property-selector"
+                ),
+                # Row 2: Kitchen Only, Kitchen with Island, Breakfast Area
+                Div(
+                    Button(Span("Kitchen", cls="size-line1"), Span("Only", cls="size-line2"), cls="property-btn area-btn", data_area="kitchen-only", onclick="toggleArea(this)"),
+                    Button(Span("Kitchen", cls="size-line1"), Span("with Island", cls="size-line2"), cls="property-btn area-btn", data_area="kitchen-island", onclick="toggleArea(this)"),
+                    Button(Span("Breakfast", cls="size-line1"), Span("Area", cls="size-line2"), cls="property-btn area-btn", data_area="breakfast-area", onclick="toggleArea(this)"),
+                    cls="property-selector"
+                ),
+                # Row 3: Master Bedroom, 2nd Bedroom, 3rd Bedroom
+                Div(
+                    Button(Span("Master", cls="size-line1"), Span("Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="master-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("2nd", cls="size-line1"), Span("Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="2nd-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("3rd", cls="size-line1"), Span("Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="3rd-bedroom", onclick="toggleArea(this)"),
+                    cls="property-selector"
+                ),
+                # Row 4: 4th Bedroom, 5th Bedroom, 6th Bedroom
+                Div(
+                    Button(Span("4th", cls="size-line1"), Span("Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="4th-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("5th", cls="size-line1"), Span("Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="5th-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("6th", cls="size-line1"), Span("Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="6th-bedroom", onclick="toggleArea(this)"),
+                    cls="property-selector"
+                ),
+                # Row 5: Office, Bathrooms, Outdoor
+                Div(
+                    Button(Span("Office", cls="size-line1"), Span("", cls="size-line2"), cls="property-btn area-btn", data_area="office", onclick="toggleArea(this)"),
+                    Button(Span("Bathrooms", cls="size-line1"), Span("", cls="size-line2"), cls="property-btn area-btn", data_area="bathrooms", onclick="toggleArea(this)"),
+                    Button(Span("Outdoor", cls="size-line1"), Span("", cls="size-line2"), cls="property-btn area-btn", data_area="outdoor", onclick="toggleArea(this)"),
+                    cls="property-selector"
+                ),
+                # Row 6: Basement Living, Basement Dining, Basement Office
+                Div(
+                    Button(Span("Basement", cls="size-line1"), Span("Living", cls="size-line2"), cls="property-btn area-btn", data_area="basement-living", onclick="toggleArea(this)"),
+                    Button(Span("Basement", cls="size-line1"), Span("Dining", cls="size-line2"), cls="property-btn area-btn", data_area="basement-dining", onclick="toggleArea(this)"),
+                    Button(Span("Basement", cls="size-line1"), Span("Office", cls="size-line2"), cls="property-btn area-btn", data_area="basement-office", onclick="toggleArea(this)"),
+                    cls="property-selector"
+                ),
+                # Row 7: Basement 1st Bedroom, Basement 2nd Bedroom
+                Div(
+                    Button(Span("Basement", cls="size-line1"), Span("1st Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="basement-1st-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("Basement", cls="size-line1"), Span("2nd Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="basement-2nd-bedroom", onclick="toggleArea(this)"),
+                    cls="property-selector"
+                ),
+                id="area-selector",
+                cls="area-selector hidden"
             ),
             cls="container"
         ),
@@ -637,27 +713,48 @@ def property_type_selector():
 
             function selectPropertyType(btn) {
                 buttonFeedback();
-                const allBtns = document.querySelectorAll('.property-btn:not(.size-btn)');
+                const allBtns = document.querySelectorAll('.property-btn:not(.size-btn):not(.status-btn):not(.area-btn):not(.placeholder-btn)');
                 const sizeSelector = document.getElementById('size-selector');
+                const sizePlaceholder = document.getElementById('size-placeholder');
+                const statusSelector = document.getElementById('status-selector');
+                const statusPlaceholder = document.getElementById('status-placeholder');
+                const areaSelector = document.getElementById('area-selector');
+                const areaPlaceholder = document.getElementById('area-placeholder');
 
                 if (btn.classList.contains('selected')) {
                     // Toggle off if already selected
                     btn.classList.remove('selected');
+                    allBtns.forEach(b => b.classList.remove('dimmed'));
                     sizeSelector.classList.add('hidden');
                     sizeSelector.innerHTML = '';
+                    sizePlaceholder.classList.remove('hidden');
+                    statusSelector.classList.add('hidden');
+                    statusSelector.innerHTML = '';
+                    statusPlaceholder.classList.remove('hidden');
+                    areaSelector.classList.add('hidden');
+                    areaPlaceholder.classList.remove('hidden');
+                    document.querySelectorAll('.area-btn').forEach(b => b.classList.remove('selected'));
                 } else {
-                    // Deselect all, select clicked one
-                    allBtns.forEach(b => b.classList.remove('selected'));
+                    // Deselect all, select clicked one, dim others
+                    allBtns.forEach(b => {
+                        b.classList.remove('selected');
+                        b.classList.add('dimmed');
+                    });
                     btn.classList.add('selected');
+                    btn.classList.remove('dimmed');
 
-                    // Show size options for selected type
+                    // Clear size selection and show size options
                     const type = btn.getAttribute('data-type');
                     showSizeOptions(type);
+
+                    // Show status options immediately
+                    showStatusOptions();
                 }
             }
 
             function showSizeOptions(type) {
                 const sizeSelector = document.getElementById('size-selector');
+                const sizePlaceholder = document.getElementById('size-placeholder');
                 const options = sizeOptions[type];
 
                 sizeSelector.innerHTML = options.map(opt => `
@@ -667,8 +764,15 @@ def property_type_selector():
                     </button>
                 `).join('');
 
+                sizePlaceholder.classList.add('hidden');
                 sizeSelector.classList.remove('hidden');
             }
+
+            const statusOptions = [
+                { line1: 'Vacant', line2: 'No Furniture', value: 'vacant' },
+                { line1: 'Occupied', line2: 'Existing Furniture', value: 'occupied-furniture' },
+                { line1: 'Occupied', line2: 'Accessory Only', value: 'occupied-accessory' }
+            ];
 
             function selectSize(btn) {
                 buttonFeedback();
@@ -676,10 +780,58 @@ def property_type_selector():
 
                 if (btn.classList.contains('selected')) {
                     btn.classList.remove('selected');
+                    allSizeBtns.forEach(b => b.classList.remove('dimmed'));
                 } else {
-                    allSizeBtns.forEach(b => b.classList.remove('selected'));
+                    allSizeBtns.forEach(b => {
+                        b.classList.remove('selected');
+                        b.classList.add('dimmed');
+                    });
                     btn.classList.add('selected');
+                    btn.classList.remove('dimmed');
                 }
+            }
+
+            function showStatusOptions() {
+                const statusSelector = document.getElementById('status-selector');
+                const statusPlaceholder = document.getElementById('status-placeholder');
+
+                statusSelector.innerHTML = statusOptions.map(opt => `
+                    <button class="property-btn status-btn" data-status="${opt.value}" onclick="selectStatus(this)">
+                        <span class="size-line1">${opt.line1}</span>
+                        <span class="size-line2">${opt.line2}</span>
+                    </button>
+                `).join('');
+
+                statusPlaceholder.classList.add('hidden');
+                statusSelector.classList.remove('hidden');
+            }
+
+            function selectStatus(btn) {
+                buttonFeedback();
+                const allStatusBtns = document.querySelectorAll('.status-btn');
+                const areaSelector = document.getElementById('area-selector');
+                const areaPlaceholder = document.getElementById('area-placeholder');
+
+                if (btn.classList.contains('selected')) {
+                    btn.classList.remove('selected');
+                    allStatusBtns.forEach(b => b.classList.remove('dimmed'));
+                    areaSelector.classList.add('hidden');
+                    areaPlaceholder.classList.remove('hidden');
+                } else {
+                    allStatusBtns.forEach(b => {
+                        b.classList.remove('selected');
+                        b.classList.add('dimmed');
+                    });
+                    btn.classList.add('selected');
+                    btn.classList.remove('dimmed');
+                    areaPlaceholder.classList.add('hidden');
+                    areaSelector.classList.remove('hidden');
+                }
+            }
+
+            function toggleArea(btn) {
+                buttonFeedback();
+                btn.classList.toggle('selected');
             }
         """),
         cls="property-type-section"
@@ -705,8 +857,13 @@ def get_property_selector_styles():
         margin-top: 10px;
     }
 
-    .size-selector.hidden {
+    .size-selector.hidden,
+    .status-selector.hidden {
         display: none;
+    }
+
+    .status-selector {
+        margin-top: 10px;
     }
 
     .property-btn {
@@ -744,6 +901,10 @@ def get_property_selector_styles():
         box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15), 0 4px 16px rgba(255, 255, 255, 0.05);
     }
 
+    .property-btn.dimmed {
+        opacity: 0.4;
+    }
+
     .property-icon {
         font-size: 52px;
         line-height: 1;
@@ -777,10 +938,57 @@ def get_property_selector_styles():
     }
 
     .size-line2 {
-        font-size: 11px;
-        font-weight: 500;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--color-primary);
+        line-height: 1.2;
+    }
+
+    /* Placeholder Buttons */
+    .placeholder-row {
+        margin-top: 10px;
+    }
+
+    .placeholder-row.hidden {
+        display: none;
+    }
+
+    .placeholder-btn {
+        flex: 1;
+        aspect-ratio: auto;
+        height: calc((100vw - 40px) / 3);
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .placeholder-btn:disabled {
+        pointer-events: none;
+    }
+
+    .placeholder-text {
+        font-size: 14px;
+        font-weight: 600;
         color: var(--color-secondary);
-        text-transform: lowercase;
+    }
+
+    .area-placeholder-btn {
+        height: calc(((100vw - 40px) / 3) * 4 + 30px);
+    }
+
+    /* Area Selector */
+    .area-selector {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 10px;
+    }
+
+    .area-selector.hidden {
+        display: none;
+    }
+
+    .area-selector .property-selector {
+        margin-top: 0;
     }
 
     /* Tablet and up */
@@ -806,6 +1014,14 @@ def get_property_selector_styles():
         .property-btn {
             border-radius: 20px;
         }
+
+        .placeholder-btn {
+            height: calc((500px - 30px) / 3);
+        }
+
+        .area-placeholder-btn {
+            height: calc(((500px - 30px) / 3) * 4 + 30px);
+        }
     }
 
     /* Desktop */
@@ -825,6 +1041,14 @@ def get_property_selector_styles():
 
         .property-label {
             font-size: 14px;
+        }
+
+        .placeholder-btn {
+            height: calc((600px - 40px) / 3);
+        }
+
+        .area-placeholder-btn {
+            height: calc(((600px - 40px) / 3) * 4 + 40px);
         }
     }
     """
