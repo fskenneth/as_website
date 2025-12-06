@@ -616,50 +616,50 @@ def property_type_selector():
             Div(
                 # Row 1: Living Room, Dining Room, Family Room
                 Div(
-                    Button(Span("Living", cls="size-line1"), Span("Room", cls="size-line2"), cls="property-btn area-btn", data_area="living-room", onclick="toggleArea(this)"),
-                    Button(Span("Dining", cls="size-line1"), Span("Room", cls="size-line2"), cls="property-btn area-btn", data_area="dining-room", onclick="toggleArea(this)"),
-                    Button(Span("Family", cls="size-line1"), Span("Room", cls="size-line2"), cls="property-btn area-btn", data_area="family-room", onclick="toggleArea(this)"),
+                    Button(Span("Living Room", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="living-room", onclick="toggleArea(this)"),
+                    Button(Span("Dining Room", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="dining-room", onclick="toggleArea(this)"),
+                    Button(Span("Family Room", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="family-room", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 2: Kitchen Only, Kitchen with Island, Breakfast Area
                 Div(
-                    Button(Span("Kitchen", cls="size-line1"), Span("Only", cls="size-line2"), cls="property-btn area-btn", data_area="kitchen-only", onclick="toggleArea(this)"),
-                    Button(Span("Kitchen", cls="size-line1"), Span("with Island", cls="size-line2"), cls="property-btn area-btn", data_area="kitchen-island", onclick="toggleArea(this)"),
-                    Button(Span("Breakfast", cls="size-line1"), Span("Area", cls="size-line2"), cls="property-btn area-btn", data_area="breakfast-area", onclick="toggleArea(this)"),
+                    Button(Span("Kitchen Only", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="kitchen-only", onclick="toggleArea(this)"),
+                    Button(Span("Kitchen Island", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="kitchen-island", onclick="toggleArea(this)"),
+                    Button(Span("Breakfast Area", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="breakfast-area", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 3: Master Bedroom, 2nd Bedroom, 3rd Bedroom
                 Div(
-                    Button(Span("Master", cls="size-line1"), Span("Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="master-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("2nd", cls="size-line1"), Span("Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="2nd-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("3rd", cls="size-line1"), Span("Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="3rd-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("Master Bedroom", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="master-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("2nd Bedroom", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="2nd-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("3rd Bedroom", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="3rd-bedroom", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 4: 4th Bedroom, 5th Bedroom, 6th Bedroom
                 Div(
-                    Button(Span("4th", cls="size-line1"), Span("Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="4th-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("5th", cls="size-line1"), Span("Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="5th-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("6th", cls="size-line1"), Span("Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="6th-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("4th Bedroom", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="4th-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("5th Bedroom", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="5th-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("6th Bedroom", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="6th-bedroom", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 5: Office, Bathrooms, Outdoor
                 Div(
-                    Button(Span("Office", cls="size-line1"), Span("", cls="size-line2"), cls="property-btn area-btn", data_area="office", onclick="toggleArea(this)"),
-                    Button(Span("Bathrooms", cls="size-line1"), Span("", cls="size-line2"), cls="property-btn area-btn", data_area="bathrooms", onclick="toggleArea(this)"),
-                    Button(Span("Outdoor", cls="size-line1"), Span("", cls="size-line2"), cls="property-btn area-btn", data_area="outdoor", onclick="toggleArea(this)"),
+                    Button(Span("Office", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="office", onclick="toggleArea(this)"),
+                    Button(Span("Bathrooms", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="bathrooms", onclick="toggleArea(this)"),
+                    Button(Span("Outdoor", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="outdoor", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 6: Basement Living, Basement Dining, Basement Office
                 Div(
-                    Button(Span("Basement", cls="size-line1"), Span("Living", cls="size-line2"), cls="property-btn area-btn", data_area="basement-living", onclick="toggleArea(this)"),
-                    Button(Span("Basement", cls="size-line1"), Span("Dining", cls="size-line2"), cls="property-btn area-btn", data_area="basement-dining", onclick="toggleArea(this)"),
-                    Button(Span("Basement", cls="size-line1"), Span("Office", cls="size-line2"), cls="property-btn area-btn", data_area="basement-office", onclick="toggleArea(this)"),
+                    Button(Span("Basement Living", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="basement-living", onclick="toggleArea(this)"),
+                    Button(Span("Basement Dining", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="basement-dining", onclick="toggleArea(this)"),
+                    Button(Span("Basement Office", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="basement-office", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 7: Basement 1st Bedroom, Basement 2nd Bedroom
                 Div(
-                    Button(Span("Basement", cls="size-line1"), Span("1st Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="basement-1st-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("Basement", cls="size-line1"), Span("2nd Bedroom", cls="size-line2"), cls="property-btn area-btn", data_area="basement-2nd-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("Basement 1st Bed", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="basement-1st-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("Basement 2nd Bed", cls="area-name"), Span("", cls="area-price"), cls="property-btn area-btn", data_area="basement-2nd-bedroom", onclick="toggleArea(this)"),
                     Div(cls="property-btn-spacer"),
                     cls="property-selector"
                 ),
@@ -708,6 +708,151 @@ def property_type_selector():
                 playClickSound();
             }
 
+            // Pricing constants
+            const BASE_STAGING_FEE = 1450.00;
+            const HUGE_AREA = 700.00;
+            const BIG_AREA = 500.00;
+            const SMALL_AREA = 200.00;
+
+            // Get current selections
+            function getSelections() {
+                const propertyBtn = document.querySelector('.property-btn.selected:not(.size-btn):not(.status-btn):not(.area-btn)');
+                const sizeBtn = document.querySelector('.size-btn.selected');
+                const statusBtn = document.querySelector('.status-btn.selected');
+
+                return {
+                    propertyType: propertyBtn ? propertyBtn.getAttribute('data-type') : null,
+                    propertySize: sizeBtn ? sizeBtn.getAttribute('data-size') : null,
+                    occupancy: statusBtn ? statusBtn.getAttribute('data-status') : null
+                };
+            }
+
+            // Calculate base fee based on size
+            function getBaseFee(propertySize) {
+                let fee = BASE_STAGING_FEE;
+                if (['2000-3000', '3000-4000', 'over-4000'].includes(propertySize)) {
+                    fee += 800;
+                } else if (propertySize === '1000-2000') {
+                    fee += 200;
+                }
+                return fee;
+            }
+
+            // Get area price based on property type, size, and area
+            function getAreaPrice(area, propertyType, propertySize) {
+                const isLargeHouse = propertyType === 'house' && ['3000-4000', 'over-4000'].includes(propertySize);
+                const isSmallCondo = propertyType === 'condo' && propertySize === 'under-1000';
+
+                switch(area) {
+                    case 'living-room':
+                        return isLargeHouse ? HUGE_AREA : BIG_AREA;
+                    case 'dining-room':
+                        if (isSmallCondo) return SMALL_AREA;
+                        return isLargeHouse ? HUGE_AREA : BIG_AREA;
+                    case 'family-room':
+                        return isLargeHouse ? HUGE_AREA : BIG_AREA;
+                    case 'kitchen-only':
+                        return 0;
+                    case 'kitchen-island':
+                        if (isSmallCondo) return 100;
+                        return isLargeHouse ? 300 : 200;
+                    case 'breakfast-area':
+                        return SMALL_AREA;
+                    case 'master-bedroom':
+                        if (isSmallCondo) return SMALL_AREA;
+                        return isLargeHouse ? HUGE_AREA : BIG_AREA;
+                    case '2nd-bedroom':
+                        return isLargeHouse ? BIG_AREA : SMALL_AREA;
+                    case '3rd-bedroom':
+                    case '4th-bedroom':
+                    case '5th-bedroom':
+                    case '6th-bedroom':
+                        return SMALL_AREA;
+                    case 'office':
+                        return isLargeHouse ? BIG_AREA : SMALL_AREA;
+                    case 'bathrooms':
+                        return 0;
+                    case 'basement-living':
+                        return BIG_AREA;
+                    case 'basement-dining':
+                    case 'basement-1st-bedroom':
+                    case 'basement-2nd-bedroom':
+                    case 'basement-office':
+                        return SMALL_AREA;
+                    case 'outdoor':
+                        return 150;
+                    default:
+                        return 0;
+                }
+            }
+
+            // Update area button prices
+            function updateAreaPrices() {
+                const { propertyType, propertySize, occupancy } = getSelections();
+                if (!propertyType || !propertySize) return;
+
+                const isOccupied = occupancy === 'occupied-furniture';
+
+                document.querySelectorAll('.area-btn').forEach(btn => {
+                    const area = btn.getAttribute('data-area');
+                    let price = getAreaPrice(area, propertyType, propertySize);
+                    // Half price for occupied with existing furniture
+                    if (isOccupied && price > 0) {
+                        price = price / 2;
+                    }
+                    const priceSpan = btn.querySelector('.area-price');
+                    if (priceSpan) {
+                        priceSpan.textContent = price > 0 ? '+$' + price : 'Included';
+                    }
+                });
+
+                calculateTotalFee();
+            }
+
+            // Calculate total staging fee
+            function calculateTotalFee() {
+                const { propertyType, propertySize, occupancy } = getSelections();
+                if (!propertyType || !propertySize || !occupancy) {
+                    updateBannerFee(null);
+                    return;
+                }
+
+                let stagingFee = getBaseFee(propertySize);
+
+                // Add selected area prices
+                document.querySelectorAll('.area-btn.selected').forEach(btn => {
+                    const area = btn.getAttribute('data-area');
+                    stagingFee += getAreaPrice(area, propertyType, propertySize);
+                });
+
+                // Occupied adjustment (half the area fees)
+                if (occupancy === 'occupied-furniture') {
+                    stagingFee = (stagingFee - getBaseFee(propertySize)) / 2 + getBaseFee(propertySize);
+                } else if (occupancy === 'occupied-accessory') {
+                    // Decor only pricing
+                    if (propertyType === 'condo') {
+                        stagingFee = BASE_STAGING_FEE + 200;
+                    } else if (propertyType === 'townhouse') {
+                        stagingFee = BASE_STAGING_FEE + 500;
+                    } else if (propertyType === 'house') {
+                        stagingFee = BASE_STAGING_FEE + 1000;
+                    }
+                }
+
+                updateBannerFee(stagingFee);
+            }
+
+            // Update banner with fee
+            function updateBannerFee(fee) {
+                const title = document.getElementById('banner-title');
+                const subtitle = document.getElementById('banner-subtitle');
+
+                if (fee !== null) {
+                    title.textContent = 'Staging Fee';
+                    subtitle.textContent = '$' + fee.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' CAD';
+                }
+            }
+
             function updateBanner(state) {
                 const title = document.getElementById('banner-title');
                 const subtitle = document.getElementById('banner-subtitle');
@@ -721,6 +866,7 @@ def property_type_selector():
                 } else if (state === 'status-selected') {
                     title.textContent = 'Instant Quote';
                     subtitle.textContent = 'choose staging areas';
+                    updateAreaPrices();
                 }
             }
 
@@ -781,6 +927,12 @@ def property_type_selector():
 
                     // Show status options immediately
                     showStatusOptions();
+
+                    // Reset areas to placeholder (since size/status are cleared)
+                    areaSelector.classList.add('hidden');
+                    areaPlaceholder.classList.remove('hidden');
+                    document.querySelectorAll('.area-btn').forEach(b => b.classList.remove('selected'));
+
                     updateBanner('property-selected');
                 }
             }
@@ -822,6 +974,8 @@ def property_type_selector():
                     btn.classList.add('selected');
                     btn.classList.remove('dimmed');
                 }
+                checkShowAreas();
+                updateAreaPrices();
             }
 
             function showStatusOptions() {
@@ -839,18 +993,47 @@ def property_type_selector():
                 statusSelector.classList.remove('hidden');
             }
 
+            function checkShowAreas() {
+                const { propertyType, propertySize, occupancy } = getSelections();
+                const areaSelector = document.getElementById('area-selector');
+                const areaPlaceholder = document.getElementById('area-placeholder');
+
+                // Accessory Only - hide areas completely and show fixed price
+                if (occupancy === 'occupied-accessory') {
+                    areaSelector.classList.add('hidden');
+                    areaPlaceholder.classList.add('hidden');
+                    // Clear area selections
+                    document.querySelectorAll('.area-btn').forEach(b => b.classList.remove('selected'));
+                    // Calculate fixed accessory price
+                    let accessoryFee = BASE_STAGING_FEE;
+                    if (propertyType === 'condo') accessoryFee += 200;
+                    else if (propertyType === 'townhouse') accessoryFee += 500;
+                    else if (propertyType === 'house') accessoryFee += 1000;
+                    updateBannerFee(accessoryFee);
+                    return;
+                }
+
+                if (propertySize && occupancy) {
+                    areaPlaceholder.classList.add('hidden');
+                    areaSelector.classList.remove('hidden');
+                    updateBanner('status-selected');
+                    updateAreaPrices();
+                } else {
+                    areaSelector.classList.add('hidden');
+                    areaPlaceholder.classList.remove('hidden');
+                    if (document.querySelector('.property-btn.selected:not(.size-btn):not(.status-btn):not(.area-btn)')) {
+                        updateBanner('property-selected');
+                    }
+                }
+            }
+
             function selectStatus(btn) {
                 buttonFeedback();
                 const allStatusBtns = document.querySelectorAll('.status-btn');
-                const areaSelector = document.getElementById('area-selector');
-                const areaPlaceholder = document.getElementById('area-placeholder');
 
                 if (btn.classList.contains('selected')) {
                     btn.classList.remove('selected');
                     allStatusBtns.forEach(b => b.classList.remove('dimmed'));
-                    areaSelector.classList.add('hidden');
-                    areaPlaceholder.classList.remove('hidden');
-                    updateBanner('property-selected');
                 } else {
                     allStatusBtns.forEach(b => {
                         b.classList.remove('selected');
@@ -858,15 +1041,15 @@ def property_type_selector():
                     });
                     btn.classList.add('selected');
                     btn.classList.remove('dimmed');
-                    areaPlaceholder.classList.add('hidden');
-                    areaSelector.classList.remove('hidden');
-                    updateBanner('status-selected');
                 }
+                checkShowAreas();
+                updateAreaPrices();
             }
 
             function toggleArea(btn) {
                 buttonFeedback();
                 btn.classList.toggle('selected');
+                calculateTotalFee();
             }
         """),
         cls="property-type-section"
@@ -878,8 +1061,10 @@ def get_property_selector_styles():
     return """
     /* Notification Banner */
     .notification-banner {
-        position: sticky;
+        position: fixed;
         top: 59px;
+        left: 0;
+        right: 0;
         z-index: 100;
         color: var(--color-primary);
         padding: 12px 15px;
@@ -921,10 +1106,19 @@ def get_property_selector_styles():
         background: var(--bg-primary);
     }
 
+    .property-type-section > .container {
+        padding-top: 85px;  /* Account for fixed banner height (~77px) */
+    }
+
     .property-selector {
         display: flex;
         gap: 10px;
         width: 100%;
+        margin-top: 10px;
+    }
+
+    .property-selector:first-child {
+        margin-top: 0;
     }
 
     .size-selector {
@@ -1072,16 +1266,44 @@ def get_property_selector_styles():
         margin-top: 0;
     }
 
+    /* Area button text styles */
+    .area-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--color-primary);
+        line-height: 1.2;
+        text-align: center;
+    }
+
+    .area-price {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--color-secondary);
+        margin-top: 2px;
+    }
+
+    .area-btn.selected .area-price {
+        color: var(--color-primary);
+    }
+
     /* Tablet and up */
     @media (min-width: 768px) {
         .property-type-section {
-            padding: 30px 20px;
+            padding: 0 20px 30px;
+        }
+
+        .property-type-section > .container {
+            padding-top: 65px;  /* Account for fixed banner height */
         }
 
         .property-selector {
             gap: 15px;
             max-width: 500px;
-            margin: 0 auto;
+            margin: 15px auto 0;
+        }
+
+        .property-selector:first-child {
+            margin-top: 0;
         }
 
         .property-icon {
@@ -1108,12 +1330,21 @@ def get_property_selector_styles():
     /* Desktop */
     @media (min-width: 1024px) {
         .property-type-section {
-            padding: 40px 30px;
+            padding: 0 30px 40px;
+        }
+
+        .property-type-section > .container {
+            padding-top: 70px;  /* Account for fixed banner height */
         }
 
         .property-selector {
             gap: 20px;
             max-width: 600px;
+            margin: 20px auto 0;
+        }
+
+        .property-selector:first-child {
+            margin-top: 0;
         }
 
         .property-icon {
