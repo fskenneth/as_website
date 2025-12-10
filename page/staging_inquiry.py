@@ -734,17 +734,6 @@ def property_type_selector():
                 id="size-selector",
                 cls="property-selector size-selector hidden"
             ),
-            # Property Status Row - Placeholder shown by default
-            Div(
-                Button(Span("Vacant or Occupied", cls="placeholder-text"), cls="property-btn placeholder-btn", disabled=True),
-                id="status-placeholder",
-                cls="property-selector placeholder-row"
-            ),
-            # Property Status Row (hidden by default)
-            Div(
-                id="status-selector",
-                cls="property-selector status-selector hidden"
-            ),
             # Area Placeholder (shown by default)
             Div(
                 Button(Span("Staging Areas", cls="placeholder-text"), cls="property-btn placeholder-btn area-placeholder-btn", disabled=True),
@@ -857,14 +846,12 @@ def property_type_selector():
 
             // Get current selections
             function getSelections() {
-                const propertyBtn = document.querySelector('.property-btn.selected:not(.size-btn):not(.status-btn):not(.area-btn)');
+                const propertyBtn = document.querySelector('.property-btn.selected:not(.size-btn):not(.area-btn)');
                 const sizeBtn = document.querySelector('.size-btn.selected');
-                const statusBtn = document.querySelector('.status-btn.selected');
 
                 return {
                     propertyType: propertyBtn ? propertyBtn.getAttribute('data-type') : null,
-                    propertySize: sizeBtn ? sizeBtn.getAttribute('data-size') : null,
-                    occupancy: statusBtn ? statusBtn.getAttribute('data-status') : null
+                    propertySize: sizeBtn ? sizeBtn.getAttribute('data-size') : null
                 };
             }
 
@@ -929,18 +916,12 @@ def property_type_selector():
 
             // Update area button prices
             function updateAreaPrices() {
-                const { propertyType, propertySize, occupancy } = getSelections();
+                const { propertyType, propertySize } = getSelections();
                 if (!propertyType || !propertySize) return;
-
-                const isOccupied = occupancy === 'occupied-furniture';
 
                 document.querySelectorAll('.area-btn').forEach(btn => {
                     const area = btn.getAttribute('data-area');
                     let price = getAreaPrice(area, propertyType, propertySize);
-                    // Half price for occupied with existing furniture
-                    if (isOccupied && price > 0) {
-                        price = price / 2;
-                    }
                     const priceSpan = btn.querySelector('.area-price');
                     if (priceSpan) {
                         priceSpan.textContent = price > 0 ? '+$' + price : 'Included';
@@ -952,8 +933,8 @@ def property_type_selector():
 
             // Calculate total staging fee
             function calculateTotalFee() {
-                const { propertyType, propertySize, occupancy } = getSelections();
-                if (!propertyType || !propertySize || !occupancy) {
+                const { propertyType, propertySize } = getSelections();
+                if (!propertyType || !propertySize) {
                     updateBannerFee(null);
                     return;
                 }
@@ -965,20 +946,6 @@ def property_type_selector():
                     const area = btn.getAttribute('data-area');
                     stagingFee += getAreaPrice(area, propertyType, propertySize);
                 });
-
-                // Occupied adjustment (half the area fees)
-                if (occupancy === 'occupied-furniture') {
-                    stagingFee = (stagingFee - getBaseFee(propertySize)) / 2 + getBaseFee(propertySize);
-                } else if (occupancy === 'occupied-accessory') {
-                    // Decor only pricing
-                    if (propertyType === 'condo') {
-                        stagingFee = BASE_STAGING_FEE + 200;
-                    } else if (propertyType === 'townhouse') {
-                        stagingFee = BASE_STAGING_FEE + 500;
-                    } else if (propertyType === 'house') {
-                        stagingFee = BASE_STAGING_FEE + 1000;
-                    }
-                }
 
                 updateBannerFee(stagingFee);
             }
@@ -1031,11 +998,9 @@ def property_type_selector():
 
             function selectPropertyType(btn) {
                 buttonFeedback();
-                const allBtns = document.querySelectorAll('.property-btn:not(.size-btn):not(.status-btn):not(.area-btn):not(.placeholder-btn)');
+                const allBtns = document.querySelectorAll('.property-btn:not(.size-btn):not(.area-btn):not(.placeholder-btn)');
                 const sizeSelector = document.getElementById('size-selector');
                 const sizePlaceholder = document.getElementById('size-placeholder');
-                const statusSelector = document.getElementById('status-selector');
-                const statusPlaceholder = document.getElementById('status-placeholder');
                 const areaSelector = document.getElementById('area-selector');
                 const areaPlaceholder = document.getElementById('area-placeholder');
 
@@ -1046,9 +1011,6 @@ def property_type_selector():
                     sizeSelector.classList.add('hidden');
                     sizeSelector.innerHTML = '';
                     sizePlaceholder.classList.remove('hidden');
-                    statusSelector.classList.add('hidden');
-                    statusSelector.innerHTML = '';
-                    statusPlaceholder.classList.remove('hidden');
                     areaSelector.classList.add('hidden');
                     areaPlaceholder.classList.remove('hidden');
                     document.querySelectorAll('.area-btn').forEach(b => b.classList.remove('selected'));
@@ -1066,10 +1028,7 @@ def property_type_selector():
                     const type = btn.getAttribute('data-type');
                     showSizeOptions(type);
 
-                    // Show status options immediately
-                    showStatusOptions();
-
-                    // Reset areas to placeholder (since size/status are cleared)
+                    // Reset areas to placeholder (since size is cleared)
                     areaSelector.classList.add('hidden');
                     areaPlaceholder.classList.remove('hidden');
                     document.querySelectorAll('.area-btn').forEach(b => b.classList.remove('selected'));
@@ -1094,12 +1053,6 @@ def property_type_selector():
                 sizeSelector.classList.remove('hidden');
             }
 
-            const statusOptions = [
-                { line1: 'Vacant', line2: 'No Furniture', value: 'vacant' },
-                { line1: 'Occupied', line2: 'Existing Furniture', value: 'occupied-furniture' },
-                { line1: 'Occupied', line2: 'Accessory Only', value: 'occupied-accessory' }
-            ];
-
             function selectSize(btn) {
                 buttonFeedback();
                 const allSizeBtns = document.querySelectorAll('.size-btn');
@@ -1119,72 +1072,23 @@ def property_type_selector():
                 updateAreaPrices();
             }
 
-            function showStatusOptions() {
-                const statusSelector = document.getElementById('status-selector');
-                const statusPlaceholder = document.getElementById('status-placeholder');
-
-                statusSelector.innerHTML = statusOptions.map(opt => `
-                    <button class="property-btn status-btn" data-status="${opt.value}" onclick="selectStatus(this)">
-                        <span class="size-line1">${opt.line1}</span>
-                        <span class="size-line2">${opt.line2}</span>
-                    </button>
-                `).join('');
-
-                statusPlaceholder.classList.add('hidden');
-                statusSelector.classList.remove('hidden');
-            }
-
             function checkShowAreas() {
-                const { propertyType, propertySize, occupancy } = getSelections();
+                const { propertyType, propertySize } = getSelections();
                 const areaSelector = document.getElementById('area-selector');
                 const areaPlaceholder = document.getElementById('area-placeholder');
 
-                // Accessory Only - hide areas completely and show fixed price
-                if (occupancy === 'occupied-accessory') {
-                    areaSelector.classList.add('hidden');
-                    areaPlaceholder.classList.add('hidden');
-                    // Clear area selections
-                    document.querySelectorAll('.area-btn').forEach(b => b.classList.remove('selected'));
-                    // Calculate fixed accessory price
-                    let accessoryFee = BASE_STAGING_FEE;
-                    if (propertyType === 'condo') accessoryFee += 200;
-                    else if (propertyType === 'townhouse') accessoryFee += 500;
-                    else if (propertyType === 'house') accessoryFee += 1000;
-                    updateBannerFee(accessoryFee);
-                    return;
-                }
-
-                if (propertySize && occupancy) {
+                if (propertyType && propertySize) {
                     areaPlaceholder.classList.add('hidden');
                     areaSelector.classList.remove('hidden');
-                    updateBanner('status-selected');
+                    updateBanner('size-selected');
                     updateAreaPrices();
                 } else {
                     areaSelector.classList.add('hidden');
                     areaPlaceholder.classList.remove('hidden');
-                    if (document.querySelector('.property-btn.selected:not(.size-btn):not(.status-btn):not(.area-btn)')) {
+                    if (document.querySelector('.property-btn.selected:not(.size-btn):not(.area-btn)')) {
                         updateBanner('property-selected');
                     }
                 }
-            }
-
-            function selectStatus(btn) {
-                buttonFeedback();
-                const allStatusBtns = document.querySelectorAll('.status-btn');
-
-                if (btn.classList.contains('selected')) {
-                    btn.classList.remove('selected');
-                    allStatusBtns.forEach(b => b.classList.remove('dimmed'));
-                } else {
-                    allStatusBtns.forEach(b => {
-                        b.classList.remove('selected');
-                        b.classList.add('dimmed');
-                    });
-                    btn.classList.add('selected');
-                    btn.classList.remove('dimmed');
-                }
-                checkShowAreas();
-                updateAreaPrices();
             }
 
             function toggleArea(btn) {
@@ -1778,13 +1682,8 @@ def get_property_selector_styles():
         margin-top: 10px;
     }
 
-    .size-selector.hidden,
-    .status-selector.hidden {
+    .size-selector.hidden {
         display: none;
-    }
-
-    .status-selector {
-        margin-top: 10px;
     }
 
     .property-btn {
