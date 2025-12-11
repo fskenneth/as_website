@@ -796,6 +796,13 @@ def property_type_selector():
             ),
             # Items Modal
             items_modal(),
+            # Floating Action Buttons
+            Div(
+                Button("Inquire", cls="staging-inquiry-btn"),
+                Button("Continue Booking", cls="staging-continue-btn"),
+                cls="staging-action-buttons",
+                id="staging-action-buttons"
+            ),
             cls="container"
         ),
         Script("""
@@ -949,6 +956,7 @@ def property_type_selector():
                 const { propertyType, propertySize } = getSelections();
                 if (!propertyType || !propertySize) {
                     updateBannerFee(null);
+                    updateActionButtons(false);
                     return;
                 }
 
@@ -957,6 +965,7 @@ def property_type_selector():
                 if (selectedAreas.length === 0) {
                     // No areas selected - show "select staging areas"
                     updateBanner('size-selected');
+                    updateActionButtons(false);
                     return;
                 }
 
@@ -977,6 +986,17 @@ def property_type_selector():
                 });
 
                 updateBannerFee(stagingFee);
+                updateActionButtons(true);
+            }
+
+            // Show/hide action buttons
+            function updateActionButtons(show) {
+                const actionButtons = document.getElementById('staging-action-buttons');
+                if (show) {
+                    actionButtons.classList.add('visible');
+                } else {
+                    actionButtons.classList.remove('visible');
+                }
             }
 
             // Update banner with fee
@@ -2283,6 +2303,160 @@ def get_property_selector_styles():
 
         .area-placeholder-btn {
             height: calc(((600px - 40px) / 3 * 2 / 3) * 7 + 80px);
+        }
+    }
+
+    /* Staging Action Buttons */
+    .staging-action-buttons {
+        position: fixed;
+        bottom: 30px;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: space-between;
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 0 40px;
+        padding-right: 110px; /* Leave space for WhatsApp button */
+        box-sizing: border-box;
+        z-index: 999;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+
+    .staging-action-buttons.visible {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .staging-inquiry-btn,
+    .staging-continue-btn {
+        padding: 0 28px;
+        border-radius: 30px;
+        font-size: 14px;
+        font-weight: 700;
+        text-decoration: none;
+        white-space: nowrap;
+        line-height: 1.2;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        backdrop-filter: blur(20px) saturate(150%);
+        -webkit-backdrop-filter: blur(20px) saturate(150%);
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    /* Light theme */
+    [data-theme="light"] .staging-inquiry-btn {
+        background: rgba(0, 0, 0, 0.06);
+        color: #000000;
+        border: 2px solid rgba(0, 0, 0, 0.2);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 8px 40px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+
+    [data-theme="light"] .staging-inquiry-btn:hover {
+        transform: translateY(-3px) scale(1.02);
+        background: rgba(0, 0, 0, 0.15);
+        border-color: rgba(0, 0, 0, 0.4);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2), 0 16px 60px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    }
+
+    [data-theme="light"] .staging-continue-btn {
+        background: rgba(0, 0, 0, 0.06);
+        color: #000000;
+        border: 2px solid rgba(0, 0, 0, 0.2);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 8px 40px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        animation: staging-btn-glow-light 2s ease-in-out infinite;
+    }
+
+    [data-theme="light"] .staging-continue-btn:hover {
+        transform: translateY(-3px) scale(1.02);
+        background: rgba(0, 0, 0, 0.15);
+        border-color: rgba(0, 0, 0, 0.4);
+        animation-play-state: paused;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2), 0 16px 60px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    }
+
+    /* Dark theme */
+    [data-theme="dark"] .staging-inquiry-btn {
+        background: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+        box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15), 0 8px 40px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+
+    [data-theme="dark"] .staging-inquiry-btn:hover {
+        transform: translateY(-3px) scale(1.02);
+        background: rgba(255, 255, 255, 0.3);
+        border-color: rgba(255, 255, 255, 0.7);
+        box-shadow: 0 8px 35px rgba(255, 255, 255, 0.3), 0 16px 70px rgba(255, 255, 255, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+
+    [data-theme="dark"] .staging-continue-btn {
+        background: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+        box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15), 0 8px 40px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        animation: staging-btn-glow-dark 2s ease-in-out infinite;
+    }
+
+    [data-theme="dark"] .staging-continue-btn:hover {
+        transform: translateY(-3px) scale(1.02);
+        background: rgba(255, 255, 255, 0.3);
+        border-color: rgba(255, 255, 255, 0.7);
+        animation-play-state: paused;
+        box-shadow: 0 8px 35px rgba(255, 255, 255, 0.3), 0 16px 70px rgba(255, 255, 255, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+
+    /* Glow animations */
+    @keyframes staging-btn-glow-light {
+        0%, 100% {
+            transform: scale(1);
+            background: rgba(0, 0, 0, 0.06);
+            border-color: rgba(0, 0, 0, 0.2);
+        }
+        50% {
+            transform: scale(1.02);
+            background: rgba(0, 0, 0, 0.12);
+            border-color: rgba(0, 0, 0, 0.35);
+        }
+    }
+
+    @keyframes staging-btn-glow-dark {
+        0%, 100% {
+            transform: scale(1);
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.35);
+        }
+        50% {
+            transform: scale(1.02);
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+    }
+
+    .staging-inquiry-btn:active,
+    .staging-continue-btn:active {
+        transform: translateY(-1px) scale(1.01) !important;
+    }
+
+    /* Mobile adjustments */
+    @media (max-width: 767px) {
+        .staging-action-buttons {
+            bottom: 20px;
+            padding: 0 10px;
+            padding-right: 75px; /* Space for WhatsApp button (45px + 20px right + gap) */
+        }
+
+        .staging-inquiry-btn,
+        .staging-continue-btn {
+            font-size: 13px;
+            height: 45px; /* Match WhatsApp button height on mobile */
+            padding: 0 16px;
         }
     }
     """
