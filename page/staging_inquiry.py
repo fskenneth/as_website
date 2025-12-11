@@ -939,10 +939,18 @@ def property_type_selector():
                     return;
                 }
 
+                // Check if at least 1 area is selected
+                const selectedAreas = document.querySelectorAll('.area-btn.selected');
+                if (selectedAreas.length === 0) {
+                    // No areas selected - show "select staging areas"
+                    updateBanner('size-selected');
+                    return;
+                }
+
                 let stagingFee = getBaseFee(propertySize);
 
                 // Add selected area prices
-                document.querySelectorAll('.area-btn.selected').forEach(btn => {
+                selectedAreas.forEach(btn => {
                     const area = btn.getAttribute('data-area');
                     stagingFee += getAreaPrice(area, propertyType, propertySize);
                 });
@@ -970,11 +978,10 @@ def property_type_selector():
                     subtitle.textContent = 'click a property type to start';
                 } else if (state === 'property-selected') {
                     title.textContent = 'Instant Quote';
-                    subtitle.textContent = 'select property size and occupancy';
-                } else if (state === 'status-selected') {
+                    subtitle.textContent = 'select property size';
+                } else if (state === 'size-selected') {
                     title.textContent = 'Instant Quote';
-                    subtitle.textContent = 'choose staging areas';
-                    updateAreaPrices();
+                    subtitle.textContent = 'select staging areas';
                 }
             }
 
