@@ -921,14 +921,27 @@ def property_type_selector():
 
                 document.querySelectorAll('.area-btn').forEach(btn => {
                     const area = btn.getAttribute('data-area');
-                    let price = getAreaPrice(area, propertyType, propertySize);
-                    const priceSpan = btn.querySelector('.area-price');
-                    if (priceSpan) {
-                        priceSpan.textContent = price > 0 ? '+$' + price : 'Included';
-                    }
+                    updateAreaButtonPrice(btn, area, propertyType, propertySize);
                 });
 
                 calculateTotalFee();
+            }
+
+            // Update single area button price display
+            function updateAreaButtonPrice(btn, area, propertyType, propertySize) {
+                const bulkPrice = getAreaPrice(area, propertyType, propertySize);
+                const itemTotal = getAreaItemTotal(area);
+
+                // Use lesser of bulk price or item total
+                let displayPrice = bulkPrice;
+                if (itemTotal !== null && itemTotal < bulkPrice) {
+                    displayPrice = itemTotal;
+                }
+
+                const priceSpan = btn.querySelector('.area-price');
+                if (priceSpan) {
+                    priceSpan.textContent = displayPrice > 0 ? '+$' + displayPrice : 'Included';
+                }
             }
 
             // Calculate total staging fee
@@ -949,10 +962,18 @@ def property_type_selector():
 
                 let stagingFee = getBaseFee(propertySize);
 
-                // Add selected area prices
+                // Add selected area prices (use lesser of bulk price or item total)
                 selectedAreas.forEach(btn => {
                     const area = btn.getAttribute('data-area');
-                    stagingFee += getAreaPrice(area, propertyType, propertySize);
+                    const bulkPrice = getAreaPrice(area, propertyType, propertySize);
+                    const itemTotal = getAreaItemTotal(area);
+
+                    // Use item total if available and less than bulk price
+                    if (itemTotal !== null && itemTotal < bulkPrice) {
+                        stagingFee += itemTotal;
+                    } else {
+                        stagingFee += bulkPrice;
+                    }
                 });
 
                 updateBannerFee(stagingFee);
@@ -1134,6 +1155,37 @@ def property_type_selector():
 
             // Item column order from CSV
             const itemColumns = ['sofa','accent-chair','coffee-table','end-table','console','bench','area-rug','lamp','cushion','throw','table-decor','wall-art','formal-dining-set','bar-stool','casual-dining-set','queen-bed-frame','queen-headboard','queen-mattress','queen-beddings','king-bed-frame','king-headboard','king-mattress','king-beddings','double-bed-frame','double-headboard','double-mattress','double-bedding','night-stand','single-bed-frame','single-headboard','single-mattress','single-beddings','desk','chair','patio-set'];
+
+            // Item prices lookup
+            const itemPrices = {
+                'sofa': 250, 'accent-chair': 100, 'coffee-table': 100, 'end-table': 50,
+                'console': 75, 'bench': 65, 'area-rug': 80, 'lamp': 40, 'cushion': 15,
+                'throw': 18, 'table-decor': 10, 'wall-art': 40, 'formal-dining-set': 400,
+                'bar-stool': 40, 'casual-dining-set': 250, 'queen-bed-frame': 20,
+                'queen-headboard': 90, 'queen-mattress': 50, 'queen-beddings': 120,
+                'king-bed-frame': 20, 'king-headboard': 130, 'king-mattress': 50,
+                'king-beddings': 150, 'double-bed-frame': 20, 'double-headboard': 80,
+                'double-mattress': 50, 'double-bedding': 120, 'night-stand': 60,
+                'single-bed-frame': 20, 'single-headboard': 75, 'single-mattress': 50,
+                'single-beddings': 80, 'desk': 100, 'chair': 50, 'patio-set': 150
+            };
+
+            // Calculate item total for an area (uses saved items or defaults)
+            function getAreaItemTotal(area) {
+                // Use saved items if exists, otherwise use defaults
+                let items = areaItemsData[area];
+                if (!items) {
+                    items = getDefaultItems(area);
+                }
+                if (!items) return null;
+
+                let total = 0;
+                for (const [itemId, qty] of Object.entries(items)) {
+                    const price = itemPrices[itemId] || 0;
+                    total += price * qty;
+                }
+                return total;
+            }
 
             // Default items data: defaultAreaItems[suiteType][size][areaSlug] = [qty array matching itemColumns]
             const defaultAreaItems = {
@@ -1595,7 +1647,17 @@ def property_type_selector():
 
                 areaItemsData[currentArea] = selections;
 
+                // Update the area button price display
+                const { propertyType, propertySize } = getSelections();
+                const areaBtn = document.querySelector('.area-btn[data-area="' + currentArea + '"]');
+                if (areaBtn && propertyType && propertySize) {
+                    updateAreaButtonPrice(areaBtn, currentArea, propertyType, propertySize);
+                }
+
                 closeItemsModal();
+
+                // Recalculate total fee with new item selections
+                calculateTotalFee();
             }
 
             // Close modal on backdrop click
