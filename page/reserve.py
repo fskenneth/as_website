@@ -373,6 +373,49 @@ def reserve_page(req: Request):
             cursor: pointer;
         }
 
+        /* Date type selector buttons */
+        .date-type-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .date-type-btn {
+            flex: 1;
+            padding: 16px 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: var(--color-primary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        [data-theme="light"] .date-type-btn {
+            background: rgba(0, 0, 0, 0.02);
+            border: 2px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .date-type-btn:hover {
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+
+        .date-type-btn.selected {
+            border-color: #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+        }
+
+        .calendar-container {
+            display: none;
+        }
+
+        .calendar-container.visible {
+            display: block;
+        }
+
         /* Date picker visibility - desktop shows single calendar, mobile shows scrollable months */
         .desktop-date-picker {
             display: block;
@@ -694,52 +737,69 @@ def reserve_page(req: Request):
                 propSizeEl.textContent = propSize ? propSize + ' sq ft' : 'Not selected';
             }}
 
-            // Update selected areas (comma separated, no line breaks within names)
-            const areasEl = document.getElementById('summary-areas');
-            if (areasEl) {{
-                if (stagingData.selectedAreas.length > 0) {{
-                    // Replace spaces with non-breaking spaces to keep area names on one line
-                    const areasWithNbsp = stagingData.selectedAreas.map(area => area.replace(/ /g, '\u00A0'));
-                    areasEl.textContent = areasWithNbsp.join(', ');
-                }} else {{
-                    areasEl.textContent = 'None selected';
-                }}
-            }}
-
-            // Update selected items (combine same items across areas, comma separated)
-            const itemsEl = document.getElementById('summary-items');
-            if (itemsEl) {{
-                // Combine quantities for same items across all areas
-                const combinedItems = {{}};
-                for (const [area, items] of Object.entries(stagingData.selectedItems)) {{
-                    for (const [itemId, qty] of Object.entries(items)) {{
-                        if (qty > 0) {{
-                            combinedItems[itemId] = (combinedItems[itemId] || 0) + qty;
-                        }}
-                    }}
-                }}
-
+            // Update selected areas and items (grouped by area)
+            const areasItemsEl = document.getElementById('summary-areas-items');
+            if (areasItemsEl) {{
                 // Format item name from ID (e.g., "end-table" -> "End Table")
                 function formatItemName(itemId) {{
                     if (itemNameMap[itemId]) return itemNameMap[itemId];
                     return itemId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
                 }}
 
-                // Build display list
-                const itemsList = [];
-                for (const [itemId, qty] of Object.entries(combinedItems)) {{
-                    const itemName = formatItemName(itemId);
-                    // Add 's' for plural if qty > 1 (simple pluralization)
-                    const displayName = qty > 1 ? itemName + 's' : itemName;
-                    // Replace spaces with non-breaking spaces to keep item name on one line
-                    const displayNameNbsp = displayName.replace(/ /g, '\u00A0');
-                    itemsList.push(`${{qty}}\u00A0${{displayNameNbsp}}`);
-                }}
+                // Area slug to display name mapping
+                const areaDisplayNames = {{
+                    'living-room': 'Living Room',
+                    'dining-room': 'Dining Room',
+                    'family-room': 'Family Room',
+                    'kitchen-only': 'Kitchen Only',
+                    'kitchen-island': 'Kitchen Island',
+                    'breakfast-area': 'Breakfast Area',
+                    'master-bedroom': 'Master Bedroom',
+                    '2nd-bedroom': '2nd Bedroom',
+                    '3rd-bedroom': '3rd Bedroom',
+                    '4th-bedroom': '4th Bedroom',
+                    '5th-bedroom': '5th Bedroom',
+                    '6th-bedroom': '6th Bedroom',
+                    'office': 'Office',
+                    'bathrooms': 'Bathrooms',
+                    'outdoor': 'Outdoor',
+                    'basement-living': 'Basement Living',
+                    'basement-dining': 'Basement Dining',
+                    'basement-office': 'Basement Office',
+                    'basement-1st-bedroom': 'Basement 1st Bed',
+                    'basement-2nd-bedroom': 'Basement 2nd Bed'
+                }};
 
-                if (itemsList.length > 0) {{
-                    itemsEl.textContent = itemsList.join(', ');
+                if (Object.keys(stagingData.selectedItems).length > 0) {{
+                    // Build display by area
+                    const areaLines = [];
+                    for (const [areaSlug, items] of Object.entries(stagingData.selectedItems)) {{
+                        const areaName = areaDisplayNames[areaSlug] || areaSlug;
+                        const areaNameNbsp = areaName.replace(/ /g, '\u00A0');
+
+                        // Build items list for this area
+                        const itemsList = [];
+                        for (const [itemId, qty] of Object.entries(items)) {{
+                            if (qty > 0) {{
+                                const itemName = formatItemName(itemId);
+                                const displayName = qty > 1 ? itemName + 's' : itemName;
+                                const displayNameNbsp = displayName.replace(/ /g, '\u00A0');
+                                itemsList.push(`${{qty}}\u00A0${{displayNameNbsp}}`);
+                            }}
+                        }}
+
+                        if (itemsList.length > 0) {{
+                            areaLines.push(`<div style="margin-bottom: 8px;"><strong>${{areaNameNbsp}}:</strong> ${{itemsList.join(', ')}}</div>`);
+                        }}
+                    }}
+
+                    if (areaLines.length > 0) {{
+                        areasItemsEl.innerHTML = areaLines.join('');
+                    }} else {{
+                        areasItemsEl.textContent = 'None selected';
+                    }}
                 }} else {{
-                    itemsEl.textContent = 'Default items';
+                    areasItemsEl.textContent = 'None selected';
                 }}
             }}
 
@@ -865,8 +925,9 @@ def reserve_page(req: Request):
 
                 const cellDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
 
-                // Disable past dates
-                if (cellDate < today) {{
+                // Disable past dates and weekends (Sat=6, Sun=0)
+                const dayOfWeek = cellDate.getDay();
+                if (cellDate < today || dayOfWeek === 0 || dayOfWeek === 6) {{
                     dayCell.classList.add('disabled');
                 }} else {{
                     dayCell.onclick = () => selectDate(cellDate);
@@ -962,7 +1023,9 @@ def reserve_page(req: Request):
 
                 const cellDate = new Date(currentDisplayMonth.getFullYear(), currentDisplayMonth.getMonth(), day);
 
-                if (cellDate < today) {{
+                // Disable past dates and weekends (Sat=6, Sun=0)
+                const dayOfWeek = cellDate.getDay();
+                if (cellDate < today || dayOfWeek === 0 || dayOfWeek === 6) {{
                     dayCell.classList.add('disabled');
                 }} else {{
                     dayCell.onclick = () => selectDate(cellDate);
@@ -998,20 +1061,79 @@ def reserve_page(req: Request):
             }}
         }}
 
+        // Date type selection
+        let selectedDateType = null;
+
+        function selectDateType(btn) {{
+            // Remove selected from all date type buttons
+            document.querySelectorAll('.date-type-btn').forEach(b => b.classList.remove('selected'));
+
+            // Add selected to clicked button
+            btn.classList.add('selected');
+
+            selectedDateType = btn.getAttribute('data-type');
+
+            // Store the date type
+            const dateTypeInput = document.getElementById('staging-date-type');
+            if (dateTypeInput) {{
+                dateTypeInput.value = selectedDateType;
+            }}
+
+            // Show/hide calendar based on selection
+            const calendarContainer = document.getElementById('calendar-container');
+            const dateDisplay = document.getElementById('staging-date-display');
+            const dateInput = document.getElementById('staging-date');
+
+            if (selectedDateType === 'asap') {{
+                // Hide calendar, set date to "ASAP"
+                calendarContainer.classList.remove('visible');
+                if (dateDisplay) dateDisplay.value = 'ASAP - We will contact you';
+                if (dateInput) dateInput.value = 'ASAP';
+                selectedDate = null;
+            }} else if (selectedDateType === 'week') {{
+                // Show calendar for week selection
+                calendarContainer.classList.add('visible');
+                if (dateDisplay) dateDisplay.value = '';
+                if (dateDisplay) dateDisplay.placeholder = 'Select a week';
+                if (dateInput) dateInput.value = '';
+                selectedDate = null;
+                generateCalendarMonths();
+            }} else if (selectedDateType === 'date') {{
+                // Show calendar for date selection
+                calendarContainer.classList.add('visible');
+                if (dateDisplay) dateDisplay.value = '';
+                if (dateDisplay) dateDisplay.placeholder = 'Select staging date';
+                if (dateInput) dateInput.value = '';
+                selectedDate = null;
+                generateCalendarMonths();
+            }}
+        }}
+
         function selectDate(date) {{
             selectedDate = date;
 
-            // Update display
+            // Update display based on date type
             const dateInput = document.getElementById('staging-date-display');
-            if (dateInput) {{
-                const options = {{ weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }};
-                dateInput.value = date.toLocaleDateString('en-CA', options);
-            }}
-
-            // Store the ISO date
             const hiddenInput = document.getElementById('staging-date');
-            if (hiddenInput) {{
-                hiddenInput.value = date.toISOString().split('T')[0];
+
+            if (selectedDateType === 'week') {{
+                // Show "Week of Mon, Dec 16, 2024"
+                if (dateInput) {{
+                    const options = {{ weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }};
+                    dateInput.value = 'Week of ' + date.toLocaleDateString('en-CA', options);
+                }}
+                if (hiddenInput) {{
+                    hiddenInput.value = 'week-' + date.toISOString().split('T')[0];
+                }}
+            }} else {{
+                // Show specific date
+                if (dateInput) {{
+                    const options = {{ weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }};
+                    dateInput.value = date.toLocaleDateString('en-CA', options);
+                }}
+                if (hiddenInput) {{
+                    hiddenInput.value = date.toISOString().split('T')[0];
+                }}
             }}
 
             // Regenerate calendars to update selection
@@ -1196,10 +1318,18 @@ def reserve_page(req: Request):
                             "Staging Information",
                             cls="section-title"
                         ),
+                        # Date Type Selector
+                        Div(
+                            Button("ASAP", cls="date-type-btn", data_type="asap", onclick="selectDateType(this)"),
+                            Button("Pick a week", cls="date-type-btn", data_type="week", onclick="selectDateType(this)"),
+                            Button("Pick a date", cls="date-type-btn", data_type="date", onclick="selectDateType(this)"),
+                            cls="date-type-selector"
+                        ),
                         Div(
                             Div(
                                 Label("Staging Date *", cls="form-label", For="staging-date-display"),
                                 Input(type="hidden", id="staging-date", name="staging-date"),
+                                Input(type="hidden", id="staging-date-type", name="staging-date-type"),
                                 # Desktop date picker
                                 Div(
                                     Input(type="text", id="staging-date-display", cls="form-input date-input",
@@ -1215,6 +1345,10 @@ def reserve_page(req: Request):
                                 ),
                                 cls="form-group full-width"
                             ),
+                            id="calendar-container",
+                            cls="calendar-container"
+                        ),
+                        Div(
                             Div(
                                 Label("Property Address *", cls="form-label", For="property-address"),
                                 Input(type="text", id="property-address", cls="form-input", required=True,
@@ -1439,18 +1573,10 @@ def reserve_page(req: Request):
                             Span("Not selected", cls="price-value", id="summary-property-size"),
                             cls="price-item"
                         ),
-                        # Selected Areas
+                        # Selected Areas and Items
                         Div(
-                            Span("Selected Areas", cls="price-label"),
-                            Span("None selected", cls="price-value", id="summary-areas",
-                                 style="font-size: 13px;"),
-                            cls="price-item"
-                        ),
-                        # Selected Items
-                        Div(
-                            Span("Selected Items", cls="price-label"),
-                            Span("Default items", cls="price-value", id="summary-items",
-                                 style="font-size: 13px;"),
+                            Span("Selected Areas and Items", cls="price-label"),
+                            Div(id="summary-areas-items", style="font-size: 13px;"),
                             cls="price-item"
                         ),
                         # Staging Fee
