@@ -19,6 +19,7 @@ from page.services import (
 )
 from page.contact import contact_page
 from page.staging_inquiry import staging_inquiry_page
+from page.reserve import reserve_page
 from page.areas import AREAS, AREA_PAGE_FUNCTIONS
 from page.blog_listing import blog_listing_page, load_blog_metadata
 from starlette.staticfiles import StaticFiles
@@ -422,6 +423,12 @@ def contactus():
 def staging_inquiry():
     """Staging Inquiry page for instant quotes"""
     return staging_inquiry_page()
+
+
+@rt('/reserve/')
+def reserve(req: Request):
+    """Staging reservation page"""
+    return reserve_page(req)
 
 
 # =============================================================================

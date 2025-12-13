@@ -799,7 +799,7 @@ def property_type_selector():
             # Floating Action Buttons
             Div(
                 Button("Inquire", cls="staging-inquiry-btn"),
-                Button("Continue Booking", cls="staging-continue-btn"),
+                Button("Continue Booking", cls="staging-continue-btn", onclick="goToReserve()"),
                 cls="staging-action-buttons",
                 id="staging-action-buttons"
             ),
@@ -939,6 +939,9 @@ def property_type_selector():
                 const bulkPrice = getAreaPrice(area, propertyType, propertySize);
                 const itemTotal = getAreaItemTotal(area);
 
+                // Store original bulk price as data attribute for modal display
+                btn.setAttribute('data-bulk-price', bulkPrice);
+
                 // Use lesser of bulk price or item total
                 let displayPrice = bulkPrice;
                 if (itemTotal !== null && itemTotal < bulkPrice) {
@@ -997,6 +1000,59 @@ def property_type_selector():
                 } else {
                     actionButtons.classList.remove('visible');
                 }
+            }
+
+            // Navigate to reserve page with staging data
+            function goToReserve() {
+                const { propertyType, propertySize } = getSelections();
+
+                // Get selected areas (both name and slug)
+                const selectedAreas = [];
+                const selectedAreaSlugs = [];
+                document.querySelectorAll('.area-btn.selected').forEach(btn => {
+                    const areaName = btn.querySelector('.area-name').textContent;
+                    const areaSlug = btn.getAttribute('data-area');
+                    selectedAreas.push(areaName);
+                    selectedAreaSlugs.push(areaSlug);
+                });
+
+                // Get total fee from banner
+                const bannerSubtitle = document.getElementById('banner-subtitle');
+                let totalFee = 0;
+                if (bannerSubtitle) {
+                    const feeText = bannerSubtitle.textContent;
+                    const match = feeText.match(/\$([\d,]+\.?\d*)/);
+                    if (match) {
+                        totalFee = parseFloat(match[1].replace(',', ''));
+                    }
+                }
+
+                // Build URL with parameters
+                const params = new URLSearchParams();
+                params.set('propertyType', propertyType || '');
+                params.set('propertySize', propertySize || '');
+                params.set('totalFee', totalFee.toString());
+
+                if (selectedAreas.length > 0) {
+                    params.set('areas', selectedAreas.join(','));
+                }
+
+                // Include all items for selected areas (custom or default)
+                const allItemsData = {};
+                selectedAreaSlugs.forEach(areaSlug => {
+                    // Use custom items if set, otherwise use defaults
+                    const items = areaItemsData[areaSlug] || getDefaultItems(areaSlug);
+                    if (items && Object.keys(items).length > 0) {
+                        allItemsData[areaSlug] = items;
+                    }
+                });
+
+                if (Object.keys(allItemsData).length > 0) {
+                    params.set('items', encodeURIComponent(JSON.stringify(allItemsData)));
+                }
+
+                // Redirect to reserve page
+                window.location.href = '/reserve/?' + params.toString();
             }
 
             // Update banner with fee
@@ -1470,10 +1526,9 @@ def property_type_selector():
                 // Update modal title
                 document.getElementById('items-modal-title').textContent = 'Select ' + areaName + ' Items';
 
-                // Update bulk price from area button
-                const areaPriceEl = areaBtn.querySelector('.area-price');
-                const bulkPrice = areaPriceEl ? areaPriceEl.textContent : '$0';
-                document.getElementById('items-modal-bulk-price').textContent = areaName + ' Bulk Price: ' + bulkPrice.replace('+', '');
+                // Update bulk price from area button's data attribute (original bulk price)
+                const bulkPrice = areaBtn.getAttribute('data-bulk-price') || '0';
+                document.getElementById('items-modal-bulk-price').textContent = areaName + ' Bulk Price: $' + bulkPrice;
 
                 // Load saved items for this area
                 loadAreaItems(currentArea);
