@@ -855,6 +855,39 @@ def reserve_page(req: Request):
         let selectedWeekEnd = null;
         let currentDisplayMonth = new Date();
 
+        // Statutory holidays (Ontario, Canada) - format: 'YYYY-MM-DD'
+        const statHolidays = [
+            // 2025
+            '2025-01-01', // New Year's Day
+            '2025-02-17', // Family Day
+            '2025-04-18', // Good Friday
+            '2025-05-19', // Victoria Day
+            '2025-07-01', // Canada Day
+            '2025-08-04', // Civic Holiday
+            '2025-09-01', // Labour Day
+            '2025-10-13', // Thanksgiving
+            '2025-12-25', // Christmas Day
+            '2025-12-26', // Boxing Day
+            // 2026
+            '2026-01-01', // New Year's Day
+            '2026-02-16', // Family Day
+            '2026-04-03', // Good Friday
+            '2026-05-18', // Victoria Day
+            '2026-07-01', // Canada Day
+            '2026-08-03', // Civic Holiday
+            '2026-09-07', // Labour Day
+            '2026-10-12', // Thanksgiving
+            '2026-12-25', // Christmas Day
+            '2026-12-26', // Boxing Day
+        ];
+
+        function isStatHoliday(date) {{
+            const dateStr = date.getFullYear() + '-' +
+                String(date.getMonth() + 1).padStart(2, '0') + '-' +
+                String(date.getDate()).padStart(2, '0');
+            return statHolidays.includes(dateStr);
+        }}
+
         // Generate calendar months
         function generateCalendarMonths() {{
             const container = document.getElementById('mobile-months');
@@ -927,9 +960,9 @@ def reserve_page(req: Request):
 
                 const cellDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
 
-                // Disable past dates and weekends (Sat=6, Sun=0)
+                // Disable past dates, weekends (Sat=6, Sun=0), and stat holidays
                 const dayOfWeek = cellDate.getDay();
-                if (cellDate < today || dayOfWeek === 0 || dayOfWeek === 6) {{
+                if (cellDate < today || dayOfWeek === 0 || dayOfWeek === 6 || isStatHoliday(cellDate)) {{
                     dayCell.classList.add('disabled');
                 }} else {{
                     dayCell.onclick = () => selectDate(cellDate);
@@ -1033,9 +1066,9 @@ def reserve_page(req: Request):
 
                 const cellDate = new Date(currentDisplayMonth.getFullYear(), currentDisplayMonth.getMonth(), day);
 
-                // Disable past dates and weekends (Sat=6, Sun=0)
+                // Disable past dates, weekends (Sat=6, Sun=0), and stat holidays
                 const dayOfWeek = cellDate.getDay();
-                if (cellDate < today || dayOfWeek === 0 || dayOfWeek === 6) {{
+                if (cellDate < today || dayOfWeek === 0 || dayOfWeek === 6 || isStatHoliday(cellDate)) {{
                     dayCell.classList.add('disabled');
                 }} else {{
                     dayCell.onclick = () => selectDate(cellDate);
@@ -1113,9 +1146,9 @@ def reserve_page(req: Request):
             if (dateInput) dateInput.value = '';
 
             if (selectedDateType === 'week') {{
-                if (dateDisplay) dateDisplay.placeholder = 'Select a week';
+                if (dateDisplay) dateDisplay.placeholder = 'Select a week, we\\'ll select a date';
             }} else if (selectedDateType === 'date') {{
-                if (dateDisplay) dateDisplay.placeholder = 'Select staging date';
+                if (dateDisplay) dateDisplay.placeholder = 'Select a staging date';
             }}
 
             generateCalendarMonths();
@@ -1329,7 +1362,7 @@ def reserve_page(req: Request):
             const calendarContainer = document.getElementById('calendar-container');
             if (calendarContainer) calendarContainer.classList.add('visible');
             const dateDisplay = document.getElementById('staging-date-display');
-            if (dateDisplay) dateDisplay.placeholder = 'Select a week';
+            if (dateDisplay) dateDisplay.placeholder = 'Select a week, we\\'ll select a date';
             generateCalendarMonths();
         }});
 
@@ -1368,7 +1401,7 @@ def reserve_page(req: Request):
                                 # Desktop date picker
                                 Div(
                                     Input(type="text", id="staging-date-display", cls="form-input date-input",
-                                          placeholder="Select staging date", readonly=True),
+                                          placeholder="Select a staging date", readonly=True),
                                     Div(id="desktop-calendar", cls="desktop-date-picker",
                                         style="margin-top: 16px;"),
                                     cls="date-picker-container"
