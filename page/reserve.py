@@ -851,6 +851,8 @@ def reserve_page(req: Request):
 
         // Calendar state
         let selectedDate = null;
+        let selectedWeekStart = null;
+        let selectedWeekEnd = null;
         let currentDisplayMonth = new Date();
 
         // Generate calendar months
@@ -933,8 +935,16 @@ def reserve_page(req: Request):
                     dayCell.onclick = () => selectDate(cellDate);
                 }}
 
-                // Highlight selected date
-                if (selectedDate &&
+                // Highlight selected date or week
+                if (selectedDateType === 'week' && selectedWeekStart && selectedWeekEnd) {{
+                    // Check if this date is within the selected week
+                    const cellTime = cellDate.getTime();
+                    const startTime = new Date(selectedWeekStart.getFullYear(), selectedWeekStart.getMonth(), selectedWeekStart.getDate()).getTime();
+                    const endTime = new Date(selectedWeekEnd.getFullYear(), selectedWeekEnd.getMonth(), selectedWeekEnd.getDate()).getTime();
+                    if (cellTime >= startTime && cellTime <= endTime) {{
+                        dayCell.classList.add('selected');
+                    }}
+                }} else if (selectedDate &&
                     cellDate.getDate() === selectedDate.getDate() &&
                     cellDate.getMonth() === selectedDate.getMonth() &&
                     cellDate.getFullYear() === selectedDate.getFullYear()) {{
@@ -1031,7 +1041,16 @@ def reserve_page(req: Request):
                     dayCell.onclick = () => selectDate(cellDate);
                 }}
 
-                if (selectedDate &&
+                // Highlight selected date or week
+                if (selectedDateType === 'week' && selectedWeekStart && selectedWeekEnd) {{
+                    // Check if this date is within the selected week
+                    const cellTime = cellDate.getTime();
+                    const startTime = new Date(selectedWeekStart.getFullYear(), selectedWeekStart.getMonth(), selectedWeekStart.getDate()).getTime();
+                    const endTime = new Date(selectedWeekEnd.getFullYear(), selectedWeekEnd.getMonth(), selectedWeekEnd.getDate()).getTime();
+                    if (cellTime >= startTime && cellTime <= endTime) {{
+                        dayCell.classList.add('selected');
+                    }}
+                }} else if (selectedDate &&
                     cellDate.getDate() === selectedDate.getDate() &&
                     cellDate.getMonth() === selectedDate.getMonth() &&
                     cellDate.getFullYear() === selectedDate.getFullYear()) {{
@@ -1061,8 +1080,8 @@ def reserve_page(req: Request):
             }}
         }}
 
-        // Date type selection
-        let selectedDateType = null;
+        // Date type selection - default to week
+        let selectedDateType = 'week';
 
         function selectDateType(btn) {{
             // Remove selected from all date type buttons
@@ -1079,34 +1098,27 @@ def reserve_page(req: Request):
                 dateTypeInput.value = selectedDateType;
             }}
 
-            // Show/hide calendar based on selection
+            // Show calendar (both options require calendar)
             const calendarContainer = document.getElementById('calendar-container');
             const dateDisplay = document.getElementById('staging-date-display');
             const dateInput = document.getElementById('staging-date');
 
-            if (selectedDateType === 'asap') {{
-                // Hide calendar, set date to "ASAP"
-                calendarContainer.classList.remove('visible');
-                if (dateDisplay) dateDisplay.value = 'ASAP - We will contact you';
-                if (dateInput) dateInput.value = 'ASAP';
-                selectedDate = null;
-            }} else if (selectedDateType === 'week') {{
-                // Show calendar for week selection
-                calendarContainer.classList.add('visible');
-                if (dateDisplay) dateDisplay.value = '';
+            // Clear previous selection
+            selectedDate = null;
+            selectedWeekStart = null;
+            selectedWeekEnd = null;
+
+            calendarContainer.classList.add('visible');
+            if (dateDisplay) dateDisplay.value = '';
+            if (dateInput) dateInput.value = '';
+
+            if (selectedDateType === 'week') {{
                 if (dateDisplay) dateDisplay.placeholder = 'Select a week';
-                if (dateInput) dateInput.value = '';
-                selectedDate = null;
-                generateCalendarMonths();
             }} else if (selectedDateType === 'date') {{
-                // Show calendar for date selection
-                calendarContainer.classList.add('visible');
-                if (dateDisplay) dateDisplay.value = '';
                 if (dateDisplay) dateDisplay.placeholder = 'Select staging date';
-                if (dateInput) dateInput.value = '';
-                selectedDate = null;
-                generateCalendarMonths();
             }}
+
+            generateCalendarMonths();
         }}
 
         function selectDate(date) {{
@@ -1117,15 +1129,34 @@ def reserve_page(req: Request):
             const hiddenInput = document.getElementById('staging-date');
 
             if (selectedDateType === 'week') {{
-                // Show "Week of Mon, Dec 16, 2024"
+                // Calculate the week: find Monday and Friday of the clicked date's week
+                const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+
+                // Calculate Monday (start of week)
+                let mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+                selectedWeekStart = new Date(date);
+                selectedWeekStart.setDate(date.getDate() + mondayOffset);
+
+                // Calculate Friday (end of week)
+                selectedWeekEnd = new Date(selectedWeekStart);
+                selectedWeekEnd.setDate(selectedWeekStart.getDate() + 4);
+
+                // Format: "Dec 16 to Dec 20"
                 if (dateInput) {{
-                    const options = {{ weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }};
-                    dateInput.value = 'Week of ' + date.toLocaleDateString('en-CA', options);
+                    const startOptions = {{ month: 'short', day: 'numeric' }};
+                    const endOptions = {{ month: 'short', day: 'numeric' }};
+                    const startStr = selectedWeekStart.toLocaleDateString('en-CA', startOptions);
+                    const endStr = selectedWeekEnd.toLocaleDateString('en-CA', endOptions);
+                    dateInput.value = startStr + ' to ' + endStr;
                 }}
                 if (hiddenInput) {{
-                    hiddenInput.value = 'week-' + date.toISOString().split('T')[0];
+                    hiddenInput.value = 'week-' + selectedWeekStart.toISOString().split('T')[0] + '-to-' + selectedWeekEnd.toISOString().split('T')[0];
                 }}
             }} else {{
+                // Clear week selection
+                selectedWeekStart = null;
+                selectedWeekEnd = null;
+
                 // Show specific date
                 if (dateInput) {{
                     const options = {{ weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }};
@@ -1294,6 +1325,11 @@ def reserve_page(req: Request):
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {{
             loadStagingData();
+            // Show calendar by default (week mode is selected)
+            const calendarContainer = document.getElementById('calendar-container');
+            if (calendarContainer) calendarContainer.classList.add('visible');
+            const dateDisplay = document.getElementById('staging-date-display');
+            if (dateDisplay) dateDisplay.placeholder = 'Select a week';
             generateCalendarMonths();
         }});
 
@@ -1320,9 +1356,8 @@ def reserve_page(req: Request):
                         ),
                         # Date Type Selector
                         Div(
-                            Button("ASAP", cls="date-type-btn", data_type="asap", onclick="selectDateType(this)"),
-                            Button("Pick a week", cls="date-type-btn", data_type="week", onclick="selectDateType(this)"),
-                            Button("Pick a date", cls="date-type-btn", data_type="date", onclick="selectDateType(this)"),
+                            Button("Pick a Week", cls="date-type-btn selected", data_type="week", onclick="selectDateType(this)"),
+                            Button("Pick a Date", cls="date-type-btn", data_type="date", onclick="selectDateType(this)"),
                             cls="date-type-selector"
                         ),
                         Div(
