@@ -234,6 +234,56 @@ def reserve_page(req: Request):
             line-height: 1.4;
         }
 
+        /* Summary row - horizontal layout */
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+        }
+
+        .summary-row .price-label {
+            font-size: 14px;
+        }
+
+        .summary-row .price-value {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .summary-addon-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+            font-size: 13px;
+        }
+
+        .summary-addon-row .addon-label {
+            color: var(--color-secondary);
+        }
+
+        .summary-addon-row .addon-value {
+            font-weight: 500;
+        }
+
+        .summary-addon-row .addon-value.positive {
+            color: #f59e0b;
+        }
+
+        .summary-addon-row .addon-value.negative {
+            color: #22c55e;
+        }
+
+        .summary-divider {
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            margin: 12px 0;
+        }
+
+        [data-theme="light"] .summary-divider {
+            border-top: 1px solid rgba(0, 0, 0, 0.15);
+        }
+
         /* Policy Styles */
         .policy-list {
             display: flex;
@@ -298,9 +348,16 @@ def reserve_page(req: Request):
         }
 
         .reserve-now-btn:disabled {
-            opacity: 0.7;
+            opacity: 0.5;
             cursor: not-allowed;
             transform: none;
+            background: linear-gradient(135deg, #888 0%, #666 100%);
+            box-shadow: none;
+        }
+
+        .reserve-now-btn:disabled:hover {
+            transform: none;
+            box-shadow: none;
         }
 
         /* Add-on checkbox styles */
@@ -721,7 +778,7 @@ def reserve_page(req: Request):
                     // Mount the card element
                     cardElement.mount('#card-element');
 
-                    // Handle card errors
+                    // Handle card errors and completion
                     cardElement.on('change', function(event) {{
                         const errorDiv = document.getElementById('card-error');
                         if (event.error) {{
@@ -731,6 +788,9 @@ def reserve_page(req: Request):
                             errorDiv.textContent = '';
                             errorDiv.style.display = 'none';
                         }}
+                        // Track card completion state for form validation
+                        cardElementComplete = event.complete;
+                        validateForm();
                     }});
 
                     // Watch for theme changes and update Stripe Elements
@@ -768,6 +828,9 @@ def reserve_page(req: Request):
                                         errorDiv.textContent = '';
                                         errorDiv.style.display = 'none';
                                     }}
+                                    // Track card completion state for form validation
+                                    cardElementComplete = event.complete;
+                                    validateForm();
                                 }});
                             }}
                         }});
@@ -948,28 +1011,69 @@ def reserve_page(req: Request):
             // Update total fee
             const totalEl = document.getElementById('summary-total-fee');
             if (totalEl) {{
-                totalEl.textContent = '$' + stagingData.totalFee.toLocaleString('en-CA', {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}) + ' CAD';
+                totalEl.textContent = '$' + stagingData.totalFee.toLocaleString('en-CA', {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }});
             }}
         }}
 
         // Calculate and update Due Today amount
         function updateDueToday() {{
             let totalWithAddons = stagingData.totalFee;
+            let addonsHtml = '';
+            let discountsHtml = '';
 
-            // Add selected add-ons
-            stagingData.addons.forEach(addon => {{
-                totalWithAddons += addonPrices[addon] || 0;
-            }});
+            // Add selected add-ons and build HTML
+            if (stagingData.addons.includes('photos')) {{
+                const photoPrice = addonPrices['photos'];
+                totalWithAddons += photoPrice;
+                addonsHtml += `<div class="summary-addon-row"><span class="addon-label">Photography</span><span class="addon-value positive">+$${{photoPrice}}</span></div>`;
+            }}
+
+            if (stagingData.addons.includes('consultation')) {{
+                const consultPrice = addonPrices['consultation'];
+                totalWithAddons += consultPrice;
+                addonsHtml += `<div class="summary-addon-row"><span class="addon-label">Consultation</span><span class="addon-value">${{consultPrice === 0 ? '$0' : '+$' + consultPrice}}</span></div>`;
+            }}
+
+            // Add long distance fee if property is over 70km from warehouse
+            const longDistanceFee = propertyDistanceKm > LONG_DISTANCE_THRESHOLD ? LONG_DISTANCE_FEE : 0;
+            if (longDistanceFee > 0) {{
+                totalWithAddons += longDistanceFee;
+                addonsHtml += `<div class="summary-addon-row"><span class="addon-label">Long Distance Fee</span><span class="addon-value positive">+$${{longDistanceFee}}</span></div>`;
+            }}
+
+            // Apply $50 discount for "Pick a Week" flexibility
+            const weekDiscount = selectedDateType === 'week' ? 50 : 0;
+            if (weekDiscount > 0) {{
+                discountsHtml += `<div class="summary-addon-row"><span class="addon-label">Flex Discount</span><span class="addon-value negative">-$${{weekDiscount}}</span></div>`;
+            }}
+
+            // Update add-ons container
+            const addonsContainer = document.getElementById('summary-addons-container');
+            if (addonsContainer) {{
+                addonsContainer.innerHTML = addonsHtml;
+            }}
+
+            // Update discounts container
+            const discountsContainer = document.getElementById('summary-discounts-container');
+            if (discountsContainer) {{
+                discountsContainer.innerHTML = discountsHtml;
+            }}
+
+            // Calculate total after discounts (minimum $0)
+            const totalAfterDiscounts = Math.max(0, totalWithAddons - weekDiscount);
 
             // Due Today = floor of half the total, rounded down to nearest 500
             const halfTotal = totalWithAddons / 2;
-            const dueToday = Math.floor(halfTotal / 500) * 500;
+            let dueToday = Math.floor(halfTotal / 500) * 500;
 
-            // Update display
-            const dueTodayAmount = Math.max(500, dueToday);
+            // Apply week discount to due today
+            let dueTodayAmount = Math.max(500, dueToday) - weekDiscount;
+            dueTodayAmount = Math.max(450, dueTodayAmount); // Minimum $450 with discount
+
+            // Update display - simpler format now that line items show details
             const dueTodayEl = document.getElementById('due-today-amount');
             if (dueTodayEl) {{
-                dueTodayEl.textContent = '$' + dueTodayAmount.toLocaleString('en-CA', {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}) + ' CAD';
+                dueTodayEl.textContent = '$' + dueTodayAmount.toLocaleString('en-CA', {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }});
             }}
 
             // Update Reserve button text
@@ -978,10 +1082,10 @@ def reserve_page(req: Request):
                 reserveBtn.textContent = 'Reserve Now - Pay $' + dueTodayAmount.toLocaleString('en-CA', {{ minimumFractionDigits: 0, maximumFractionDigits: 0 }});
             }}
 
-            // Update total with add-ons
+            // Update total (after discounts applied)
             const totalWithAddonsEl = document.getElementById('total-with-addons');
             if (totalWithAddonsEl) {{
-                totalWithAddonsEl.textContent = '$' + totalWithAddons.toLocaleString('en-CA', {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}) + ' CAD';
+                totalWithAddonsEl.textContent = '$' + totalAfterDiscounts.toLocaleString('en-CA', {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }});
             }}
         }}
 
@@ -996,6 +1100,73 @@ def reserve_page(req: Request):
                 stagingData.addons = stagingData.addons.filter(a => a !== addon);
             }}
             updateDueToday();
+        }}
+
+        // Track card element completion state
+        let cardElementComplete = false;
+
+        // Validate all required form fields
+        function validateForm() {{
+            const reserveBtn = document.getElementById('reserve-btn');
+            if (!reserveBtn) return;
+
+            // Required field IDs
+            const requiredFieldIds = [
+                'staging-date',
+                'property-address',
+                'first-name',
+                'last-name',
+                'email',
+                'phone',
+                'billing-address',
+                'billing-city',
+                'billing-state',
+                'billing-zip'
+            ];
+
+            // Check if all required fields have values
+            let allFieldsFilled = true;
+            for (const fieldId of requiredFieldIds) {{
+                const field = document.getElementById(fieldId);
+                if (!field || !field.value || field.value.trim() === '') {{
+                    allFieldsFilled = false;
+                    break;
+                }}
+            }}
+
+            // Check if card element is complete
+            const isValid = allFieldsFilled && cardElementComplete;
+
+            // Enable/disable button
+            reserveBtn.disabled = !isValid;
+        }}
+
+        // Initialize form validation listeners
+        function initFormValidation() {{
+            const requiredFieldIds = [
+                'staging-date',
+                'property-address',
+                'first-name',
+                'last-name',
+                'email',
+                'phone',
+                'billing-address',
+                'billing-city',
+                'billing-state',
+                'billing-zip'
+            ];
+
+            // Add input event listeners to all required fields
+            for (const fieldId of requiredFieldIds) {{
+                const field = document.getElementById(fieldId);
+                if (field) {{
+                    field.addEventListener('input', validateForm);
+                    field.addEventListener('change', validateForm);
+                }}
+            }}
+
+            // Initial validation check (button should be disabled initially)
+            validateForm();
         }}
 
         // Calendar state
@@ -1300,7 +1471,11 @@ def reserve_page(req: Request):
                 if (dateDisplay) dateDisplay.placeholder = 'Select a staging date';
             }}
 
+            // Update due today to reflect week discount
+            updateDueToday();
             generateCalendarMonths();
+            // Validate form after date type change (clears date selection)
+            validateForm();
         }}
 
         function selectDate(date) {{
@@ -1309,6 +1484,10 @@ def reserve_page(req: Request):
             // Update display based on date type
             const dateInput = document.getElementById('staging-date-display');
             const hiddenInput = document.getElementById('staging-date');
+
+            // Get today's date at midnight for comparison
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
 
             if (selectedDateType === 'week') {{
                 // Calculate the week: find Monday and Friday of the clicked date's week
@@ -1323,13 +1502,29 @@ def reserve_page(req: Request):
                 selectedWeekEnd = new Date(selectedWeekStart);
                 selectedWeekEnd.setDate(selectedWeekStart.getDate() + 4);
 
-                // Format: "Dec 16 to Dec 20"
+                // Find available dates in the week (exclude past, today, weekends, holidays)
+                const availableDates = [];
+                for (let d = new Date(selectedWeekStart); d <= selectedWeekEnd; d.setDate(d.getDate() + 1)) {{
+                    const checkDate = new Date(d);
+                    const dow = checkDate.getDay();
+                    // Skip weekends, past dates, today, and holidays
+                    if (dow !== 0 && dow !== 6 && checkDate > today && !isStatHoliday(checkDate)) {{
+                        availableDates.push(new Date(checkDate));
+                    }}
+                }}
+
+                // Format display based on available dates
                 if (dateInput) {{
-                    const startOptions = {{ month: 'short', day: 'numeric' }};
-                    const endOptions = {{ month: 'short', day: 'numeric' }};
-                    const startStr = selectedWeekStart.toLocaleDateString('en-CA', startOptions);
-                    const endStr = selectedWeekEnd.toLocaleDateString('en-CA', endOptions);
-                    dateInput.value = startStr + ' to ' + endStr;
+                    const dateOptions = {{ month: 'short', day: 'numeric' }};
+                    if (availableDates.length === 0) {{
+                        dateInput.value = 'No available dates this week';
+                    }} else if (availableDates.length === 1) {{
+                        dateInput.value = 'Any date on ' + availableDates[0].toLocaleDateString('en-CA', dateOptions);
+                    }} else {{
+                        const firstDate = availableDates[0].toLocaleDateString('en-CA', dateOptions);
+                        const lastDate = availableDates[availableDates.length - 1].toLocaleDateString('en-CA', dateOptions);
+                        dateInput.value = 'Any date between ' + firstDate + ' to ' + lastDate;
+                    }}
                 }}
                 if (hiddenInput) {{
                     hiddenInput.value = 'week-' + selectedWeekStart.toISOString().split('T')[0] + '-to-' + selectedWeekEnd.toISOString().split('T')[0];
@@ -1351,6 +1546,71 @@ def reserve_page(req: Request):
 
             // Regenerate calendars to update selection
             generateCalendarMonths();
+            // Validate form after date selection
+            validateForm();
+        }}
+
+        // Warehouse address for distance calculation
+        const WAREHOUSE_ADDRESS = '3600A Laird Rd, Mississauga, ON';
+        const LONG_DISTANCE_THRESHOLD = 70; // km
+        const LONG_DISTANCE_FEE = 100; // $100 fee for properties over 70km
+        let propertyDistanceKm = 0; // Store distance in km
+
+        // Clear distance display when address is empty
+        function clearPropertyDistance() {{
+            const distanceDisplay = document.querySelector('.property-distance-display');
+            const distanceSpan = document.getElementById('property-distance');
+            if (distanceDisplay) {{
+                distanceDisplay.style.display = 'none';
+            }}
+            if (distanceSpan) {{
+                distanceSpan.textContent = '--';
+            }}
+            propertyDistanceKm = 0;
+            updateDueToday();
+        }}
+
+        // Calculate distance between property and warehouse
+        function calculatePropertyDistance(propertyAddress) {{
+            const distanceDisplay = document.querySelector('.property-distance-display');
+            const distanceSpan = document.getElementById('property-distance');
+
+            if (!distanceDisplay || !distanceSpan) return;
+
+            // Show loading state
+            distanceDisplay.style.display = 'block';
+            distanceSpan.textContent = 'Calculating...';
+
+            const service = new google.maps.DistanceMatrixService();
+            service.getDistanceMatrix({{
+                origins: [WAREHOUSE_ADDRESS],
+                destinations: [propertyAddress],
+                travelMode: google.maps.TravelMode.DRIVING,
+                unitSystem: google.maps.UnitSystem.METRIC
+            }}, function(response, status) {{
+                if (status === 'OK' && response.rows[0].elements[0].status === 'OK') {{
+                    const distance = response.rows[0].elements[0].distance.text;
+                    const distanceValue = response.rows[0].elements[0].distance.value; // distance in meters
+                    const duration = response.rows[0].elements[0].duration.text;
+
+                    // Store distance in km
+                    propertyDistanceKm = distanceValue / 1000;
+
+                    // Display distance with long distance fee warning if applicable
+                    if (propertyDistanceKm > LONG_DISTANCE_THRESHOLD) {{
+                        distanceSpan.innerHTML = `${{distance}} (~${{duration}} drive) <span style="color: #f59e0b; font-weight: 500;">+$100 long distance fee</span>`;
+                    }} else {{
+                        distanceSpan.textContent = `${{distance}} (~${{duration}} drive)`;
+                    }}
+
+                    // Update pricing to reflect long distance fee
+                    updateDueToday();
+                }} else {{
+                    propertyDistanceKm = 0;
+                    distanceSpan.textContent = 'Unable to calculate';
+                    updateDueToday();
+                }}
+            }});
         }}
 
         // Initialize Google Maps Autocomplete for property address
@@ -1358,10 +1618,17 @@ def reserve_page(req: Request):
             const addressInput = document.getElementById('property-address');
             if (!addressInput) return;
 
+            // Clear distance when address is emptied
+            addressInput.addEventListener('input', function() {{
+                if (!this.value || this.value.trim() === '') {{
+                    clearPropertyDistance();
+                }}
+            }});
+
             const autocomplete = new google.maps.places.Autocomplete(addressInput, {{
                 types: ['address'],
                 componentRestrictions: {{ country: 'ca' }},
-                fields: ['address_components', 'formatted_address']
+                fields: ['address_components', 'formatted_address', 'geometry']
             }});
 
             autocomplete.addListener('place_changed', function() {{
@@ -1392,6 +1659,11 @@ def reserve_page(req: Request):
                 // Format the address
                 const fullAddress = `${{streetNumber}} ${{route}}, ${{city}}, ${{province}} ${{postalCode}}`.trim();
                 addressInput.value = fullAddress;
+
+                // Calculate distance from warehouse
+                if (fullAddress) {{
+                    calculatePropertyDistance(fullAddress);
+                }}
             }});
         }}
 
@@ -1816,6 +2088,8 @@ def reserve_page(req: Request):
             // Initialize billing address autocomplete and country-specific fields
             initBillingAutocomplete();
             updateAddressFields();
+            // Initialize form validation (button disabled until all fields filled)
+            initFormValidation();
         }});
 
         // Make functions globally available
@@ -1843,7 +2117,7 @@ def reserve_page(req: Request):
                         ),
                         # Date Type Selector
                         Div(
-                            Button("Pick a Week", cls="date-type-btn selected", data_type="week", onclick="selectDateType(this)"),
+                            Button("Pick a Week (-$50)", cls="date-type-btn selected", data_type="week", onclick="selectDateType(this)"),
                             Button("Pick a Date", cls="date-type-btn", data_type="date", onclick="selectDateType(this)"),
                             cls="date-type-selector"
                         ),
@@ -1876,6 +2150,12 @@ def reserve_page(req: Request):
                                 Input(type="text", id="property-address", cls="form-input", required=True,
                                       placeholder="Start typing the property address...",
                                       autocomplete="off"),
+                                Div(
+                                    Span("📍 Distance from warehouse: "),
+                                    Span("--", id="property-distance"),
+                                    cls="property-distance-display",
+                                    style="margin-top: 8px; font-size: 14px; color: var(--color-secondary); display: none;"
+                                ),
                                 cls="form-group full-width"
                             ),
                             cls="form-grid"
@@ -2123,13 +2403,13 @@ def reserve_page(req: Request):
                         Div(
                             Span("Property Type", cls="price-label"),
                             Span("Not selected", cls="price-value", id="summary-property-type"),
-                            cls="price-item"
+                            cls="summary-row"
                         ),
                         # Property Size
                         Div(
                             Span("Property Size", cls="price-label"),
                             Span("Not selected", cls="price-value", id="summary-property-size"),
-                            cls="price-item"
+                            cls="summary-row"
                         ),
                         # Selected Areas and Items
                         Div(
@@ -2140,20 +2420,26 @@ def reserve_page(req: Request):
                         # Staging Fee
                         Div(
                             Span("Staging Fee", cls="price-label"),
-                            Span("$0.00 CAD", cls="price-value", id="summary-total-fee"),
-                            cls="price-item"
+                            Span("$0.00", cls="price-value", id="summary-total-fee"),
+                            cls="summary-row"
                         ),
-                        # Total with Add-ons
+                        # Add-ons (dynamic)
+                        Div(id="summary-addons-container"),
+                        # Discounts (dynamic)
+                        Div(id="summary-discounts-container"),
+                        # Divider
+                        Div(style="border-top: 1px solid rgba(255,255,255,0.2); margin: 12px 0;", cls="summary-divider"),
+                        # Total
                         Div(
-                            Span("Total (with add-ons)", cls="total-label"),
-                            Span("$0.00 CAD", cls="total-value", id="total-with-addons"),
-                            cls="price-item"
+                            Span("Total", cls="total-label"),
+                            Span("$0.00", cls="total-value", id="total-with-addons"),
+                            cls="summary-row"
                         ),
                         # Due Today
                         Div(
                             Span("Due Today", cls="total-label"),
-                            Span("$500.00 CAD", cls="total-value", id="due-today-amount"),
-                            cls="price-item"
+                            Span("$500.00", cls="total-value", id="due-today-amount"),
+                            cls="summary-row"
                         ),
                     ),
                     cls="price-summary"
@@ -2164,7 +2450,7 @@ def reserve_page(req: Request):
 
             # Reserve Now Button
             Div(
-                Button("Reserve Now - Pay $500", cls="reserve-now-btn", id="reserve-btn", onclick="submitReservation()"),
+                Button("Reserve Now - Pay $500", cls="reserve-now-btn", id="reserve-btn", onclick="submitReservation()", disabled=True),
                 style="text-align: center; padding: 20px 0;"
             ),
 
