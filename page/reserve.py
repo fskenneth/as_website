@@ -732,6 +732,147 @@ def reserve_page(req: Request):
             addons: []
         }};
 
+        // Reserve page session data
+        let reserveFormData = {{
+            stagingDate: '',
+            dateType: 'week',
+            propertyAddress: '',
+            firstName: '',
+            lastName: '',
+            email: '',
+            phone: '',
+            addons: [],
+            specialRequests: ''
+        }};
+
+        // Session Storage Key (shared with staging-inquiry page)
+        const STAGING_SESSION_KEY = 'astra_staging_data';
+        const RESERVE_SESSION_KEY = 'astra_reserve_data';
+
+        // Save reserve form data to session storage
+        function saveReserveSession() {{
+            const formData = {{
+                stagingDate: document.getElementById('staging-date')?.value || '',
+                dateType: selectedDateType || 'week',
+                propertyAddress: document.getElementById('property-address')?.value || '',
+                firstName: document.getElementById('first-name')?.value || '',
+                lastName: document.getElementById('last-name')?.value || '',
+                email: document.getElementById('email')?.value || '',
+                phone: document.getElementById('phone')?.value || '',
+                billingAddress: document.getElementById('billing-address')?.value || '',
+                billingCity: document.getElementById('billing-city')?.value || '',
+                billingState: document.getElementById('billing-state')?.value || '',
+                billingZip: document.getElementById('billing-zip')?.value || '',
+                addons: stagingData.addons || [],
+                specialRequests: document.getElementById('special-requests')?.value || '',
+                timestamp: Date.now()
+            }};
+
+            try {{
+                sessionStorage.setItem(RESERVE_SESSION_KEY, JSON.stringify(formData));
+            }} catch (e) {{
+                console.warn('Could not save to sessionStorage:', e);
+            }}
+        }}
+
+        // Load reserve form data from session storage
+        function loadReserveSession() {{
+            try {{
+                const saved = sessionStorage.getItem(RESERVE_SESSION_KEY);
+                if (!saved) return null;
+                return JSON.parse(saved);
+            }} catch (e) {{
+                console.warn('Could not load from sessionStorage:', e);
+                return null;
+            }}
+        }}
+
+        // Restore reserve form data from session
+        function restoreReserveSession() {{
+            const data = loadReserveSession();
+            if (!data) return;
+
+            // Restore date type
+            if (data.dateType) {{
+                selectDateType(data.dateType, true); // true = skip save
+            }}
+
+            // Restore staging date
+            if (data.stagingDate) {{
+                const dateInput = document.getElementById('staging-date');
+                const dateDisplay = document.getElementById('staging-date-display');
+                if (dateInput) dateInput.value = data.stagingDate;
+                if (dateDisplay) {{
+                    // Format the date for display
+                    const dateParts = data.stagingDate.split('-');
+                    if (dateParts.length === 3) {{
+                        const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+                        const options = {{ year: 'numeric', month: 'long', day: 'numeric' }};
+                        dateDisplay.value = dateObj.toLocaleDateString('en-US', options);
+                    }}
+                }}
+            }}
+
+            // Restore form fields
+            if (data.propertyAddress) {{
+                const el = document.getElementById('property-address');
+                if (el) el.value = data.propertyAddress;
+            }}
+            if (data.firstName) {{
+                const el = document.getElementById('first-name');
+                if (el) el.value = data.firstName;
+            }}
+            if (data.lastName) {{
+                const el = document.getElementById('last-name');
+                if (el) el.value = data.lastName;
+            }}
+            if (data.email) {{
+                const el = document.getElementById('email');
+                if (el) el.value = data.email;
+            }}
+            if (data.phone) {{
+                const el = document.getElementById('phone');
+                if (el) el.value = data.phone;
+            }}
+            if (data.billingAddress) {{
+                const el = document.getElementById('billing-address');
+                if (el) el.value = data.billingAddress;
+            }}
+            if (data.billingCity) {{
+                const el = document.getElementById('billing-city');
+                if (el) el.value = data.billingCity;
+            }}
+            if (data.billingState) {{
+                const el = document.getElementById('billing-state');
+                if (el) el.value = data.billingState;
+            }}
+            if (data.billingZip) {{
+                const el = document.getElementById('billing-zip');
+                if (el) el.value = data.billingZip;
+            }}
+            if (data.specialRequests) {{
+                const el = document.getElementById('special-requests');
+                if (el) el.value = data.specialRequests;
+            }}
+
+            // Restore add-ons
+            if (data.addons && data.addons.length > 0) {{
+                data.addons.forEach(addon => {{
+                    const checkbox = document.querySelector(`input[type="checkbox"][value="${{addon}}"]`);
+                    if (checkbox && !checkbox.checked) {{
+                        checkbox.checked = true;
+                        if (!stagingData.addons.includes(addon)) {{
+                            stagingData.addons.push(addon);
+                        }}
+                    }}
+                }});
+                updateDueToday();
+            }}
+
+            // Validate form after restoring
+            validateForm();
+        }}
+
         // Add-on prices
         const addonPrices = {{
             'photos': 199,
@@ -898,27 +1039,53 @@ def reserve_page(req: Request):
             'bath-accessories': 'Bath Accessories'
         }};
 
-        // Parse URL parameters on load
+        // Parse URL parameters on load, fallback to session storage
         function loadStagingData() {{
             const urlParams = new URLSearchParams(window.location.search);
 
-            stagingData.propertyType = urlParams.get('propertyType') || '';
-            stagingData.propertySize = urlParams.get('propertySize') || '';
-            stagingData.totalFee = parseFloat(urlParams.get('totalFee')) || 0;
+            // Check if URL has parameters
+            const hasUrlParams = urlParams.get('propertyType') || urlParams.get('totalFee');
 
-            // Parse selected areas
-            const areasParam = urlParams.get('areas');
-            if (areasParam) {{
-                stagingData.selectedAreas = areasParam.split(',');
-            }}
+            if (hasUrlParams) {{
+                // Load from URL parameters
+                stagingData.propertyType = urlParams.get('propertyType') || '';
+                stagingData.propertySize = urlParams.get('propertySize') || '';
+                stagingData.totalFee = parseFloat(urlParams.get('totalFee')) || 0;
 
-            // Parse selected items (JSON encoded)
-            const itemsParam = urlParams.get('items');
-            if (itemsParam) {{
+                // Parse selected areas
+                const areasParam = urlParams.get('areas');
+                if (areasParam) {{
+                    stagingData.selectedAreas = areasParam.split(',');
+                }}
+
+                // Parse selected items (JSON encoded)
+                const itemsParam = urlParams.get('items');
+                if (itemsParam) {{
+                    try {{
+                        stagingData.selectedItems = JSON.parse(decodeURIComponent(itemsParam));
+                    }} catch (e) {{
+                        console.error('Error parsing items:', e);
+                    }}
+                }}
+            }} else {{
+                // Try to load from session storage (from staging-inquiry page)
                 try {{
-                    stagingData.selectedItems = JSON.parse(decodeURIComponent(itemsParam));
+                    const savedData = sessionStorage.getItem(STAGING_SESSION_KEY);
+                    if (savedData) {{
+                        const data = JSON.parse(savedData);
+                        stagingData.propertyType = data.propertyType || '';
+                        stagingData.propertySize = data.propertySize || '';
+                        stagingData.selectedAreas = data.selectedAreas || [];
+                        stagingData.selectedItems = data.areaItemsData || {{}};
+
+                        // Parse total fee from string like "$1,450.00"
+                        if (data.totalFee) {{
+                            const feeStr = data.totalFee.replace(/[$,]/g, '');
+                            stagingData.totalFee = parseFloat(feeStr) || 0;
+                        }}
+                    }}
                 }} catch (e) {{
-                    console.error('Error parsing items:', e);
+                    console.warn('Could not load from sessionStorage:', e);
                 }}
             }}
 
@@ -1100,6 +1267,8 @@ def reserve_page(req: Request):
                 stagingData.addons = stagingData.addons.filter(a => a !== addon);
             }}
             updateDueToday();
+            // Save to session storage
+            saveReserveSession();
         }}
 
         // Track card element completion state
@@ -1160,9 +1329,21 @@ def reserve_page(req: Request):
             for (const fieldId of requiredFieldIds) {{
                 const field = document.getElementById(fieldId);
                 if (field) {{
-                    field.addEventListener('input', validateForm);
-                    field.addEventListener('change', validateForm);
+                    field.addEventListener('input', function() {{
+                        validateForm();
+                        saveReserveSession();
+                    }});
+                    field.addEventListener('change', function() {{
+                        validateForm();
+                        saveReserveSession();
+                    }});
                 }}
+            }}
+
+            // Also save special requests when it changes
+            const specialRequests = document.getElementById('special-requests');
+            if (specialRequests) {{
+                specialRequests.addEventListener('input', saveReserveSession);
             }}
 
             // Initial validation check (button should be disabled initially)
@@ -1436,14 +1617,24 @@ def reserve_page(req: Request):
         // Date type selection - default to week
         let selectedDateType = 'week';
 
-        function selectDateType(btn) {{
-            // Remove selected from all date type buttons
-            document.querySelectorAll('.date-type-btn').forEach(b => b.classList.remove('selected'));
+        function selectDateType(btnOrType, skipSave = false) {{
+            let type;
+            if (typeof btnOrType === 'string') {{
+                // Called with type string directly (from restore)
+                type = btnOrType;
+                const btn = document.querySelector(`.date-type-btn[data-type="${{type}}"]`);
+                if (btn) {{
+                    document.querySelectorAll('.date-type-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                }}
+            }} else {{
+                // Called with button element
+                document.querySelectorAll('.date-type-btn').forEach(b => b.classList.remove('selected'));
+                btnOrType.classList.add('selected');
+                type = btnOrType.getAttribute('data-type');
+            }}
 
-            // Add selected to clicked button
-            btn.classList.add('selected');
-
-            selectedDateType = btn.getAttribute('data-type');
+            selectedDateType = type;
 
             // Store the date type
             const dateTypeInput = document.getElementById('staging-date-type');
@@ -1476,6 +1667,9 @@ def reserve_page(req: Request):
             generateCalendarMonths();
             // Validate form after date type change (clears date selection)
             validateForm();
+
+            // Save to session storage
+            if (!skipSave) saveReserveSession();
         }}
 
         function selectDate(date) {{
@@ -1548,6 +1742,8 @@ def reserve_page(req: Request):
             generateCalendarMonths();
             // Validate form after date selection
             validateForm();
+            // Save to session storage
+            saveReserveSession();
         }}
 
         // Warehouse address for distance calculation
@@ -2090,6 +2286,11 @@ def reserve_page(req: Request):
             updateAddressFields();
             // Initialize form validation (button disabled until all fields filled)
             initFormValidation();
+            // Restore reserve form data from session (after a short delay to let other init complete)
+            setTimeout(function() {{
+                restoreReserveSession();
+                validateForm(); // Re-validate after restoring
+            }}, 100);
         }});
 
         // Make functions globally available

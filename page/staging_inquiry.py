@@ -693,6 +693,111 @@ def items_modal():
     )
 
 
+def inquiry_modal():
+    """Modal for inquiry form with fields from reserve page (except Payment and Policies)"""
+    return Div(
+        Div(
+            # Modal Header
+            Div(
+                H3("Request Staging Quote", cls="modal-title", id="inquiry-modal-title"),
+                Button("✕", cls="modal-close-btn", onclick="closeInquiryModal()"),
+                cls="modal-header"
+            ),
+            # Modal Body - Single form with all fields
+            Div(
+                Form(
+                    # Staging Date
+                    Div(
+                        Label("Preferred Staging Date", cls="inquiry-form-label", For="inquiry-staging-date"),
+                        Input(type="date", id="inquiry-staging-date", cls="inquiry-form-input"),
+                        cls="inquiry-form-group"
+                    ),
+                    # Property Address
+                    Div(
+                        Label("Property Address *", cls="inquiry-form-label", For="inquiry-property-address"),
+                        Input(type="text", id="inquiry-property-address", cls="inquiry-form-input",
+                              placeholder="Enter property address", required=True),
+                        cls="inquiry-form-group"
+                    ),
+                    # Name row
+                    Div(
+                        Div(
+                            Label("First Name *", cls="inquiry-form-label", For="inquiry-first-name"),
+                            Input(type="text", id="inquiry-first-name", cls="inquiry-form-input",
+                                  placeholder="First name", required=True),
+                            cls="inquiry-form-group"
+                        ),
+                        Div(
+                            Label("Last Name *", cls="inquiry-form-label", For="inquiry-last-name"),
+                            Input(type="text", id="inquiry-last-name", cls="inquiry-form-input",
+                                  placeholder="Last name", required=True),
+                            cls="inquiry-form-group"
+                        ),
+                        cls="inquiry-form-row"
+                    ),
+                    # Contact row
+                    Div(
+                        Div(
+                            Label("Email *", cls="inquiry-form-label", For="inquiry-email"),
+                            Input(type="email", id="inquiry-email", cls="inquiry-form-input",
+                                  placeholder="your@email.com", required=True),
+                            cls="inquiry-form-group"
+                        ),
+                        Div(
+                            Label("Phone *", cls="inquiry-form-label", For="inquiry-phone"),
+                            Input(type="tel", id="inquiry-phone", cls="inquiry-form-input",
+                                  placeholder="(123) 456-7890", required=True),
+                            cls="inquiry-form-group"
+                        ),
+                        cls="inquiry-form-row"
+                    ),
+                    # Add-ons
+                    Div(
+                        Label("Add-ons (Optional)", cls="inquiry-form-label"),
+                        Div(
+                            Label(
+                                Input(type="checkbox", id="inquiry-addon-photos", value="photos", cls="inquiry-checkbox"),
+                                Span("Professional Photography (+$199)", cls="inquiry-checkbox-label"),
+                                cls="inquiry-checkbox-item"
+                            ),
+                            Label(
+                                Input(type="checkbox", id="inquiry-addon-consultation", value="consultation", cls="inquiry-checkbox"),
+                                Span("Staging Consultation (Free)", cls="inquiry-checkbox-label"),
+                                cls="inquiry-checkbox-item"
+                            ),
+                            cls="inquiry-addons-list"
+                        ),
+                        cls="inquiry-form-group"
+                    ),
+                    # Special Requests
+                    Div(
+                        Label("Special Requests or Notes", cls="inquiry-form-label", For="inquiry-special-requests"),
+                        Textarea(id="inquiry-special-requests", cls="inquiry-form-textarea",
+                                 placeholder="Any special requests or questions? (Optional)", rows="3"),
+                        cls="inquiry-form-group"
+                    ),
+                    # Hidden fields for staging data
+                    Input(type="hidden", id="inquiry-property-type"),
+                    Input(type="hidden", id="inquiry-property-size"),
+                    Input(type="hidden", id="inquiry-selected-areas"),
+                    Input(type="hidden", id="inquiry-selected-items"),
+                    Input(type="hidden", id="inquiry-total-fee"),
+                    id="inquiry-form"
+                ),
+                cls="modal-body inquiry-form-body"
+            ),
+            # Modal Footer
+            Div(
+                Button("Submit Inquiry", cls="inquiry-submit-btn", onclick="submitInquiry()"),
+                cls="modal-footer inquiry-modal-footer"
+            ),
+            cls="modal-content inquiry-modal-content"
+        ),
+        id="inquiry-modal",
+        cls="inquiry-modal hidden"
+    )
+
+
 def property_type_selector():
     """Property type selector with 3 square buttons"""
     return Section(
@@ -796,9 +901,11 @@ def property_type_selector():
             ),
             # Items Modal
             items_modal(),
+            # Inquiry Modal
+            inquiry_modal(),
             # Floating Action Buttons
             Div(
-                Button("Inquire", cls="staging-inquiry-btn"),
+                Button("Inquire", cls="staging-inquiry-btn", onclick="openInquiryModal()"),
                 Button("Continue Booking", cls="staging-continue-btn", onclick="goToReserve()"),
                 cls="staging-action-buttons",
                 id="staging-action-buttons"
@@ -850,6 +957,96 @@ def property_type_selector():
             const HUGE_AREA = 700.00;
             const BIG_AREA = 500.00;
             const SMALL_AREA = 200.00;
+
+            // Session Storage Key
+            const STAGING_SESSION_KEY = 'astra_staging_data';
+
+            // Save staging data to session storage
+            function saveStagingSession() {
+                const { propertyType, propertySize } = getSelections();
+
+                // Get selected areas
+                const selectedAreas = [];
+                document.querySelectorAll('.area-btn.selected').forEach(btn => {
+                    selectedAreas.push(btn.getAttribute('data-area'));
+                });
+
+                // Get total fee from banner subtitle
+                const bannerSubtitle = document.getElementById('banner-subtitle');
+                let totalFee = '$0';
+                if (bannerSubtitle && bannerSubtitle.textContent.includes('$')) {
+                    totalFee = bannerSubtitle.textContent;
+                }
+
+                const sessionData = {
+                    propertyType: propertyType || null,
+                    propertySize: propertySize || null,
+                    selectedAreas: selectedAreas,
+                    areaItemsData: typeof areaItemsData !== 'undefined' ? areaItemsData : {},
+                    totalFee: totalFee,
+                    timestamp: Date.now()
+                };
+
+                try {
+                    sessionStorage.setItem(STAGING_SESSION_KEY, JSON.stringify(sessionData));
+                } catch (e) {
+                    console.warn('Could not save to sessionStorage:', e);
+                }
+            }
+
+            // Load staging data from session storage
+            function loadStagingSession() {
+                try {
+                    const saved = sessionStorage.getItem(STAGING_SESSION_KEY);
+                    if (!saved) return null;
+                    return JSON.parse(saved);
+                } catch (e) {
+                    console.warn('Could not load from sessionStorage:', e);
+                    return null;
+                }
+            }
+
+            // Restore selections from session data
+            function restoreStagingSession() {
+                const data = loadStagingSession();
+                if (!data) return;
+
+                // Restore property type
+                if (data.propertyType) {
+                    const propertyBtn = document.querySelector(`.property-btn[data-type="${data.propertyType}"]:not(.size-btn):not(.area-btn)`);
+                    if (propertyBtn) {
+                        selectPropertyType(propertyBtn, true); // true = skip save
+                    }
+                }
+
+                // Restore property size (after a slight delay to allow size selector to show)
+                if (data.propertySize) {
+                    setTimeout(() => {
+                        const sizeBtn = document.querySelector(`.size-btn[data-size="${data.propertySize}"]`);
+                        if (sizeBtn) {
+                            selectSize(sizeBtn, true); // true = skip save
+                        }
+
+                        // Restore areas (after size is selected)
+                        if (data.selectedAreas && data.selectedAreas.length > 0) {
+                            setTimeout(() => {
+                                data.selectedAreas.forEach(area => {
+                                    const areaBtn = document.querySelector(`.area-btn[data-area="${area}"]`);
+                                    if (areaBtn && !areaBtn.classList.contains('selected')) {
+                                        toggleArea(areaBtn, true); // true = skip save
+                                    }
+                                });
+
+                                // Restore item selections
+                                if (data.areaItemsData && typeof areaItemsData !== 'undefined') {
+                                    Object.assign(areaItemsData, data.areaItemsData);
+                                    calculateTotalFee();
+                                }
+                            }, 100);
+                        }
+                    }, 100);
+                }
+            }
 
             // Get current selections
             function getSelections() {
@@ -1100,7 +1297,7 @@ def property_type_selector():
                 ]
             };
 
-            function selectPropertyType(btn) {
+            function selectPropertyType(btn, skipSave = false) {
                 buttonFeedback();
                 const allBtns = document.querySelectorAll('.property-btn:not(.size-btn):not(.area-btn):not(.placeholder-btn)');
                 const sizeSelector = document.getElementById('size-selector');
@@ -1139,6 +1336,9 @@ def property_type_selector():
 
                     updateBanner('property-selected');
                 }
+
+                // Save to session storage
+                if (!skipSave) saveStagingSession();
             }
 
             function showSizeOptions(type) {
@@ -1157,7 +1357,7 @@ def property_type_selector():
                 sizeSelector.classList.remove('hidden');
             }
 
-            function selectSize(btn) {
+            function selectSize(btn, skipSave = false) {
                 buttonFeedback();
                 const allSizeBtns = document.querySelectorAll('.size-btn');
 
@@ -1174,6 +1374,9 @@ def property_type_selector():
                 }
                 checkShowAreas();
                 updateAreaPrices();
+
+                // Save to session storage
+                if (!skipSave) saveStagingSession();
             }
 
             function checkShowAreas() {
@@ -1195,10 +1398,13 @@ def property_type_selector():
                 }
             }
 
-            function toggleArea(btn) {
+            function toggleArea(btn, skipSave = false) {
                 buttonFeedback();
                 btn.classList.toggle('selected');
                 calculateTotalFee();
+
+                // Save to session storage
+                if (!skipSave) saveStagingSession();
             }
 
             // Items Modal Functions
@@ -1733,6 +1939,9 @@ def property_type_selector():
 
                 // Recalculate total fee with new item selections
                 calculateTotalFee();
+
+                // Save to session storage
+                saveStagingSession();
             }
 
             // Close modal on backdrop click
@@ -1750,7 +1959,155 @@ def property_type_selector():
                     if (!modal.classList.contains('hidden')) {
                         closeItemsModal();
                     }
+                    const inquiryModal = document.getElementById('inquiry-modal');
+                    if (!inquiryModal.classList.contains('hidden')) {
+                        closeInquiryModal();
+                    }
                 }
+            });
+
+            // Inquiry Modal Functions
+            function openInquiryModal() {
+                const { propertyType, propertySize } = getSelections();
+
+                // Populate hidden fields with current staging data
+                document.getElementById('inquiry-property-type').value = propertyType || '';
+                document.getElementById('inquiry-property-size').value = propertySize || '';
+
+                // Get selected areas
+                const selectedAreas = [];
+                document.querySelectorAll('.area-btn.selected').forEach(btn => {
+                    selectedAreas.push(btn.getAttribute('data-area'));
+                });
+                document.getElementById('inquiry-selected-areas').value = selectedAreas.join(',');
+
+                // Get selected items
+                document.getElementById('inquiry-selected-items').value = typeof areaItemsData !== 'undefined' ? JSON.stringify(areaItemsData) : '{}';
+
+                // Get total fee from banner subtitle
+                const bannerSubtitle = document.getElementById('banner-subtitle');
+                let totalFee = '$0';
+                if (bannerSubtitle && bannerSubtitle.textContent.includes('$')) {
+                    totalFee = bannerSubtitle.textContent;
+                }
+                document.getElementById('inquiry-total-fee').value = totalFee;
+
+                // Show modal
+                document.getElementById('inquiry-modal').classList.remove('hidden');
+            }
+
+            function closeInquiryModal() {
+                document.getElementById('inquiry-modal').classList.add('hidden');
+            }
+
+            // Close inquiry modal on backdrop click
+            document.getElementById('inquiry-modal').addEventListener('click', function(event) {
+                if (event.target === this) {
+                    closeInquiryModal();
+                }
+            });
+
+            // Format phone number as user types
+            document.getElementById('inquiry-phone').addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\\D/g, '');
+                if (value.length > 10) value = value.slice(0, 10);
+                if (value.length >= 6) {
+                    value = '(' + value.slice(0, 3) + ') ' + value.slice(3, 6) + '-' + value.slice(6);
+                } else if (value.length >= 3) {
+                    value = '(' + value.slice(0, 3) + ') ' + value.slice(3);
+                }
+                e.target.value = value;
+            });
+
+            // Submit inquiry form
+            async function submitInquiry() {
+                const form = document.getElementById('inquiry-form');
+                const submitBtn = document.querySelector('.inquiry-submit-btn');
+
+                // Get form values
+                const stagingDate = document.getElementById('inquiry-staging-date').value || 'Flexible';
+                const propertyAddress = document.getElementById('inquiry-property-address').value;
+                const firstName = document.getElementById('inquiry-first-name').value;
+                const lastName = document.getElementById('inquiry-last-name').value;
+                const email = document.getElementById('inquiry-email').value;
+                const phone = document.getElementById('inquiry-phone').value;
+                const specialRequests = document.getElementById('inquiry-special-requests').value;
+
+                // Get add-ons
+                const addons = [];
+                if (document.getElementById('inquiry-addon-photos').checked) addons.push('Professional Photography');
+                if (document.getElementById('inquiry-addon-consultation').checked) addons.push('Staging Consultation');
+
+                // Get staging data from hidden fields
+                const propertyType = document.getElementById('inquiry-property-type').value;
+                const propertySize = document.getElementById('inquiry-property-size').value;
+                const selectedAreas = document.getElementById('inquiry-selected-areas').value;
+                const selectedItems = document.getElementById('inquiry-selected-items').value;
+                const totalFee = document.getElementById('inquiry-total-fee').value;
+
+                // Validate required fields
+                if (!propertyAddress || !firstName || !lastName || !email || !phone) {
+                    alert('Please fill in all required fields.');
+                    return;
+                }
+
+                // Email validation
+                const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    alert('Please enter a valid email address.');
+                    return;
+                }
+
+                // Disable button and show loading state
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Submitting...';
+
+                try {
+                    const response = await fetch('/api/staging-inquiry', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            stagingDate,
+                            propertyAddress,
+                            firstName,
+                            lastName,
+                            email,
+                            phone,
+                            addons,
+                            specialRequests,
+                            propertyType,
+                            propertySize,
+                            selectedAreas,
+                            selectedItems,
+                            totalFee
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        alert('Thank you! Your staging inquiry has been submitted. We will contact you within 24 hours.');
+                        closeInquiryModal();
+                        // Clear form
+                        form.reset();
+                    } else {
+                        alert('There was an error submitting your inquiry. Please try again or call us at 1-888-744-4078.');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('There was an error submitting your inquiry. Please try again or call us at 1-888-744-4078.');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Inquiry';
+                }
+            }
+
+            // Restore session data on page load
+            document.addEventListener('DOMContentLoaded', function() {
+                // Small delay to ensure all elements are rendered
+                setTimeout(restoreStagingSession, 50);
             });
         """),
         cls="property-type-section"
@@ -2281,6 +2638,139 @@ def get_property_selector_styles():
 
     .modal-apply-btn:hover {
         opacity: 0.8;
+    }
+
+    /* Inquiry Modal */
+    .inquiry-modal {
+        position: fixed;
+        top: 70px;
+        left: 0;
+        right: 0;
+        bottom: 80px;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 15px;
+    }
+
+    .inquiry-modal.hidden {
+        display: none;
+    }
+
+    .inquiry-modal-content {
+        max-width: 500px;
+        max-height: 100%;
+    }
+
+    .inquiry-form-body {
+        padding: 20px;
+        overflow-y: auto;
+    }
+
+    .inquiry-form-group {
+        margin-bottom: 16px;
+    }
+
+    .inquiry-form-row {
+        display: flex;
+        gap: 12px;
+    }
+
+    .inquiry-form-row .inquiry-form-group {
+        flex: 1;
+    }
+
+    .inquiry-form-label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--color-primary);
+        margin-bottom: 6px;
+    }
+
+    .inquiry-form-input,
+    .inquiry-form-textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        background: var(--bg-secondary);
+        color: var(--color-primary);
+        font-size: 14px;
+        font-family: inherit;
+        transition: border-color 0.2s ease;
+        box-sizing: border-box;
+    }
+
+    .inquiry-form-input:focus,
+    .inquiry-form-textarea:focus {
+        outline: none;
+        border-color: var(--color-primary);
+    }
+
+    .inquiry-form-textarea {
+        resize: vertical;
+        min-height: 70px;
+    }
+
+    .inquiry-addons-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .inquiry-checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        padding: 8px 12px;
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        transition: background 0.2s ease;
+    }
+
+    .inquiry-checkbox-item:hover {
+        background: var(--border-color);
+    }
+
+    .inquiry-checkbox {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--color-primary);
+    }
+
+    .inquiry-checkbox-label {
+        font-size: 14px;
+        color: var(--color-primary);
+    }
+
+    .inquiry-modal-footer {
+        justify-content: center;
+    }
+
+    .inquiry-submit-btn {
+        width: 100%;
+        padding: 14px 24px;
+        background: var(--color-primary);
+        color: var(--bg-primary);
+        border: none;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s ease;
+    }
+
+    .inquiry-submit-btn:hover {
+        opacity: 0.85;
+    }
+
+    .inquiry-submit-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
 
     /* Tablet and up */
