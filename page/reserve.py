@@ -681,6 +681,110 @@ def reserve_page(req: Request):
             'consultation': 0
         }};
 
+        // Initialize Stripe
+        let stripe = null;
+        let elements = null;
+        let cardElement = null;
+
+        // Load Stripe configuration and setup Elements
+        async function loadStripeConfig() {{
+            try {{
+                const response = await fetch('/api/stripe-config');
+                const config = await response.json();
+                if (config.publishableKey) {{
+                    stripe = Stripe(config.publishableKey);
+
+                    // Create Elements instance
+                    elements = stripe.elements();
+
+                    // Create and mount card element
+                    const isDarkMode = document.documentElement.getAttribute('data-theme') !== 'light';
+                    const style = {{
+                        base: {{
+                            fontSize: '15px',
+                            color: isDarkMode ? '#f5f5f5' : '#333333',
+                            '::placeholder': {{
+                                color: isDarkMode ? '#999999' : '#666666',
+                            }},
+                            fontFamily: 'SF Pro Display, Segoe UI, Tahoma, sans-serif',
+                        }},
+                        invalid: {{
+                            color: '#ff4444',
+                        }}
+                    }};
+
+                    cardElement = elements.create('card', {{
+                        style: style,
+                        hidePostalCode: true
+                    }});
+
+                    // Mount the card element
+                    cardElement.mount('#card-element');
+
+                    // Handle card errors
+                    cardElement.on('change', function(event) {{
+                        const errorDiv = document.getElementById('card-error');
+                        if (event.error) {{
+                            errorDiv.textContent = event.error.message;
+                            errorDiv.style.display = 'block';
+                        }} else {{
+                            errorDiv.textContent = '';
+                            errorDiv.style.display = 'none';
+                        }}
+                    }});
+
+                    // Watch for theme changes and update Stripe Elements
+                    const observer = new MutationObserver(function(mutations) {{
+                        mutations.forEach(function(mutation) {{
+                            if (mutation.type === 'attributes' && mutation.attributeName === 'data-theme') {{
+                                const isDarkMode = document.documentElement.getAttribute('data-theme') !== 'light';
+                                const newStyle = {{
+                                    base: {{
+                                        fontSize: '15px',
+                                        color: isDarkMode ? '#f5f5f5' : '#333333',
+                                        '::placeholder': {{
+                                            color: isDarkMode ? '#999999' : '#666666',
+                                        }},
+                                        fontFamily: 'SF Pro Display, Segoe UI, Tahoma, sans-serif',
+                                    }},
+                                    invalid: {{
+                                        color: '#ff4444',
+                                    }}
+                                }};
+
+                                cardElement.unmount();
+                                cardElement = elements.create('card', {{
+                                    style: newStyle,
+                                    hidePostalCode: true
+                                }});
+                                cardElement.mount('#card-element');
+
+                                cardElement.on('change', function(event) {{
+                                    const errorDiv = document.getElementById('card-error');
+                                    if (event.error) {{
+                                        errorDiv.textContent = event.error.message;
+                                        errorDiv.style.display = 'block';
+                                    }} else {{
+                                        errorDiv.textContent = '';
+                                        errorDiv.style.display = 'none';
+                                    }}
+                                }});
+                            }}
+                        }});
+                    }});
+
+                    observer.observe(document.documentElement, {{ attributes: true }});
+                }}
+            }} catch (error) {{
+                console.error('Failed to load Stripe config:', error);
+            }}
+        }}
+
+        // Load Stripe on page load
+        if (typeof Stripe !== 'undefined') {{
+            document.addEventListener('DOMContentLoaded', loadStripeConfig);
+        }}
+
         // Item ID to display name mapping
         const itemNameMap = {{
             'sofa': 'Sofa',
@@ -998,9 +1102,9 @@ def reserve_page(req: Request):
 
                 const cellDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
 
-                // Disable past dates, weekends (Sat=6, Sun=0), and stat holidays
+                // Disable past dates, today, weekends (Sat=6, Sun=0), and stat holidays
                 const dayOfWeek = cellDate.getDay();
-                if (cellDate < today || dayOfWeek === 0 || dayOfWeek === 6 || isStatHoliday(cellDate)) {{
+                if (cellDate <= today || dayOfWeek === 0 || dayOfWeek === 6 || isStatHoliday(cellDate)) {{
                     dayCell.classList.add('disabled');
                 }} else {{
                     dayCell.onclick = () => selectDate(cellDate);
@@ -1104,9 +1208,9 @@ def reserve_page(req: Request):
 
                 const cellDate = new Date(currentDisplayMonth.getFullYear(), currentDisplayMonth.getMonth(), day);
 
-                // Disable past dates, weekends (Sat=6, Sun=0), and stat holidays
+                // Disable past dates, today, weekends (Sat=6, Sun=0), and stat holidays
                 const dayOfWeek = cellDate.getDay();
-                if (cellDate < today || dayOfWeek === 0 || dayOfWeek === 6 || isStatHoliday(cellDate)) {{
+                if (cellDate <= today || dayOfWeek === 0 || dayOfWeek === 6 || isStatHoliday(cellDate)) {{
                     dayCell.classList.add('disabled');
                 }} else {{
                     dayCell.onclick = () => selectDate(cellDate);
@@ -1284,6 +1388,162 @@ def reserve_page(req: Request):
             }});
         }}
 
+        // Initialize Google Places Autocomplete for billing address
+        function initBillingAutocomplete() {{
+            const addressInput = document.getElementById('billing-address');
+            if (!addressInput) return;
+
+            const autocomplete = new google.maps.places.Autocomplete(addressInput, {{
+                types: ['address'],
+                fields: ['address_components', 'formatted_address']
+            }});
+
+            autocomplete.addListener('place_changed', function() {{
+                const place = autocomplete.getPlace();
+                if (!place.address_components) return;
+
+                let streetNumber = '';
+                let route = '';
+                let city = '';
+                let province = '';
+                let country = '';
+                let postalCode = '';
+
+                // Parse address components
+                for (const component of place.address_components) {{
+                    const types = component.types;
+                    if (types.includes('street_number')) {{
+                        streetNumber = component.long_name;
+                    }} else if (types.includes('route')) {{
+                        route = component.long_name;
+                    }} else if (types.includes('locality')) {{
+                        city = component.long_name;
+                    }} else if (types.includes('administrative_area_level_1')) {{
+                        province = component.short_name;
+                    }} else if (types.includes('country')) {{
+                        country = component.short_name;
+                    }} else if (types.includes('postal_code')) {{
+                        postalCode = component.long_name;
+                    }}
+                }}
+
+                // Fill in the form fields
+                const fullStreet = `${{streetNumber}} ${{route}}`.trim();
+                if (fullStreet) {{
+                    addressInput.value = fullStreet;
+                }}
+
+                const cityField = document.getElementById('billing-city');
+                if (cityField && city) {{
+                    cityField.value = city;
+                    cityField.style.borderColor = '';
+                }}
+
+                const stateField = document.getElementById('billing-state');
+                if (stateField && province) {{
+                    stateField.value = province;
+                    stateField.style.borderColor = '';
+                }}
+
+                const countryField = document.getElementById('billing-country');
+                if (countryField && country) {{
+                    countryField.value = country;
+                    countryField.style.borderColor = '';
+                    // Trigger address fields update for country-specific formatting
+                    updateAddressFields();
+                }}
+
+                const postalField = document.getElementById('billing-zip');
+                if (postalField && postalCode) {{
+                    // Format Canadian postal code
+                    let formatted = postalCode.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    if (formatted.length === 6) {{
+                        formatted = formatted.substring(0, 3) + ' ' + formatted.substring(3, 6);
+                    }}
+                    postalField.value = formatted;
+                    postalField.style.borderColor = '';
+                }}
+            }});
+        }}
+
+        // Update address field labels and placeholders based on selected country
+        function updateAddressFields() {{
+            const countrySelect = document.getElementById('billing-country');
+            const stateLabel = document.querySelector('label[for="billing-state"]');
+            const stateInput = document.getElementById('billing-state');
+            const postalLabel = document.querySelector('label[for="billing-zip"]');
+            const postalInput = document.getElementById('billing-zip');
+
+            if (!countrySelect || !stateLabel || !stateInput || !postalLabel || !postalInput) return;
+
+            const country = countrySelect.value;
+
+            // Define country-specific labels and placeholders
+            const countryConfig = {{
+                'US': {{
+                    stateLabel: 'State *',
+                    statePlaceholder: 'CA',
+                    postalLabel: 'ZIP Code *',
+                    postalPlaceholder: '12345',
+                    postalMaxLength: 10,
+                    postalFormat: null
+                }},
+                'CA': {{
+                    stateLabel: 'Province *',
+                    statePlaceholder: 'ON',
+                    postalLabel: 'Postal Code *',
+                    postalPlaceholder: 'A1A 1A1',
+                    postalMaxLength: 7,
+                    postalFormat: function(value) {{
+                        let v = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                        if (v.length > 3) {{
+                            v = v.substring(0, 3) + ' ' + v.substring(3, 6);
+                        }}
+                        return v;
+                    }}
+                }}
+            }};
+
+            // Default configuration for countries not specifically listed
+            const defaultConfig = {{
+                stateLabel: 'State/Province *',
+                statePlaceholder: '',
+                postalLabel: 'Postal Code *',
+                postalPlaceholder: '',
+                postalMaxLength: 10,
+                postalFormat: null
+            }};
+
+            // Get configuration for selected country or use default
+            const config = countryConfig[country] || defaultConfig;
+
+            // Update labels
+            stateLabel.textContent = config.stateLabel;
+            postalLabel.textContent = config.postalLabel;
+
+            // Update placeholders
+            stateInput.placeholder = config.statePlaceholder;
+            postalInput.placeholder = config.postalPlaceholder;
+
+            // Update postal code max length
+            postalInput.maxLength = config.postalMaxLength;
+
+            // Update postal code input handlers if there's a format function
+            if (config.postalFormat) {{
+                postalInput.oninput = function() {{
+                    this.value = config.postalFormat(this.value);
+                }};
+            }} else {{
+                // Remove custom formatting for countries without specific format
+                postalInput.oninput = null;
+            }}
+
+            // Clear validation errors
+            stateInput.style.borderColor = '';
+            postalInput.style.borderColor = '';
+            postalInput.setCustomValidity('');
+        }}
+
         // Auto-formatting functions
         function formatName(input) {{
             let value = input.value.trim().replace(/\\s+/g, ' ');
@@ -1336,35 +1596,85 @@ def reserve_page(req: Request):
             }}
         }}
 
-        // Form submission
+        // Form submission with Stripe payment
         async function submitReservation() {{
+            // Collect form data
             const stagingDate = document.getElementById('staging-date').value;
             const propertyAddress = document.getElementById('property-address').value;
             const firstName = document.getElementById('first-name').value;
             const lastName = document.getElementById('last-name').value;
             const email = document.getElementById('email').value;
             const phone = document.getElementById('phone').value;
-            const postalCode = document.getElementById('billing-zip').value;
+            const billingAddress = document.getElementById('billing-address')?.value || '';
+            const billingCity = document.getElementById('billing-city')?.value || '';
+            const billingState = document.getElementById('billing-state')?.value || '';
+            const billingCountry = document.getElementById('billing-country')?.value || 'CA';
+            const billingZip = document.getElementById('billing-zip').value;
             const specialRequests = document.getElementById('special-requests').value;
 
             // Validate required fields
-            if (!stagingDate) {{
-                alert('Please select a staging date');
-                return;
+            const requiredFields = [
+                {{ id: 'staging-date', name: 'Staging Date', value: stagingDate }},
+                {{ id: 'property-address', name: 'Property Address', value: propertyAddress }},
+                {{ id: 'first-name', name: 'First Name', value: firstName }},
+                {{ id: 'last-name', name: 'Last Name', value: lastName }},
+                {{ id: 'email', name: 'Email', value: email }},
+                {{ id: 'phone', name: 'Phone', value: phone }},
+                {{ id: 'billing-address', name: 'Billing Address', value: billingAddress }},
+                {{ id: 'billing-city', name: 'City', value: billingCity }},
+                {{ id: 'billing-state', name: 'Province', value: billingState }},
+                {{ id: 'billing-zip', name: 'Postal Code', value: billingZip }}
+            ];
+
+            let missingFields = [];
+            for (const field of requiredFields) {{
+                if (!field.value || field.value.trim() === '') {{
+                    missingFields.push(field.name);
+                    const element = document.getElementById(field.id);
+                    if (element) {{
+                        element.style.borderColor = '#ff4444';
+                        element.style.borderWidth = '2px';
+                    }}
+                }} else {{
+                    const element = document.getElementById(field.id);
+                    if (element) {{
+                        element.style.borderColor = '';
+                        element.style.borderWidth = '';
+                    }}
+                }}
             }}
-            if (!propertyAddress) {{
-                alert('Please enter the property address');
-                return;
+
+            // Check if card element has been filled
+            if (!cardElement || !cardElement._complete) {{
+                missingFields.push('Card Details');
+                const cardElementDiv = document.getElementById('card-element');
+                if (cardElementDiv) {{
+                    cardElementDiv.style.border = '2px solid #ff4444';
+                }}
             }}
-            if (!firstName || !lastName || !email || !phone) {{
-                alert('Please fill in all guest information fields');
+
+            if (missingFields.length > 0) {{
+                alert('Please fill in all required fields:\\n\\n• ' + missingFields.join('\\n• '));
+                const firstMissing = requiredFields.find(f => missingFields.includes(f.name));
+                if (firstMissing) {{
+                    const element = document.getElementById(firstMissing.id);
+                    if (element) {{
+                        element.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+                        element.focus();
+                    }}
+                }}
                 return;
             }}
 
             const submitButton = document.querySelector('.reserve-now-btn');
             const originalText = submitButton.textContent;
             submitButton.disabled = true;
-            submitButton.textContent = 'Processing...';
+            submitButton.textContent = 'Processing Payment...';
+
+            // Get deposit amount (Due Today)
+            const dueTodayEl = document.getElementById('due-today-amount');
+            const dueTodayText = dueTodayEl ? dueTodayEl.textContent : '$500.00';
+            const dueToday = Math.round(parseFloat(dueTodayText.replace(/[$,CAD\\s]/g, '')) * 100) || 50000;
 
             // Prepare form data
             const formData = {{
@@ -1374,19 +1684,113 @@ def reserve_page(req: Request):
                 lastName,
                 email,
                 phone,
-                postalCode,
+                billing: {{
+                    address: billingAddress,
+                    city: billingCity,
+                    state: billingState,
+                    country: billingCountry,
+                    postalCode: billingZip
+                }},
                 specialRequests,
                 ...stagingData
             }};
 
             try {{
-                // For now, just show success (API endpoint to be implemented)
-                console.log('Reservation data:', formData);
-                alert('Thank you! Your staging reservation request has been submitted. We will contact you shortly to confirm.');
-                // window.location.href = '/staging-thanks';
+                // Process payment with Stripe
+                if (stripe) {{
+                    // Create payment intent
+                    const intentResponse = await fetch('/api/create-payment-intent', {{
+                        method: 'POST',
+                        headers: {{
+                            'Content-Type': 'application/json',
+                        }},
+                        body: JSON.stringify({{
+                            amount: dueToday,
+                            guest_name: `${{firstName}} ${{lastName}}`,
+                            guest_email: email,
+                            guest_phone: phone,
+                            property_address: propertyAddress,
+                            staging_date: stagingDate
+                        }})
+                    }});
+
+                    const intentData = await intentResponse.json();
+
+                    if (intentData.error) {{
+                        throw new Error(intentData.error);
+                    }}
+
+                    // Create payment method using Stripe Elements
+                    const cardName = `${{firstName}} ${{lastName}}`.trim();
+
+                    const {{error: methodError, paymentMethod}} = await stripe.createPaymentMethod({{
+                        type: 'card',
+                        card: cardElement,
+                        billing_details: {{
+                            name: cardName,
+                            email: email,
+                            phone: phone,
+                            address: {{
+                                line1: billingAddress,
+                                city: billingCity,
+                                state: billingState,
+                                postal_code: billingZip,
+                                country: billingCountry
+                            }}
+                        }}
+                    }});
+
+                    if (methodError) {{
+                        throw new Error(methodError.message);
+                    }}
+
+                    // Confirm the payment
+                    const {{error: confirmError, paymentIntent}} = await stripe.confirmCardPayment(
+                        intentData.clientSecret,
+                        {{
+                            payment_method: paymentMethod.id
+                        }}
+                    );
+
+                    if (confirmError) {{
+                        throw new Error(confirmError.message);
+                    }}
+
+                    // Payment successful - confirm reservation
+                    const confirmResponse = await fetch('/api/confirm-reservation', {{
+                        method: 'POST',
+                        headers: {{
+                            'Content-Type': 'application/json',
+                        }},
+                        body: JSON.stringify({{
+                            paymentIntentId: paymentIntent.id,
+                            customerId: intentData.customerId,
+                            formData: formData,
+                            depositAmount: dueToday / 100
+                        }})
+                    }});
+
+                    const confirmData = await confirmResponse.json();
+
+                    if (confirmData.success) {{
+                        // Store data and redirect
+                        localStorage.setItem('reservationData', JSON.stringify(formData));
+                        localStorage.setItem('reservationId', paymentIntent.id);
+                        localStorage.setItem('customerId', confirmData.customer_id || intentData.customerId);
+
+                        alert('Payment successful! Your staging reservation has been confirmed. You will receive a confirmation email shortly.');
+                        // window.location.href = '/reservation-thanks';
+                    }} else {{
+                        throw new Error('Reservation confirmation failed');
+                    }}
+                }} else {{
+                    // Stripe not configured - fallback
+                    console.log('Reservation data:', formData);
+                    alert('Thank you! Your staging reservation request has been submitted. We will contact you shortly to confirm.');
+                }}
             }} catch (error) {{
                 console.error('Error:', error);
-                alert('An error occurred. Please try again.');
+                alert('Payment failed: ' + error.message);
             }} finally {{
                 submitButton.disabled = false;
                 submitButton.textContent = originalText;
@@ -1402,10 +1806,15 @@ def reserve_page(req: Request):
             const dateDisplay = document.getElementById('staging-date-display');
             if (dateDisplay) dateDisplay.placeholder = 'Select a week, we\\'ll select a date';
             generateCalendarMonths();
+            // Initialize billing address autocomplete and country-specific fields
+            initBillingAutocomplete();
+            updateAddressFields();
         }});
 
-        // Make initAutocomplete globally available
+        // Make functions globally available
         window.initAutocomplete = initAutocomplete;
+        window.initBillingAutocomplete = initBillingAutocomplete;
+        window.updateAddressFields = updateAddressFields;
     """
 
     content = Div(
@@ -1562,7 +1971,54 @@ def reserve_page(req: Request):
                             "Payment Information",
                             cls="section-title"
                         ),
+                        Img(
+                            src="/static/images/logo_stripe.png",
+                            alt="Stripe Payment",
+                            style="max-width: 400px; width: 100%; height: auto; margin: 20px 0; display: block;"
+                        ),
                         Div(
+                            # Stripe Elements Card Input
+                            Div(
+                                Label("Card Details *", cls="form-label"),
+                                Div(
+                                    id="card-element",
+                                    cls="form-input",
+                                    style="padding: 12px 16px; min-height: 44px;"
+                                ),
+                                Div(id="card-error", style="color: #ff4444; font-size: 12px; margin-top: 4px;"),
+                                cls="form-group full-width"
+                            ),
+                            Div(
+                                Label("Street *", cls="form-label", For="billing-address"),
+                                Input(type="text", id="billing-address", cls="form-input", required=True,
+                                      placeholder="Start typing your address...",
+                                      autocomplete="off"),
+                                cls="form-group"
+                            ),
+                            Div(
+                                Label("City *", cls="form-label", For="billing-city"),
+                                Input(type="text", id="billing-city", cls="form-input", required=True),
+                                cls="form-group"
+                            ),
+                            Div(
+                                Label("Province *", cls="form-label", For="billing-state"),
+                                Input(type="text", id="billing-state", cls="form-input", required=True,
+                                      placeholder="ON"),
+                                cls="form-group"
+                            ),
+                            Div(
+                                Label("Country *", cls="form-label", For="billing-country"),
+                                Select(
+                                    Option("Select a country", value="", disabled=True),
+                                    Option("Canada", value="CA", selected=True),
+                                    Option("United States", value="US"),
+                                    id="billing-country",
+                                    cls="form-input",
+                                    required=True,
+                                    onchange="updateAddressFields()"
+                                ),
+                                cls="form-group"
+                            ),
                             Div(
                                 Label("Postal Code *", cls="form-label", For="billing-zip"),
                                 Input(type="text", id="billing-zip", cls="form-input", required=True,
@@ -1570,9 +2026,8 @@ def reserve_page(req: Request):
                                       oninput="formatPostalCode(this)"),
                                 cls="form-group"
                             ),
-                            P("Payment will be collected upon confirmation of your staging date.",
-                              style="font-size: 14px; color: var(--color-secondary); margin-top: 12px;"),
-                            cls="form-grid"
+                            cls="form-grid",
+                            id="card-details-section"
                         ),
                         cls="reserve-section"
                     ),
@@ -1710,8 +2165,9 @@ def reserve_page(req: Request):
         )
     )
 
-    # Add Google Maps script
+    # Add Stripe and Google Maps scripts
     content_with_scripts = Div(
+        Script(src="https://js.stripe.com/v3/"),
         Script(src=f"https://maps.googleapis.com/maps/api/js?key={google_api_key}&libraries=places&callback=initAutocomplete", defer="defer") if google_api_key else "",
         content
     )

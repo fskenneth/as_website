@@ -23,7 +23,7 @@ from page.reserve import reserve_page
 from page.areas import AREAS, AREA_PAGE_FUNCTIONS
 from page.blog_listing import blog_listing_page, load_blog_metadata
 from starlette.staticfiles import StaticFiles
-from starlette.responses import Response
+from starlette.responses import Response, JSONResponse
 from tools.instagram import get_cached_posts
 from tools.google_reviews import fetch_google_reviews
 from tools.email_service import send_inquiry_emails
@@ -31,6 +31,16 @@ from starlette.requests import Request
 import httpx
 import hashlib
 import json
+import os
+import stripe
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Configure Stripe
+stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
 
 app, rt = fast_app(live=True)
 
@@ -142,6 +152,128 @@ async def contact_api(request: Request):
             media_type='application/json',
             status_code=500
         )
+
+
+# =============================================================================
+# STRIPE PAYMENT ENDPOINTS
+# =============================================================================
+
+@rt('/api/stripe-config')
+def get_stripe_config():
+    """Return Stripe publishable key"""
+    return JSONResponse({'publishableKey': STRIPE_PUBLISHABLE_KEY})
+
+
+@rt('/api/create-payment-intent')
+async def create_payment_intent(req: Request):
+    """Create a Stripe payment intent with customer for staging reservation"""
+    try:
+        data = await req.json()
+
+        # Extract reservation details
+        amount = data.get('amount', 50000)  # Default to $500 in cents
+        if isinstance(amount, (int, float)) and amount < 1000:
+            # Convert dollars to cents if needed
+            amount = int(amount * 100)
+
+        guest_name = data.get('guest_name', '')
+        if not guest_name:
+            first_name = data.get('firstName', '')
+            last_name = data.get('lastName', '')
+            guest_name = f"{first_name} {last_name}".strip()
+
+        guest_email = data.get('guest_email', data.get('email', ''))
+        guest_phone = data.get('guest_phone', data.get('phone', ''))
+        property_address = data.get('property_address', '')
+        staging_date = data.get('staging_date', '')
+
+        # Validate guest email is provided
+        if not guest_email:
+            return JSONResponse({'error': 'Email is required'}, status_code=400)
+
+        print(f"Creating staging payment for: {guest_name} ({guest_email}), Property: {property_address}")
+
+        # Check if customer already exists in Stripe
+        existing_customers = stripe.Customer.list(email=guest_email, limit=1)
+
+        if existing_customers.data:
+            customer = existing_customers.data[0]
+            print(f"Found existing Stripe customer: {customer.id} ({customer.email})")
+        else:
+            # Create new customer (not a guest) so we can charge them later
+            customer = stripe.Customer.create(
+                email=guest_email,
+                name=guest_name,
+                phone=guest_phone,
+                metadata={
+                    'property_address': property_address,
+                    'staging_date': staging_date,
+                    'source': 'astra_staging_website'
+                }
+            )
+            print(f"Created new Stripe customer: {customer.id} ({guest_email})")
+
+        # Create payment intent with customer for future charges
+        intent = stripe.PaymentIntent.create(
+            amount=amount,
+            currency='cad',
+            customer=customer.id,
+            receipt_email=guest_email,
+            description='Astra Staging - Reservation Deposit',
+            setup_future_usage='off_session',  # Save payment method for future use
+            automatic_payment_methods={'enabled': True},
+            metadata={
+                'customer_name': guest_name,
+                'customer_email': guest_email,
+                'customer_phone': guest_phone,
+                'property_address': property_address,
+                'staging_date': staging_date,
+                'type': 'staging_deposit'
+            }
+        )
+
+        return JSONResponse({
+            'clientSecret': intent.client_secret,
+            'paymentIntentId': intent.id,
+            'customerId': customer.id
+        })
+    except Exception as e:
+        print(f"Stripe error: {str(e)}")
+        return JSONResponse({'error': str(e)}, status_code=400)
+
+
+@rt('/api/confirm-reservation')
+async def confirm_reservation(req: Request):
+    """Confirm reservation after successful payment"""
+    try:
+        data = await req.json()
+        payment_intent_id = data.get('paymentIntentId')
+        customer_id = data.get('customerId')
+        form_data = data.get('formData', {})
+        deposit_amount = data.get('depositAmount', 500)
+
+        # Verify payment was successful
+        intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+
+        if intent.status == 'succeeded':
+            # Payment successful - log and return success
+            print(f"Payment successful for customer {customer_id}, intent {payment_intent_id}")
+
+            # TODO: Send confirmation email, save to database, etc.
+
+            return JSONResponse({
+                'success': True,
+                'customer_id': customer_id,
+                'payment_intent_id': payment_intent_id
+            })
+        else:
+            return JSONResponse({
+                'success': False,
+                'error': f'Payment not completed. Status: {intent.status}'
+            }, status_code=400)
+    except Exception as e:
+        print(f"Confirmation error: {str(e)}")
+        return JSONResponse({'success': False, 'error': str(e)}, status_code=400)
 
 
 # =============================================================================
