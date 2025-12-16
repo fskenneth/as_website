@@ -612,6 +612,45 @@ def reserve_page(req: Request):
                 font-size: 15px;
             }
 
+            /* Disable hover effects on mobile */
+            .reserve-section:hover {
+                transform: none;
+                box-shadow: none;
+            }
+
+            /* Mobile calendar - compact square cells */
+            .mobile-months-container {
+                gap: 16px;
+            }
+
+            .mobile-months-container .calendar-grid {
+                gap: 2px;
+            }
+
+            .mobile-months-container .calendar-day {
+                aspect-ratio: 1;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 13px;
+                border-radius: 6px;
+            }
+
+            .mobile-months-container .calendar-day-header {
+                padding: 6px 4px;
+                font-size: 11px;
+            }
+
+            .mobile-months-container .calendar-header {
+                padding: 8px 0;
+                margin-bottom: 4px;
+            }
+
+            .mobile-months-container .calendar-month-year {
+                font-size: 14px;
+            }
+
         }
 
         @media (max-width: 390px) {
@@ -638,9 +677,8 @@ def reserve_page(req: Request):
 
         // Add-on prices
         const addonPrices = {{
-            'photos': 150,
-            'floorplan': 200,
-            'virtual-tour': 300
+            'photos': 199,
+            'consultation': 0
         }};
 
         // Item ID to display name mapping
@@ -1443,7 +1481,7 @@ def reserve_page(req: Request):
                                 Div(
                                     Div(
                                         Span("Professional Photography"),
-                                        Span("+$150", cls="addon-price"),
+                                        Span("+$199", cls="addon-price"),
                                         cls="addon-title"
                                     ),
                                     Div("High-quality photos of your staged property", cls="addon-desc"),
@@ -1452,29 +1490,19 @@ def reserve_page(req: Request):
                                 cls="addon-item"
                             ),
                             Label(
-                                Input(type="checkbox", value="floorplan", cls="addon-checkbox",
+                                Input(type="checkbox", value="consultation", cls="addon-checkbox",
                                       onchange="handleAddonChange(this)"),
                                 Div(
                                     Div(
-                                        Span("Floor Plan"),
-                                        Span("+$200", cls="addon-price"),
+                                        Span("Staging Consultation"),
+                                        Span(
+                                            Span("$150", style="text-decoration: line-through; opacity: 0.6; margin-right: 6px;"),
+                                            Span("$0", style="color: #4CAF50;"),
+                                            cls="addon-price"
+                                        ),
                                         cls="addon-title"
                                     ),
-                                    Div("Detailed floor plan with measurements", cls="addon-desc"),
-                                    cls="addon-content"
-                                ),
-                                cls="addon-item"
-                            ),
-                            Label(
-                                Input(type="checkbox", value="virtual-tour", cls="addon-checkbox",
-                                      onchange="handleAddonChange(this)"),
-                                Div(
-                                    Div(
-                                        Span("Virtual Tour"),
-                                        Span("+$300", cls="addon-price"),
-                                        cls="addon-title"
-                                    ),
-                                    Div("360-degree virtual walkthrough of the property", cls="addon-desc"),
+                                    Div("Professional staging opinions provided by a stager in-person or virtually", cls="addon-desc"),
                                     cls="addon-content"
                                 ),
                                 cls="addon-item"
