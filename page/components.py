@@ -1399,7 +1399,7 @@ def get_shared_styles():
     .general-inquiry-popup-close {
         position: fixed;
         top: 125px;
-        right: 40px;
+        right: 20px;
         width: 45px;
         height: 45px;
         border-radius: 50%;
@@ -1418,6 +1418,12 @@ def get_shared_styles():
         opacity: 0;
         visibility: hidden;
         z-index: 9999;
+    }
+    /* Desktop: position close button within navbar max-width */
+    @media (min-width: 768px) {
+        .general-inquiry-popup-close {
+            right: calc((100vw - 960px) / 2);
+        }
     }
     .general-inquiry-popup-close.visible {
         opacity: 1;
