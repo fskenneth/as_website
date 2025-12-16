@@ -966,9 +966,16 @@ def reserve_page(req: Request):
             const dueToday = Math.floor(halfTotal / 500) * 500;
 
             // Update display
+            const dueTodayAmount = Math.max(500, dueToday);
             const dueTodayEl = document.getElementById('due-today-amount');
             if (dueTodayEl) {{
-                dueTodayEl.textContent = '$' + Math.max(500, dueToday).toLocaleString('en-CA', {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}) + ' CAD';
+                dueTodayEl.textContent = '$' + dueTodayAmount.toLocaleString('en-CA', {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}) + ' CAD';
+            }}
+
+            // Update Reserve button text
+            const reserveBtn = document.getElementById('reserve-btn');
+            if (reserveBtn) {{
+                reserveBtn.textContent = 'Reserve Now - Pay $' + dueTodayAmount.toLocaleString('en-CA', {{ minimumFractionDigits: 0, maximumFractionDigits: 0 }});
             }}
 
             // Update total with add-ons
@@ -2157,7 +2164,7 @@ def reserve_page(req: Request):
 
             # Reserve Now Button
             Div(
-                Button("Reserve Now", cls="reserve-now-btn", onclick="submitReservation()"),
+                Button("Reserve Now - Pay $500", cls="reserve-now-btn", id="reserve-btn", onclick="submitReservation()"),
                 style="text-align: center; padding: 20px 0;"
             ),
 
