@@ -749,11 +749,23 @@ def reserve_page(req: Request):
         const STAGING_SESSION_KEY = 'astra_staging_data';
         const RESERVE_SESSION_KEY = 'astra_reserve_data';
 
+        // Calendar state (declared early for session restore access)
+        let selectedDate = null;
+        let selectedWeekStart = null;
+        let selectedWeekEnd = null;
+        let currentDisplayMonth = new Date();
+        let selectedDateType = 'week';
+
         // Save reserve form data to session storage
         function saveReserveSession() {{
             const formData = {{
                 stagingDate: document.getElementById('staging-date')?.value || '',
+                stagingDateDisplay: document.getElementById('staging-date-display')?.value || '',
                 dateType: selectedDateType || 'week',
+                // Save calendar selection state
+                selectedDate: selectedDate ? selectedDate.toISOString() : null,
+                selectedWeekStart: selectedWeekStart ? selectedWeekStart.toISOString() : null,
+                selectedWeekEnd: selectedWeekEnd ? selectedWeekEnd.toISOString() : null,
                 propertyAddress: document.getElementById('property-address')?.value || '',
                 firstName: document.getElementById('first-name')?.value || '',
                 lastName: document.getElementById('last-name')?.value || '',
@@ -797,21 +809,29 @@ def reserve_page(req: Request):
                 selectDateType(data.dateType, true); // true = skip save
             }}
 
-            // Restore staging date
+            // Restore calendar selection state
+            if (data.selectedDate) {{
+                selectedDate = new Date(data.selectedDate);
+            }}
+            if (data.selectedWeekStart) {{
+                selectedWeekStart = new Date(data.selectedWeekStart);
+            }}
+            if (data.selectedWeekEnd) {{
+                selectedWeekEnd = new Date(data.selectedWeekEnd);
+            }}
+
+            // Restore staging date hidden value and display text
             if (data.stagingDate) {{
                 const dateInput = document.getElementById('staging-date');
                 const dateDisplay = document.getElementById('staging-date-display');
                 if (dateInput) dateInput.value = data.stagingDate;
-                if (dateDisplay) {{
-                    // Format the date for display
-                    const dateParts = data.stagingDate.split('-');
-                    if (dateParts.length === 3) {{
-                        const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
-                        const options = {{ year: 'numeric', month: 'long', day: 'numeric' }};
-                        dateDisplay.value = dateObj.toLocaleDateString('en-US', options);
-                    }}
+                if (dateDisplay && data.stagingDateDisplay) {{
+                    dateDisplay.value = data.stagingDateDisplay;
                 }}
             }}
+
+            // Re-generate calendar to show highlighted selection
+            generateCalendarMonths();
 
             // Restore form fields
             if (data.propertyAddress) {{
@@ -1350,12 +1370,6 @@ def reserve_page(req: Request):
             validateForm();
         }}
 
-        // Calendar state
-        let selectedDate = null;
-        let selectedWeekStart = null;
-        let selectedWeekEnd = null;
-        let currentDisplayMonth = new Date();
-
         // Statutory holidays (Ontario, Canada) - format: 'YYYY-MM-DD'
         const statHolidays = [
             // 2025
@@ -1614,9 +1628,7 @@ def reserve_page(req: Request):
             }}
         }}
 
-        // Date type selection - default to week
-        let selectedDateType = 'week';
-
+        // Date type selection function
         function selectDateType(btnOrType, skipSave = false) {{
             let type;
             if (typeof btnOrType === 'string') {{
