@@ -1199,57 +1199,12 @@ def property_type_selector():
                 }
             }
 
-            // Navigate to reserve page with staging data
+            // Navigate to reserve page (data is passed via session storage)
             function goToReserve() {
-                const { propertyType, propertySize } = getSelections();
-
-                // Get selected areas (both name and slug)
-                const selectedAreas = [];
-                const selectedAreaSlugs = [];
-                document.querySelectorAll('.area-btn.selected').forEach(btn => {
-                    const areaName = btn.querySelector('.area-name').textContent;
-                    const areaSlug = btn.getAttribute('data-area');
-                    selectedAreas.push(areaName);
-                    selectedAreaSlugs.push(areaSlug);
-                });
-
-                // Get total fee from banner
-                const bannerSubtitle = document.getElementById('banner-subtitle');
-                let totalFee = 0;
-                if (bannerSubtitle) {
-                    const feeText = bannerSubtitle.textContent;
-                    const match = feeText.match(/\$([\d,]+\.?\d*)/);
-                    if (match) {
-                        totalFee = parseFloat(match[1].replace(',', ''));
-                    }
-                }
-
-                // Build URL with parameters
-                const params = new URLSearchParams();
-                params.set('propertyType', propertyType || '');
-                params.set('propertySize', propertySize || '');
-                params.set('totalFee', totalFee.toString());
-
-                if (selectedAreas.length > 0) {
-                    params.set('areas', selectedAreas.join(','));
-                }
-
-                // Include all items for selected areas (custom or default)
-                const allItemsData = {};
-                selectedAreaSlugs.forEach(areaSlug => {
-                    // Use custom items if set, otherwise use defaults
-                    const items = areaItemsData[areaSlug] || getDefaultItems(areaSlug);
-                    if (items && Object.keys(items).length > 0) {
-                        allItemsData[areaSlug] = items;
-                    }
-                });
-
-                if (Object.keys(allItemsData).length > 0) {
-                    params.set('items', encodeURIComponent(JSON.stringify(allItemsData)));
-                }
-
-                // Redirect to reserve page
-                window.location.href = '/reserve/?' + params.toString();
+                // Save current selections to session storage before navigating
+                saveStagingSession();
+                // Redirect to reserve page without URL parameters
+                window.location.href = '/reserve/';
             }
 
             // Update banner with fee
