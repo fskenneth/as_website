@@ -421,6 +421,104 @@ def reserve_page(req: Request):
             opacity: 0.8;
         }
 
+        /* Quantity selector for add-ons */
+        .addon-quantity-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        [data-theme="light"] .addon-quantity-item {
+            background: rgba(0, 0, 0, 0.01);
+        }
+
+        .addon-quantity-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        [data-theme="light"] .addon-quantity-item:hover {
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        .addon-quantity-info {
+            flex: 1;
+        }
+
+        .addon-quantity-title {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .addon-quantity-price {
+            font-size: 14px;
+            color: var(--color-secondary);
+            opacity: 0.8;
+        }
+
+        .addon-quantity-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .addon-qty-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            background: transparent;
+            color: var(--color-primary);
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        [data-theme="light"] .addon-qty-btn {
+            border-color: rgba(0, 0, 0, 0.2);
+        }
+
+        .addon-qty-btn:hover {
+            border-color: #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+        }
+
+        .addon-qty-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .addon-qty-btn:disabled:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            background: transparent;
+        }
+
+        [data-theme="light"] .addon-qty-btn:disabled:hover {
+            border-color: rgba(0, 0, 0, 0.2);
+        }
+
+        .addon-qty-value {
+            font-size: 18px;
+            font-weight: 600;
+            min-width: 24px;
+            text-align: center;
+        }
+
+        .addon-qty-total {
+            font-size: 14px;
+            font-weight: 600;
+            color: #4CAF50;
+            min-width: 60px;
+            text-align: right;
+        }
+
         /* Date picker styles */
         .date-picker-container {
             position: relative;
@@ -719,6 +817,167 @@ def reserve_page(req: Request):
                 font-size: 15px;
             }
         }
+
+        /* Additional Information toggle button styles */
+        .info-toggle-group {
+            margin-bottom: 20px;
+        }
+
+        .info-toggle-group-label {
+            font-size: 14px;
+            color: var(--color-secondary);
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .info-toggle-selector {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .info-toggle-btn {
+            flex: 1;
+            min-width: 140px;
+            padding: 16px 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: var(--color-primary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        [data-theme="light"] .info-toggle-btn {
+            background: rgba(0, 0, 0, 0.02);
+            border: 2px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .info-toggle-btn:hover {
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+
+        .info-toggle-btn.selected {
+            border-color: #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+        }
+
+        /* Multi-select buttons (can select multiple) */
+        .info-multi-selector {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .info-multi-btn {
+            flex: 0 1 auto;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: var(--color-primary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        [data-theme="light"] .info-multi-btn {
+            background: rgba(0, 0, 0, 0.02);
+            border: 2px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .info-multi-btn:hover {
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+
+        .info-multi-btn.selected {
+            border-color: #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+        }
+
+        /* Referral source selector */
+        .referral-selector {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .referral-btn {
+            flex: 0 1 auto;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: var(--color-primary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        [data-theme="light"] .referral-btn {
+            background: rgba(0, 0, 0, 0.02);
+            border: 2px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .referral-btn:hover {
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+
+        .referral-btn.selected {
+            border-color: #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+        }
+
+        /* Other referral text input */
+        .referral-other-input {
+            display: none;
+            margin-top: 12px;
+        }
+
+        .referral-other-input.visible {
+            display: block;
+        }
+
+        .referral-other-input input {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: var(--color-primary);
+            font-size: 14px;
+        }
+
+        [data-theme="light"] .referral-other-input input {
+            background: rgba(0, 0, 0, 0.02);
+            border: 2px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .referral-other-input input:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+
+        @media (max-width: 767px) {
+            .info-toggle-btn {
+                min-width: calc(50% - 5px);
+                padding: 14px 10px;
+                font-size: 13px;
+            }
+
+            .info-multi-btn,
+            .referral-btn {
+                padding: 10px 14px;
+                font-size: 13px;
+            }
+        }
     """
 
     reserve_scripts = f"""
@@ -777,6 +1036,13 @@ def reserve_page(req: Request):
                 billingZip: document.getElementById('billing-zip')?.value || '',
                 addons: stagingData.addons || [],
                 specialRequests: document.getElementById('special-requests')?.value || '',
+                furnitureMoveQty: furnitureMoveQty || 0,
+                // Additional information fields
+                propertyStatus: document.getElementById('property-status')?.value || '',
+                userType: document.getElementById('user-type')?.value || '',
+                petsStatus: document.getElementById('pets-status')?.value || '',
+                referralSource: document.getElementById('referral-source')?.value || '',
+                referralOtherText: document.getElementById('referral-other-text')?.value || '',
                 timestamp: Date.now()
             }};
 
@@ -875,6 +1141,53 @@ def reserve_page(req: Request):
                 if (el) el.value = data.specialRequests;
             }}
 
+            // Restore additional information fields
+            if (data.propertyStatus) {{
+                const btn = document.querySelector(`.info-toggle-btn[data-group="property-status"][data-value="${{data.propertyStatus}}"]`);
+                if (btn) {{
+                    btn.classList.add('selected');
+                    const hiddenInput = document.getElementById('property-status');
+                    if (hiddenInput) hiddenInput.value = data.propertyStatus;
+                }}
+            }}
+
+            if (data.userType) {{
+                const userTypes = data.userType.split(',');
+                userTypes.forEach(type => {{
+                    const btn = document.querySelector(`.info-multi-btn[data-group="user-type"][data-value="${{type}}"]`);
+                    if (btn) btn.classList.add('selected');
+                }});
+                const hiddenInput = document.getElementById('user-type');
+                if (hiddenInput) hiddenInput.value = data.userType;
+            }}
+
+            if (data.petsStatus) {{
+                const pets = data.petsStatus.split(',');
+                pets.forEach(pet => {{
+                    const btn = document.querySelector(`.info-multi-btn[data-group="pets"][data-value="${{pet}}"]`);
+                    if (btn) btn.classList.add('selected');
+                }});
+                const hiddenInput = document.getElementById('pets-status');
+                if (hiddenInput) hiddenInput.value = data.petsStatus;
+            }}
+
+            if (data.referralSource) {{
+                const btn = document.querySelector(`.referral-btn[data-value="${{data.referralSource}}"]`);
+                if (btn) btn.classList.add('selected');
+                const hiddenInput = document.getElementById('referral-source');
+                if (hiddenInput) hiddenInput.value = data.referralSource;
+
+                // Show "Other" input if needed
+                if (data.referralSource === 'other') {{
+                    const otherContainer = document.getElementById('referral-other-container');
+                    if (otherContainer) otherContainer.classList.add('visible');
+                    if (data.referralOtherText) {{
+                        const otherText = document.getElementById('referral-other-text');
+                        if (otherText) otherText.value = data.referralOtherText;
+                    }}
+                }}
+            }}
+
             // Restore add-ons
             if (data.addons && data.addons.length > 0) {{
                 data.addons.forEach(addon => {{
@@ -889,6 +1202,15 @@ def reserve_page(req: Request):
                 updateDueToday();
             }}
 
+            // Restore furniture move quantity
+            if (data.furnitureMoveQty && data.furnitureMoveQty > 0) {{
+                furnitureMoveQty = data.furnitureMoveQty;
+                const checkbox = document.getElementById('furniture-move-checkbox');
+                if (checkbox) checkbox.checked = true;
+                updateFurnitureQtyUI();
+                updateDueToday();
+            }}
+
             // Validate form after restoring
             validateForm();
         }}
@@ -896,8 +1218,12 @@ def reserve_page(req: Request):
         // Add-on prices
         const addonPrices = {{
             'photos': 199,
-            'consultation': 0
+            'consultation': 0,
+            'furnitureMove': 25
         }};
+
+        // Furniture move quantity
+        let furnitureMoveQty = 0;
 
         // Initialize Stripe
         let stripe = null;
@@ -1228,6 +1554,13 @@ def reserve_page(req: Request):
                 addonsHtml += `<div class="summary-addon-row"><span class="addon-label">Long Distance Fee</span><span class="addon-value positive">+$${{longDistanceFee}}</span></div>`;
             }}
 
+            // Add furniture move cost
+            if (furnitureMoveQty > 0) {{
+                const furnitureMoveCost = furnitureMoveQty * addonPrices['furnitureMove'];
+                totalWithAddons += furnitureMoveCost;
+                addonsHtml += `<div class="summary-addon-row"><span class="addon-label">Move Furniture (x${{furnitureMoveQty}})</span><span class="addon-value positive">+$${{furnitureMoveCost}}</span></div>`;
+            }}
+
             // Apply $50 discount for "Pick a Week" flexibility
             const weekDiscount = selectedDateType === 'week' ? 50 : 0;
             if (weekDiscount > 0) {{
@@ -1291,6 +1624,51 @@ def reserve_page(req: Request):
             saveReserveSession();
         }}
 
+        // Handle furniture move checkbox change
+        function handleFurnitureMoveChange(checkbox) {{
+            if (checkbox.checked) {{
+                // Set quantity to 1 when checked
+                furnitureMoveQty = 1;
+            }} else {{
+                // Set quantity to 0 when unchecked
+                furnitureMoveQty = 0;
+            }}
+            updateFurnitureQtyUI();
+            updateDueToday();
+            saveReserveSession();
+        }}
+
+        // Update furniture move quantity
+        function updateFurnitureQty(delta) {{
+            furnitureMoveQty = Math.max(0, furnitureMoveQty + delta);
+
+            // If quantity becomes 0, uncheck the checkbox
+            const checkbox = document.getElementById('furniture-move-checkbox');
+            if (checkbox) {{
+                checkbox.checked = furnitureMoveQty > 0;
+            }}
+
+            updateFurnitureQtyUI();
+            updateDueToday();
+            saveReserveSession();
+        }}
+
+        // Update furniture quantity UI elements
+        function updateFurnitureQtyUI() {{
+            const qtyValue = document.getElementById('furniture-qty-value');
+            const minusBtn = document.getElementById('furniture-qty-minus');
+            const hiddenInput = document.getElementById('furniture-move-qty');
+            const totalPrice = document.getElementById('furniture-total-price');
+
+            if (qtyValue) qtyValue.textContent = furnitureMoveQty;
+            if (minusBtn) minusBtn.disabled = furnitureMoveQty === 0;
+            if (hiddenInput) hiddenInput.value = furnitureMoveQty;
+            if (totalPrice) {{
+                const total = furnitureMoveQty * addonPrices['furnitureMove'];
+                totalPrice.textContent = '+$' + total;
+            }}
+        }}
+
         // Track card element completion state
         let cardElementComplete = false;
 
@@ -1310,7 +1688,11 @@ def reserve_page(req: Request):
                 'billing-address',
                 'billing-city',
                 'billing-state',
-                'billing-zip'
+                'billing-zip',
+                'property-status',
+                'user-type',
+                'pets-status',
+                'referral-source'
             ];
 
             // Check if all required fields have values
@@ -1320,6 +1702,15 @@ def reserve_page(req: Request):
                 if (!field || !field.value || field.value.trim() === '') {{
                     allFieldsFilled = false;
                     break;
+                }}
+            }}
+
+            // Check if referral is "other" and requires additional text
+            const referralSource = document.getElementById('referral-source');
+            if (referralSource && referralSource.value === 'other') {{
+                const otherText = document.getElementById('referral-other-text');
+                if (!otherText || !otherText.value || otherText.value.trim() === '') {{
+                    allFieldsFilled = false;
                 }}
             }}
 
@@ -1366,8 +1757,137 @@ def reserve_page(req: Request):
                 specialRequests.addEventListener('input', saveReserveSession);
             }}
 
+            // Add listener for referral other text input
+            const referralOtherText = document.getElementById('referral-other-text');
+            if (referralOtherText) {{
+                referralOtherText.addEventListener('input', function() {{
+                    validateForm();
+                    saveReserveSession();
+                }});
+            }}
+
             // Initial validation check (button should be disabled initially)
             validateForm();
+        }}
+
+        // Toggle button selection (mutually exclusive - property status)
+        function selectInfoToggle(btn) {{
+            const group = btn.getAttribute('data-group');
+            const value = btn.getAttribute('data-value');
+
+            // Deselect all buttons in this group
+            document.querySelectorAll(`.info-toggle-btn[data-group="${{group}}"]`).forEach(b => {{
+                b.classList.remove('selected');
+            }});
+
+            // Select clicked button
+            btn.classList.add('selected');
+
+            // Update hidden input
+            const hiddenInput = document.getElementById(group);
+            if (hiddenInput) {{
+                hiddenInput.value = value;
+            }}
+
+            validateForm();
+            saveReserveSession();
+        }}
+
+        // Multi-select toggle (user type - can select both)
+        function toggleMultiSelect(btn) {{
+            const group = btn.getAttribute('data-group');
+            const value = btn.getAttribute('data-value');
+
+            // Toggle this button's selection
+            btn.classList.toggle('selected');
+
+            // Collect all selected values for this group
+            const selectedValues = [];
+            document.querySelectorAll(`.info-multi-btn[data-group="${{group}}"].selected`).forEach(b => {{
+                selectedValues.push(b.getAttribute('data-value'));
+            }});
+
+            // Update hidden input
+            const hiddenInput = document.getElementById(group);
+            if (hiddenInput) {{
+                hiddenInput.value = selectedValues.join(',');
+            }}
+
+            validateForm();
+            saveReserveSession();
+        }}
+
+        // Pet selection toggle (special handling - "none" is exclusive, dogs/cats can be combined)
+        function togglePetSelect(btn) {{
+            const value = btn.getAttribute('data-value');
+
+            if (value === 'none') {{
+                // If clicking "No pets", deselect dogs and cats
+                document.querySelectorAll('.info-multi-btn[data-group="pets"]').forEach(b => {{
+                    b.classList.remove('selected');
+                }});
+                btn.classList.add('selected');
+            }} else {{
+                // If clicking dogs or cats, deselect "no pets"
+                const noPetsBtn = document.querySelector('.info-multi-btn[data-group="pets"][data-value="none"]');
+                if (noPetsBtn) {{
+                    noPetsBtn.classList.remove('selected');
+                }}
+                // Toggle this button
+                btn.classList.toggle('selected');
+            }}
+
+            // Collect all selected values
+            const selectedValues = [];
+            document.querySelectorAll('.info-multi-btn[data-group="pets"].selected').forEach(b => {{
+                selectedValues.push(b.getAttribute('data-value'));
+            }});
+
+            // Update hidden input
+            const hiddenInput = document.getElementById('pets-status');
+            if (hiddenInput) {{
+                hiddenInput.value = selectedValues.join(',');
+            }}
+
+            validateForm();
+            saveReserveSession();
+        }}
+
+        // Referral source selection (mutually exclusive)
+        function selectReferral(btn) {{
+            const value = btn.getAttribute('data-value');
+
+            // Deselect all referral buttons
+            document.querySelectorAll('.referral-btn').forEach(b => {{
+                b.classList.remove('selected');
+            }});
+
+            // Select clicked button
+            btn.classList.add('selected');
+
+            // Show/hide "Other" text input
+            const otherContainer = document.getElementById('referral-other-container');
+            if (otherContainer) {{
+                if (value === 'other') {{
+                    otherContainer.classList.add('visible');
+                }} else {{
+                    otherContainer.classList.remove('visible');
+                    // Clear the other text input when not selected
+                    const otherText = document.getElementById('referral-other-text');
+                    if (otherText) {{
+                        otherText.value = '';
+                    }}
+                }}
+            }}
+
+            // Update hidden input
+            const hiddenInput = document.getElementById('referral-source');
+            if (hiddenInput) {{
+                hiddenInput.value = value;
+            }}
+
+            validateForm();
+            saveReserveSession();
         }}
 
         // Statutory holidays (Ontario, Canada) - format: 'YYYY-MM-DD'
@@ -2416,6 +2936,33 @@ def reserve_page(req: Request):
                                 ),
                                 cls="addon-item"
                             ),
+                            # Move Furniture add-on with quantity selector
+                            Label(
+                                Input(type="checkbox", value="furniture-move", cls="addon-checkbox",
+                                      id="furniture-move-checkbox",
+                                      onchange="handleFurnitureMoveChange(this)"),
+                                Div(
+                                    Div(
+                                        Span("Move Furniture to Garage or Basement"),
+                                        Span("+$0", cls="addon-price", id="furniture-total-price"),
+                                        cls="addon-title"
+                                    ),
+                                    Div(
+                                        Span("$25 per item", cls="addon-desc", style="flex: 1;"),
+                                        Div(
+                                            Button("−", cls="addon-qty-btn", id="furniture-qty-minus", onclick="event.preventDefault(); updateFurnitureQty(-1)", disabled=True),
+                                            Span("0", cls="addon-qty-value", id="furniture-qty-value"),
+                                            Button("+", cls="addon-qty-btn", id="furniture-qty-plus", onclick="event.preventDefault(); updateFurnitureQty(1)"),
+                                            cls="addon-quantity-controls",
+                                            style="display: flex; align-items: center; gap: 8px;"
+                                        ),
+                                        style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;"
+                                    ),
+                                    cls="addon-content"
+                                ),
+                                cls="addon-item"
+                            ),
+                            Input(type="hidden", id="furniture-move-qty", name="furniture-move-qty", value="0"),
                             cls="addon-list"
                         ),
                         cls="reserve-section"
@@ -2539,11 +3086,63 @@ def reserve_page(req: Request):
                             "Additional Information",
                             cls="section-title"
                         ),
+                        # Property Status (mutually exclusive)
                         Div(
+                            Div(
+                                Button("The property is vacant", Br(), "no furniture", cls="info-toggle-btn", data_group="property-status", data_value="vacant", onclick="selectInfoToggle(this)"),
+                                Button("The property is occupied", Br(), "has furniture", cls="info-toggle-btn", data_group="property-status", data_value="occupied", onclick="selectInfoToggle(this)"),
+                                cls="info-toggle-selector"
+                            ),
+                            Input(type="hidden", id="property-status", name="property-status"),
+                            cls="info-toggle-group"
+                        ),
+                        # User Type (can select both)
+                        Div(
+                            Div(
+                                Button("I'm an owner", cls="info-multi-btn", data_group="user-type", data_value="owner", onclick="toggleMultiSelect(this)"),
+                                Button("I'm a realtor", cls="info-multi-btn", data_group="user-type", data_value="realtor", onclick="toggleMultiSelect(this)"),
+                                cls="info-multi-selector"
+                            ),
+                            Input(type="hidden", id="user-type", name="user-type"),
+                            cls="info-toggle-group"
+                        ),
+                        # Pets on Property
+                        Div(
+                            Div(
+                                Button("No pets on the property", cls="info-multi-btn", data_group="pets", data_value="none", onclick="togglePetSelect(this)"),
+                                Button("Dogs on the property", cls="info-multi-btn", data_group="pets", data_value="dogs", onclick="togglePetSelect(this)"),
+                                Button("Cats on the property", cls="info-multi-btn", data_group="pets", data_value="cats", onclick="togglePetSelect(this)"),
+                                cls="info-multi-selector"
+                            ),
+                            Input(type="hidden", id="pets-status", name="pets-status"),
+                            cls="info-toggle-group"
+                        ),
+                        # How did you hear about us
+                        Div(
+                            Div("How did you hear about Astra Staging? *", cls="info-toggle-group-label"),
+                            Div(
+                                Button("Google", cls="referral-btn", data_value="google", onclick="selectReferral(this)"),
+                                Button("Instagram", cls="referral-btn", data_value="instagram", onclick="selectReferral(this)"),
+                                Button("Referral", cls="referral-btn", data_value="referral", onclick="selectReferral(this)"),
+                                Button("Email Newsletter", cls="referral-btn", data_value="email-newsletter", onclick="selectReferral(this)"),
+                                Button("Return Client", cls="referral-btn", data_value="return-client", onclick="selectReferral(this)"),
+                                Button("Truck Ads", cls="referral-btn", data_value="truck-ads", onclick="selectReferral(this)"),
+                                Button("Other", cls="referral-btn", data_value="other", onclick="selectReferral(this)"),
+                                cls="referral-selector"
+                            ),
+                            Div(
+                                Input(type="text", id="referral-other-text", placeholder="Please specify...", cls="form-input"),
+                                cls="referral-other-input", id="referral-other-container"
+                            ),
+                            Input(type="hidden", id="referral-source", name="referral-source"),
+                            cls="info-toggle-group"
+                        ),
+                        # Special Requests / Notes (moved to end, renamed)
+                        Div(
+                            Div("Any other information to share with us?", cls="info-toggle-group-label"),
                             Textarea(
                                 id="special-requests",
                                 cls="form-input",
-                                placeholder="Any special requests or notes? (Optional)",
                                 rows="4",
                                 style="width: 100%; resize: vertical;"
                             ),
