@@ -2353,9 +2353,17 @@ def reserve_page(req: Request):
                 }}
             }});
 
+            // Define Ontario bounds (Southwest to Northeast)
+            const ontarioBounds = new google.maps.LatLngBounds(
+                new google.maps.LatLng(42.0, -83.5),  // SW: near Windsor
+                new google.maps.LatLng(46.5, -75.5)   // NE: Ottawa area, staying west of QC border
+            );
+
             const autocomplete = new google.maps.places.Autocomplete(addressInput, {{
                 types: ['address'],
                 componentRestrictions: {{ country: 'ca' }},
+                bounds: ontarioBounds,
+                strictBounds: true,
                 fields: ['address_components', 'formatted_address', 'geometry']
             }});
 
