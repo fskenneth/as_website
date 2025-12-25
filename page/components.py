@@ -3,6 +3,19 @@ from dotenv import load_dotenv
 from fasthtml.common import *
 from page.footer import comprehensive_footer, get_footer_styles
 
+# Define SVG elements (not included in fasthtml.common)
+def Circle(**kwargs):
+    return ft_hx('circle', **kwargs)
+
+def SvgPath(**kwargs):
+    return ft_hx('path', **kwargs)
+
+def Line(**kwargs):
+    return ft_hx('line', **kwargs)
+
+def Polyline(**kwargs):
+    return ft_hx('polyline', **kwargs)
+
 load_dotenv()
 GOOGLE_PLACES_API_KEY = os.getenv('GOOGLE_PLACES_API_KEY', '')
 
@@ -214,6 +227,30 @@ def get_shared_styles():
     .theme-icon.moon { display: none; }
     [data-theme="light"] .theme-icon.sun { display: none; }
     [data-theme="light"] .theme-icon.moon { display: block; }
+
+    /* User Icon Button */
+    .user-icon-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 0.3s ease;
+        text-decoration: none;
+        color: var(--color-primary);
+    }
+    @media (hover: hover) {
+        .user-icon-btn:hover {
+            opacity: 0.7;
+        }
+    }
+    .user-icon-btn svg {
+        width: 28px;
+        height: 28px;
+        fill: currentColor;
+    }
 
     /* Logo theme switching */
     .logo-light { display: block; }
@@ -1891,6 +1928,13 @@ def get_shared_styles():
             width: 18px;
             height: 18px;
         }
+        .user-icon-btn {
+            padding: 6px;
+        }
+        .user-icon-btn svg {
+            width: 24px;
+            height: 24px;
+        }
         .menu-toggle {
             padding: 8px;
         }
@@ -1922,6 +1966,13 @@ def get_shared_styles():
             height: 28px !important;
             padding: 4px !important;
         }
+        .user-icon-btn {
+            padding: 4px !important;
+        }
+        .user-icon-btn svg {
+            width: 22px !important;
+            height: 22px !important;
+        }
         .menu-toggle {
             width: 28px !important;
             height: 28px !important;
@@ -1951,6 +2002,13 @@ def get_shared_styles():
             width: 26px !important;
             height: 26px !important;
             padding: 3px !important;
+        }
+        .user-icon-btn {
+            padding: 3px !important;
+        }
+        .user-icon-btn svg {
+            width: 20px !important;
+            height: 20px !important;
         }
         .menu-toggle {
             width: 26px !important;
@@ -2096,6 +2154,20 @@ def get_shared_scripts():
                 }
             });
         }
+
+        // Update user icon link based on authentication status
+        const userIcon = document.getElementById('user-icon');
+        if (userIcon) {
+            fetch('/api/auth/check')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.authenticated) {
+                        userIcon.href = '/portal';
+                        userIcon.setAttribute('aria-label', 'Go to portal');
+                    }
+                })
+                .catch(() => {});
+        }
     });
     """
 
@@ -2154,6 +2226,19 @@ def navigation():
                     cls="theme-toggle",
                     id="theme-toggle",
                     **{"aria-label": "Toggle theme"}
+                ),
+                # User icon - person silhouette (head and shoulders)
+                A(
+                    Svg(
+                        # Head and shoulders as a single clean path
+                        SvgPath(d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"),
+                        viewBox="0 0 24 24",
+                        fill="currentColor"
+                    ),
+                    href="/signin",
+                    cls="user-icon-btn",
+                    id="user-icon",
+                    **{"aria-label": "Sign in or access portal"}
                 ),
                 Button(
                     Span(),

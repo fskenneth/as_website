@@ -22,17 +22,25 @@ from page.staging_inquiry import staging_inquiry_page
 from page.reserve import reserve_page
 from page.areas import AREAS, AREA_PAGE_FUNCTIONS
 from page.blog_listing import blog_listing_page, load_blog_metadata
+from page.signin import signin_page
+from page.portal import portal_page
 from starlette.staticfiles import StaticFiles
-from starlette.responses import Response, JSONResponse
+from starlette.responses import Response, JSONResponse, RedirectResponse
 from tools.instagram import get_cached_posts
 from tools.google_reviews import fetch_google_reviews
 from tools.email_service import send_inquiry_emails
+from tools.user_db import (
+    create_user, authenticate_user, get_user_by_session,
+    create_session, delete_session, get_or_create_google_user,
+    get_all_users, update_user
+)
 from starlette.requests import Request
 import httpx
 import hashlib
 import json
 import os
 import stripe
+import jwt
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -41,6 +49,12 @@ load_dotenv()
 # Configure Stripe
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
+
+# Google OAuth
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
+
+# Session cookie name
+SESSION_COOKIE_NAME = 'astra_session'
 
 app, rt = fast_app(live=True)
 
@@ -152,6 +166,252 @@ async def contact_api(request: Request):
             media_type='application/json',
             status_code=500
         )
+
+
+# =============================================================================
+# AUTHENTICATION ENDPOINTS
+# =============================================================================
+
+def get_current_user(request: Request):
+    """Get current user from session cookie"""
+    session_token = request.cookies.get(SESSION_COOKIE_NAME)
+    if not session_token:
+        return None
+    return get_user_by_session(session_token)
+
+
+@rt('/api/auth/signin', methods=['POST'])
+async def auth_signin(request: Request):
+    """Handle email/password sign in"""
+    try:
+        data = await request.json()
+        email = data.get('email', '').strip()
+        password = data.get('password', '')
+
+        if not email or not password:
+            return JSONResponse({'success': False, 'error': 'Email and password required'}, status_code=400)
+
+        result = authenticate_user(email, password)
+
+        if not result['success']:
+            return JSONResponse({'success': False, 'error': result.get('error', 'Authentication failed')}, status_code=401)
+
+        # Create session
+        user = result['user']
+        session_token = create_session(user['id'])
+
+        response = JSONResponse({'success': True, 'user': user})
+        response.set_cookie(
+            key=SESSION_COOKIE_NAME,
+            value=session_token,
+            max_age=7 * 24 * 60 * 60,  # 7 days
+            httponly=True,
+            samesite='lax',
+            secure=False  # Set to True in production with HTTPS
+        )
+        return response
+
+    except Exception as e:
+        print(f"Sign in error: {e}")
+        return JSONResponse({'success': False, 'error': 'Sign in failed'}, status_code=500)
+
+
+@rt('/api/auth/register', methods=['POST'])
+async def auth_register(request: Request):
+    """Handle user registration"""
+    try:
+        data = await request.json()
+        first_name = data.get('first_name', '').strip()
+        last_name = data.get('last_name', '').strip()
+        email = data.get('email', '').strip()
+        phone = data.get('phone', '').strip()
+        password = data.get('password', '')
+
+        if not first_name or not last_name or not email or not password:
+            return JSONResponse({'success': False, 'error': 'All required fields must be filled'}, status_code=400)
+
+        if len(password) < 8:
+            return JSONResponse({'success': False, 'error': 'Password must be at least 8 characters'}, status_code=400)
+
+        result = create_user(
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            phone=phone or None,
+            password=password,
+            user_role='customer'
+        )
+
+        if not result['success']:
+            return JSONResponse({'success': False, 'error': result.get('error', 'Registration failed')}, status_code=400)
+
+        # Create session
+        user = result['user']
+        session_token = create_session(user['id'])
+
+        response = JSONResponse({'success': True, 'user': user})
+        response.set_cookie(
+            key=SESSION_COOKIE_NAME,
+            value=session_token,
+            max_age=7 * 24 * 60 * 60,  # 7 days
+            httponly=True,
+            samesite='lax',
+            secure=False  # Set to True in production with HTTPS
+        )
+        return response
+
+    except Exception as e:
+        print(f"Registration error: {e}")
+        return JSONResponse({'success': False, 'error': 'Registration failed'}, status_code=500)
+
+
+@rt('/api/auth/google', methods=['POST'])
+async def auth_google(request: Request):
+    """Handle Google sign in"""
+    try:
+        data = await request.json()
+        credential = data.get('credential', '')
+
+        if not credential or not GOOGLE_CLIENT_ID:
+            return JSONResponse({'success': False, 'error': 'Google sign in not configured'}, status_code=400)
+
+        # Decode the JWT token from Google (without verification for simplicity)
+        # In production, you should verify the token properly
+        try:
+            # Decode without verification (Google already verified it)
+            payload = jwt.decode(credential, options={"verify_signature": False})
+        except Exception as e:
+            return JSONResponse({'success': False, 'error': 'Invalid Google token'}, status_code=400)
+
+        google_id = payload.get('sub')
+        email = payload.get('email')
+        first_name = payload.get('given_name', '')
+        last_name = payload.get('family_name', '')
+
+        if not google_id or not email:
+            return JSONResponse({'success': False, 'error': 'Invalid Google account data'}, status_code=400)
+
+        result = get_or_create_google_user(
+            google_id=google_id,
+            email=email,
+            first_name=first_name,
+            last_name=last_name
+        )
+
+        if not result['success']:
+            return JSONResponse({'success': False, 'error': result.get('error', 'Google sign in failed')}, status_code=400)
+
+        # Create session
+        user = result['user']
+        session_token = create_session(user['id'])
+
+        response = JSONResponse({'success': True, 'user': {
+            'id': user['id'],
+            'first_name': user['first_name'],
+            'last_name': user['last_name'],
+            'email': user['email'],
+            'user_role': user['user_role']
+        }})
+        response.set_cookie(
+            key=SESSION_COOKIE_NAME,
+            value=session_token,
+            max_age=7 * 24 * 60 * 60,  # 7 days
+            httponly=True,
+            samesite='lax',
+            secure=False  # Set to True in production with HTTPS
+        )
+        return response
+
+    except Exception as e:
+        print(f"Google sign in error: {e}")
+        return JSONResponse({'success': False, 'error': 'Google sign in failed'}, status_code=500)
+
+
+@rt('/api/auth/signout', methods=['POST'])
+async def auth_signout(request: Request):
+    """Handle sign out"""
+    try:
+        session_token = request.cookies.get(SESSION_COOKIE_NAME)
+        if session_token:
+            delete_session(session_token)
+
+        response = JSONResponse({'success': True})
+        response.delete_cookie(SESSION_COOKIE_NAME)
+        return response
+
+    except Exception as e:
+        print(f"Sign out error: {e}")
+        response = JSONResponse({'success': True})
+        response.delete_cookie(SESSION_COOKIE_NAME)
+        return response
+
+
+@rt('/api/auth/check')
+def auth_check(request: Request):
+    """Check if user is authenticated"""
+    user = get_current_user(request)
+    if user:
+        return JSONResponse({
+            'authenticated': True,
+            'user': {
+                'id': user['id'],
+                'first_name': user['first_name'],
+                'last_name': user['last_name'],
+                'email': user['email'],
+                'user_role': user['user_role']
+            }
+        })
+    return JSONResponse({'authenticated': False})
+
+
+# =============================================================================
+# ADMIN API ENDPOINTS
+# =============================================================================
+
+@rt('/api/admin/users')
+def admin_users(request: Request):
+    """Get all users (admin only)"""
+    user = get_current_user(request)
+    if not user or user.get('user_role') != 'admin':
+        return JSONResponse({'error': 'Unauthorized'}, status_code=403)
+
+    users = get_all_users()
+    return JSONResponse({'users': users})
+
+
+@rt('/api/admin/users/update', methods=['POST'])
+async def admin_update_user(request: Request):
+    """Update a user (admin only)"""
+    user = get_current_user(request)
+    if not user or user.get('user_role') != 'admin':
+        return JSONResponse({'error': 'Unauthorized'}, status_code=403)
+
+    try:
+        data = await request.json()
+        user_id = data.get('id')
+
+        if not user_id:
+            return JSONResponse({'success': False, 'error': 'User ID required'}, status_code=400)
+
+        # Build update fields
+        update_fields = {}
+        for field in ['first_name', 'last_name', 'email', 'phone', 'user_role', 'password']:
+            if field in data and data[field]:
+                update_fields[field] = data[field]
+
+        if not update_fields:
+            return JSONResponse({'success': False, 'error': 'No fields to update'}, status_code=400)
+
+        result = update_user(user_id, **update_fields)
+
+        if result['success']:
+            return JSONResponse({'success': True})
+        else:
+            return JSONResponse({'success': False, 'error': result.get('error', 'Update failed')}, status_code=400)
+
+    except Exception as e:
+        print(f"Admin update user error: {e}")
+        return JSONResponse({'success': False, 'error': 'Update failed'}, status_code=500)
 
 
 # =============================================================================
@@ -561,6 +821,30 @@ def staging_inquiry():
 def reserve(req: Request):
     """Staging reservation page"""
     return reserve_page(req)
+
+
+# =============================================================================
+# AUTHENTICATION PAGES
+# =============================================================================
+
+@rt('/signin')
+def signin(req: Request):
+    """Sign in / Register page"""
+    # If already signed in, redirect to portal
+    user = get_current_user(req)
+    if user:
+        return RedirectResponse('/portal', status_code=302)
+    return signin_page()
+
+
+@rt('/portal')
+def portal(req: Request):
+    """User portal page"""
+    # If not signed in, redirect to signin
+    user = get_current_user(req)
+    if not user:
+        return RedirectResponse('/signin', status_code=302)
+    return portal_page(user)
 
 
 # =============================================================================

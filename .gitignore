@@ -46,3 +46,6 @@ logs/
 
 # Session keys
 .sesskey
+
+# User database
+data/
