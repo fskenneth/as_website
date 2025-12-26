@@ -1331,7 +1331,6 @@ def portal_page(user: dict = None):
 
     # Build tabs based on role
     tabs = [
-        ("dashboard", "Dashboard"),
         ("staging", "Staging"),
     ]
     if is_admin:
@@ -1348,34 +1347,14 @@ def portal_page(user: dict = None):
         for i, (tab_id, label) in enumerate(tabs)
     ]
 
-    # Dashboard tab content
-    dashboard_content = Div(
-        Div(
-            Svg(
-                Circle(cx="12", cy="12", r="10"),
-                SvgPath(d="M12 6v6l4 2"),
-                viewBox="0 0 24 24",
-                fill="none",
-                stroke="currentColor",
-                **{"stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round"},
-                cls="dashboard-placeholder-icon"
-            ),
-            H2("Dashboard Coming Soon", cls="dashboard-placeholder-title"),
-            P("Your personalized dashboard is being set up.", cls="dashboard-placeholder-text"),
-            cls="dashboard-placeholder"
-        ),
-        id="tab-dashboard",
-        cls="portal-tab-content active"
-    )
-
-    # Staging tab content
+    # Staging tab content (now the default active tab)
     staging_content = Div(
         Div(
             id="staging-container",
             cls="staging-container"
         ),
         id="tab-staging",
-        cls="portal-tab-content"
+        cls="portal-tab-content active"
     )
 
     # Users tab content (admin only)
@@ -1536,7 +1515,6 @@ def portal_page(user: dict = None):
                 Div(*tab_buttons, cls="portal-tabs"),
 
                 # Tab contents
-                dashboard_content,
                 staging_content,
                 users_content,
 

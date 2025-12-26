@@ -882,7 +882,7 @@ def reserve_page(req: Request, user: dict = None):
         .info-toggle-btn {
             flex: 1;
             min-width: 140px;
-            padding: 16px 12px;
+            padding: 10px 12px;
             background: rgba(255, 255, 255, 0.03);
             border: 2px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
@@ -906,6 +906,24 @@ def reserve_page(req: Request, user: dict = None):
         .info-toggle-btn.selected {
             border-color: #4CAF50;
             background: rgba(76, 175, 80, 0.1);
+        }
+
+        .info-toggle-title {
+            font-size: 18px;
+            font-weight: 700;
+            display: block;
+            margin-bottom: 0;
+        }
+
+        .info-toggle-desc {
+            font-size: 13px;
+            font-weight: 400;
+            color: var(--color-secondary);
+            display: block;
+        }
+
+        .info-toggle-btn.selected .info-toggle-desc {
+            color: var(--color-primary);
         }
 
         /* Multi-select buttons (can select multiple) */
@@ -3205,8 +3223,8 @@ def reserve_page(req: Request, user: dict = None):
                         # Property Status (mutually exclusive)
                         Div(
                             Div(
-                                Button("The property is vacant", Br(), "no furniture", cls="info-toggle-btn", data_group="property-status", data_value="vacant", onclick="selectInfoToggle(this)"),
-                                Button("The property is occupied", Br(), "has furniture", cls="info-toggle-btn", data_group="property-status", data_value="occupied", onclick="selectInfoToggle(this)"),
+                                Button(Span("Vacant", cls="info-toggle-title"), Br(), Span("The property has no furniture", cls="info-toggle-desc"), cls="info-toggle-btn", data_group="property-status", data_value="vacant", onclick="selectInfoToggle(this)"),
+                                Button(Span("Occupied", cls="info-toggle-title"), Br(), Span("The property has furniture", cls="info-toggle-desc"), cls="info-toggle-btn", data_group="property-status", data_value="occupied", onclick="selectInfoToggle(this)"),
                                 cls="info-toggle-selector"
                             ),
                             Input(type="hidden", id="property-status", name="property-status"),
