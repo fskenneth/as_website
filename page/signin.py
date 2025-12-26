@@ -462,7 +462,27 @@ def get_signin_scripts():
         }});
     }}
 
-    // Initialize Google Sign In
+    // Format phone number as (XXX) XXX-XXXX
+    function formatPhoneNumber(value) {{
+        // Remove all non-digit characters
+        const digits = value.replace(/\D/g, '');
+
+        // Limit to 10 digits
+        const limited = digits.substring(0, 10);
+
+        // Format based on length
+        if (limited.length === 0) return '';
+        if (limited.length <= 3) return `(${{limited}}`;
+        if (limited.length <= 6) return `(${{limited.substring(0, 3)}}) ${{limited.substring(3)}}`;
+        return `(${{limited.substring(0, 3)}}) ${{limited.substring(3, 6)}}-${{limited.substring(6)}}`;
+    }}
+
+    // Format email (lowercase and trim)
+    function formatEmail(value) {{
+        return value.toLowerCase().trim();
+    }}
+
+    // Initialize Google Sign In and input formatters
     document.addEventListener('DOMContentLoaded', function() {{
         // Initialize Google Identity Services if client ID is available
         const googleClientId = '{GOOGLE_CLIENT_ID}';
@@ -477,6 +497,36 @@ def get_signin_scripts():
                 btn.addEventListener('click', function() {{
                     google.accounts.id.prompt();
                 }});
+            }});
+        }}
+
+        // Add phone formatting to register phone field
+        const registerPhone = document.getElementById('register-phone');
+        if (registerPhone) {{
+            registerPhone.addEventListener('input', function(e) {{
+                const cursorPos = e.target.selectionStart;
+                const oldLength = e.target.value.length;
+                e.target.value = formatPhoneNumber(e.target.value);
+                const newLength = e.target.value.length;
+                // Adjust cursor position
+                const newCursorPos = cursorPos + (newLength - oldLength);
+                e.target.setSelectionRange(newCursorPos, newCursorPos);
+            }});
+        }}
+
+        // Add email formatting to register email field
+        const registerEmail = document.getElementById('register-email');
+        if (registerEmail) {{
+            registerEmail.addEventListener('blur', function(e) {{
+                e.target.value = formatEmail(e.target.value);
+            }});
+        }}
+
+        // Add email formatting to signin email field
+        const signinEmail = document.getElementById('signin-email');
+        if (signinEmail) {{
+            signinEmail.addEventListener('blur', function(e) {{
+                e.target.value = formatEmail(e.target.value);
             }});
         }}
     }});
@@ -610,8 +660,8 @@ def signin_page():
                             cls="form-group"
                         ),
                         Div(
-                            Label("Phone (optional)", cls="form-label", **{"for": "register-phone"}),
-                            Input(type="tel", id="register-phone", cls="form-input", placeholder="Enter your phone number"),
+                            Label("Phone", cls="form-label", **{"for": "register-phone"}),
+                            Input(type="tel", id="register-phone", cls="form-input", placeholder="Enter your phone number", required=True),
                             cls="form-group"
                         ),
                         Div(

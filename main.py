@@ -358,10 +358,42 @@ def auth_check(request: Request):
                 'first_name': user['first_name'],
                 'last_name': user['last_name'],
                 'email': user['email'],
+                'phone': user.get('phone', ''),
                 'user_role': user['user_role']
             }
         })
     return JSONResponse({'authenticated': False})
+
+
+@rt('/api/profile/update', methods=['POST'])
+async def profile_update(request: Request):
+    """Update current user's profile"""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({'success': False, 'error': 'Not authenticated'}, status_code=401)
+
+    try:
+        data = await request.json()
+
+        # Update user (only allow updating own profile, keep same role)
+        result = update_user(
+            user_id=user['id'],
+            first_name=data.get('first_name'),
+            last_name=data.get('last_name'),
+            email=data.get('email'),
+            phone=data.get('phone'),
+            user_role=user['user_role'],  # Keep existing role
+            password=data.get('password')
+        )
+
+        if result.get('success'):
+            return JSONResponse({'success': True})
+        else:
+            return JSONResponse({'success': False, 'error': result.get('error', 'Update failed')}, status_code=400)
+
+    except Exception as e:
+        print(f"Profile update error: {e}")
+        return JSONResponse({'success': False, 'error': 'Update failed'}, status_code=500)
 
 
 # =============================================================================
@@ -820,7 +852,8 @@ def staging_inquiry():
 @rt('/reserve/')
 def reserve(req: Request):
     """Staging reservation page"""
-    return reserve_page(req)
+    user = get_current_user(req)
+    return reserve_page(req, user=user)
 
 
 # =============================================================================

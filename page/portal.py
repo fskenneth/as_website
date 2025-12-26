@@ -42,8 +42,31 @@ def get_portal_styles():
         color: var(--color-primary);
     }
 
-    .portal-signout {
+    .portal-header-actions {
         margin-left: auto;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .portal-edit-btn {
+        padding: 8px 16px;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--color-primary);
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .portal-edit-btn:hover {
+        border-color: var(--border-hover);
+        background: var(--bg-secondary);
+    }
+
+    .portal-signout {
         padding: 8px 16px;
         border: 1px solid var(--border-color);
         border-radius: 6px;
@@ -275,6 +298,14 @@ def get_portal_styles():
         border-color: var(--border-hover);
     }
 
+    .modal-form input.input-error {
+        border-color: #dc2626;
+    }
+
+    .modal-form input.input-error:focus {
+        border-color: #dc2626;
+    }
+
     .modal-actions {
         display: flex;
         gap: 12px;
@@ -358,6 +389,225 @@ def get_portal_styles():
         color: var(--color-secondary);
     }
 
+    /* Staging Tab Styles */
+    .staging-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .staging-card {
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        padding: 24px;
+        border: 1px solid var(--border-color);
+        transition: all 0.2s ease;
+    }
+
+    .staging-card:hover {
+        border-color: var(--border-hover);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .staging-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 16px;
+        gap: 12px;
+    }
+
+    .staging-address {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--color-primary);
+        line-height: 1.3;
+    }
+
+    .staging-address.staging-address-pending {
+        color: var(--color-secondary);
+        font-style: italic;
+    }
+
+    .staging-status {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 16px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        flex-shrink: 0;
+    }
+
+    .staging-status.quote {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    .staging-status.confirmed {
+        background: #d1fae5;
+        color: #059669;
+    }
+
+    [data-theme="dark"] .staging-status.quote {
+        background: rgba(217, 119, 6, 0.2);
+    }
+
+    [data-theme="dark"] .staging-status.confirmed {
+        background: rgba(5, 150, 105, 0.2);
+    }
+
+    .staging-card-body {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    .staging-detail {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .staging-detail.full-width {
+        grid-column: 1 / -1;
+    }
+
+    .staging-detail-label {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--color-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .staging-detail-value {
+        font-size: 14px;
+        color: var(--color-primary);
+    }
+
+    .staging-total {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .staging-total-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--color-secondary);
+    }
+
+    .staging-total-value {
+        font-size: 20px;
+        font-weight: 700;
+        color: #4CAF50;
+    }
+
+    .staging-actions {
+        margin-top: 16px;
+        display: flex;
+        gap: 12px;
+    }
+
+    .staging-action-btn {
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .staging-action-btn.primary {
+        background: #4CAF50;
+        color: white;
+        border: none;
+    }
+
+    .staging-action-btn.primary:hover {
+        background: #45a049;
+    }
+
+    .staging-action-btn.secondary {
+        background: transparent;
+        color: var(--color-primary);
+        border: 1px solid var(--border-color);
+    }
+
+    .staging-action-btn.secondary:hover {
+        border-color: var(--border-hover);
+        background: var(--bg-primary);
+    }
+
+    .staging-empty {
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        padding: 60px 40px;
+        text-align: center;
+    }
+
+    .staging-empty-icon {
+        width: 60px;
+        height: 60px;
+        margin: 0 auto 20px;
+        color: var(--color-accent);
+    }
+
+    .staging-empty-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--color-primary);
+        margin-bottom: 8px;
+    }
+
+    .staging-empty-text {
+        font-size: 14px;
+        color: var(--color-secondary);
+        margin-bottom: 20px;
+    }
+
+    .staging-empty-btn {
+        display: inline-block;
+        padding: 12px 24px;
+        background: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .staging-empty-btn:hover {
+        background: #45a049;
+    }
+
+    .staging-areas-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .staging-area-tag {
+        display: inline-block;
+        padding: 3px 8px;
+        background: rgba(76, 175, 80, 0.1);
+        color: #4CAF50;
+        border-radius: 4px;
+        font-size: 12px;
+    }
+
+    [data-theme="dark"] .staging-area-tag {
+        background: rgba(76, 175, 80, 0.2);
+    }
+
     /* Mobile adjustments */
     @media (max-width: 767px) {
         .portal-section {
@@ -376,6 +626,11 @@ def get_portal_styles():
             font-size: 14px;
         }
 
+        .portal-header-actions {
+            gap: 8px;
+        }
+
+        .portal-edit-btn,
         .portal-signout {
             padding: 6px 12px;
             font-size: 12px;
@@ -409,6 +664,34 @@ def get_portal_styles():
 
         .modal-form .form-row {
             flex-direction: column;
+        }
+
+        .staging-card-body {
+            grid-template-columns: 1fr;
+        }
+
+        .staging-card-header {
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .staging-address {
+            font-size: 16px;
+        }
+
+        .staging-total {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+        }
+
+        .staging-actions {
+            flex-direction: column;
+        }
+
+        .staging-action-btn {
+            width: 100%;
+            text-align: center;
         }
     }
     """
@@ -514,6 +797,29 @@ def get_portal_scripts():
         const saveBtn = form.querySelector('.modal-btn.save');
         const originalText = saveBtn.textContent;
 
+        // Validate email
+        const emailField = document.getElementById('edit-email');
+        const email = emailField.value.toLowerCase().trim();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!email || !emailRegex.test(email)) {
+            showModalMessage('Please enter a valid email address', 'error');
+            emailField.classList.add('input-error');
+            emailField.focus();
+            return;
+        }
+        emailField.classList.remove('input-error');
+
+        // Validate phone (must have 10 digits)
+        const phoneField = document.getElementById('edit-phone');
+        const phoneDigits = phoneField.value.replace(/\D/g, '');
+        if (!phoneDigits || phoneDigits.length < 10) {
+            showModalMessage('Please enter a valid 10-digit phone number', 'error');
+            phoneField.classList.add('input-error');
+            phoneField.focus();
+            return;
+        }
+        phoneField.classList.remove('input-error');
+
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving...';
         hideModalMessage();
@@ -522,8 +828,8 @@ def get_portal_scripts():
             id: parseInt(document.getElementById('edit-user-id').value),
             first_name: document.getElementById('edit-first-name').value,
             last_name: document.getElementById('edit-last-name').value,
-            email: document.getElementById('edit-email').value,
-            phone: document.getElementById('edit-phone').value || null,
+            email: email,
+            phone: phoneField.value || null,
             user_role: document.getElementById('edit-role').value,
             password: document.getElementById('edit-password').value || null
         };
@@ -569,6 +875,438 @@ def get_portal_scripts():
         if (document.getElementById('users-tbody')) {
             loadUsers();
         }
+
+        // Load staging data
+        if (document.getElementById('staging-container')) {
+            loadStagingData();
+        }
+    });
+
+    // Session storage keys
+    const STAGING_SESSION_KEY = 'astra_staging_data';
+    const RESERVE_SESSION_KEY = 'astra_reserve_data';
+
+    // Area display names
+    const areaDisplayNames = {
+        'living-room': 'Living Room',
+        'dining-room': 'Dining Room',
+        'family-room': 'Family Room',
+        'kitchen-only': 'Kitchen Only',
+        'kitchen-island': 'Kitchen Island',
+        'breakfast-area': 'Breakfast Area',
+        'master-bedroom': 'Master Bedroom',
+        '2nd-bedroom': '2nd Bedroom',
+        '3rd-bedroom': '3rd Bedroom',
+        '4th-bedroom': '4th Bedroom',
+        '5th-bedroom': '5th Bedroom',
+        '6th-bedroom': '6th Bedroom',
+        'office': 'Office',
+        'bathrooms': 'Bathrooms',
+        'outdoor': 'Outdoor',
+        'basement-living': 'Basement Living',
+        'basement-dining': 'Basement Dining',
+        'basement-office': 'Basement Office',
+        'basement-1st-bedroom': 'Basement 1st Bed',
+        'basement-2nd-bedroom': 'Basement 2nd Bed'
+    };
+
+    // Load staging data from session/local storage
+    function loadStagingData() {
+        const container = document.getElementById('staging-container');
+        if (!container) return;
+
+        const stagingItems = [];
+
+        // Load confirmed bookings from localStorage
+        try {
+            const reservationData = localStorage.getItem('reservationData');
+            const reservationId = localStorage.getItem('reservationId');
+            if (reservationData && reservationId) {
+                const data = JSON.parse(reservationData);
+                stagingItems.push({
+                    ...data,
+                    status: 'confirmed',
+                    reservationId: reservationId
+                });
+            }
+        } catch (e) {
+            console.warn('Error loading reservation data:', e);
+        }
+
+        // Load staging inquiry data (partial quotes without address)
+        let stagingInfo = {};
+        try {
+            const stagingData = sessionStorage.getItem(STAGING_SESSION_KEY);
+            if (stagingData) {
+                stagingInfo = JSON.parse(stagingData);
+            }
+        } catch (e) {
+            console.warn('Error loading staging data:', e);
+        }
+
+        // Load reserve page data (quotes with address info)
+        let reserveInfo = {};
+        try {
+            const reserveData = sessionStorage.getItem(RESERVE_SESSION_KEY);
+            if (reserveData) {
+                reserveInfo = JSON.parse(reserveData);
+            }
+        } catch (e) {
+            console.warn('Error loading reserve data:', e);
+        }
+
+        // Check if we have any quote data (either from staging inquiry or reserve page)
+        const hasPropertyType = stagingInfo.propertyType || reserveInfo.propertyType;
+        const hasPropertySize = stagingInfo.propertySize || reserveInfo.propertySize;
+        const hasSelectedAreas = (stagingInfo.selectedAreas && stagingInfo.selectedAreas.length > 0);
+
+        if (hasPropertyType || hasPropertySize || hasSelectedAreas) {
+            const propertyAddress = reserveInfo.propertyAddress || '';
+
+            // Check if not already confirmed
+            const isAlreadyConfirmed = propertyAddress && stagingItems.some(
+                item => item.propertyAddress === propertyAddress && item.status === 'confirmed'
+            );
+
+            if (!isAlreadyConfirmed) {
+                stagingItems.push({
+                    ...stagingInfo,
+                    ...reserveInfo,
+                    propertyAddress: propertyAddress,
+                    status: 'quote'
+                });
+            }
+        }
+
+        renderStagingItems(container, stagingItems);
+    }
+
+    // Render staging items
+    function renderStagingItems(container, items) {
+        if (items.length === 0) {
+            container.innerHTML = `
+                <div class="staging-empty">
+                    <svg class="staging-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="9" y1="3" x2="9" y2="21"></line>
+                    </svg>
+                    <h3 class="staging-empty-title">No Staging Quotes</h3>
+                    <p class="staging-empty-text">You haven't created any staging quotes yet. Get started by getting an instant quote for your property.</p>
+                    <a href="/staging-inquiry/" class="staging-empty-btn">Get Instant Quote</a>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = items.map(item => renderStagingCard(item)).join('');
+    }
+
+    // Render a single staging card
+    function renderStagingCard(item) {
+        const statusClass = item.status === 'confirmed' ? 'confirmed' : 'quote';
+        const statusText = item.status === 'confirmed' ? 'Confirmed' : 'Quote';
+
+        // Format property type
+        const propType = item.propertyType ?
+            item.propertyType.charAt(0).toUpperCase() + item.propertyType.slice(1) :
+            '-';
+
+        // Format property size
+        const propSize = item.propertySize ? item.propertySize + ' sq ft' : '-';
+
+        // Format selected areas
+        let areasHtml = '-';
+        if (item.selectedAreas && item.selectedAreas.length > 0) {
+            areasHtml = `<div class="staging-areas-list">
+                ${item.selectedAreas.map(area =>
+                    `<span class="staging-area-tag">${areaDisplayNames[area] || area}</span>`
+                ).join('')}
+            </div>`;
+        }
+
+        // Format total fee
+        let totalFee = '$0.00';
+        if (item.totalFee) {
+            if (typeof item.totalFee === 'string') {
+                totalFee = item.totalFee.startsWith('$') ? item.totalFee : '$' + item.totalFee;
+            } else {
+                totalFee = '$' + item.totalFee.toLocaleString('en-CA', { minimumFractionDigits: 2 });
+            }
+        }
+
+        // Format date
+        let stagingDate = '-';
+        if (item.stagingDateDisplay) {
+            stagingDate = item.stagingDateDisplay;
+        } else if (item.stagingDate) {
+            stagingDate = item.stagingDate;
+        }
+
+        // Format addons
+        let addonsText = '-';
+        if (item.addons && item.addons.length > 0) {
+            const addonNames = {
+                'photos': 'Photography',
+                'consultation': 'Consultation',
+                'furniture-move': 'Furniture Move'
+            };
+            addonsText = item.addons.map(a => addonNames[a] || a).join(', ');
+        }
+
+        // Action buttons
+        let actionsHtml = '';
+        if (item.status === 'quote') {
+            actionsHtml = `
+                <div class="staging-actions">
+                    <a href="/reserve/" class="staging-action-btn primary">Complete Booking</a>
+                    <button class="staging-action-btn secondary" onclick="clearQuote()">Remove Quote</button>
+                </div>
+            `;
+        }
+
+        // Address display
+        const addressDisplay = item.propertyAddress || 'Property Address Not Set';
+        const addressClass = item.propertyAddress ? '' : 'staging-address-pending';
+
+        return `
+            <div class="staging-card">
+                <div class="staging-card-header">
+                    <div class="staging-address ${addressClass}">${addressDisplay}</div>
+                    <span class="staging-status ${statusClass}">${statusText}</span>
+                </div>
+                <div class="staging-card-body">
+                    <div class="staging-detail">
+                        <span class="staging-detail-label">Property Type</span>
+                        <span class="staging-detail-value">${propType}</span>
+                    </div>
+                    <div class="staging-detail">
+                        <span class="staging-detail-label">Property Size</span>
+                        <span class="staging-detail-value">${propSize}</span>
+                    </div>
+                    <div class="staging-detail">
+                        <span class="staging-detail-label">Staging Date</span>
+                        <span class="staging-detail-value">${stagingDate}</span>
+                    </div>
+                    <div class="staging-detail">
+                        <span class="staging-detail-label">Add-ons</span>
+                        <span class="staging-detail-value">${addonsText}</span>
+                    </div>
+                    <div class="staging-detail full-width">
+                        <span class="staging-detail-label">Selected Areas</span>
+                        <div class="staging-detail-value">${areasHtml}</div>
+                    </div>
+                </div>
+                <div class="staging-total">
+                    <span class="staging-total-label">Total Staging Fee</span>
+                    <span class="staging-total-value">${totalFee}</span>
+                </div>
+                ${actionsHtml}
+            </div>
+        `;
+    }
+
+    // Clear quote from session storage
+    function clearQuote() {
+        if (confirm('Are you sure you want to remove this quote?')) {
+            sessionStorage.removeItem(STAGING_SESSION_KEY);
+            sessionStorage.removeItem(RESERVE_SESSION_KEY);
+            loadStagingData();
+        }
+    }
+
+    // Profile modal functions
+    function openProfileModal() {
+        // Fetch current user data
+        fetch('/api/auth/check')
+            .then(response => response.json())
+            .then(data => {
+                if (data.authenticated && data.user) {
+                    document.getElementById('profile-first-name').value = data.user.first_name || '';
+                    document.getElementById('profile-last-name').value = data.user.last_name || '';
+                    document.getElementById('profile-email').value = data.user.email || '';
+                    document.getElementById('profile-phone').value = data.user.phone || '';
+                    document.getElementById('profile-password').value = '';
+                    hideProfileModalMessage();
+                    document.getElementById('profile-modal').classList.add('active');
+                }
+            })
+            .catch(error => {
+                console.error('Failed to load user data:', error);
+            });
+    }
+
+    function closeProfileModal() {
+        document.getElementById('profile-modal').classList.remove('active');
+    }
+
+    function showProfileModalMessage(message, type) {
+        const msgEl = document.getElementById('profile-modal-message');
+        msgEl.textContent = message;
+        msgEl.className = 'modal-message ' + type;
+    }
+
+    function hideProfileModalMessage() {
+        const msgEl = document.getElementById('profile-modal-message');
+        msgEl.className = 'modal-message';
+    }
+
+    async function saveProfile(event) {
+        event.preventDefault();
+        const form = event.target;
+        const saveBtn = form.querySelector('.modal-btn.save');
+        const originalText = saveBtn.textContent;
+
+        // Validate email
+        const emailField = document.getElementById('profile-email');
+        const email = emailField.value.toLowerCase().trim();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!email || !emailRegex.test(email)) {
+            showProfileModalMessage('Please enter a valid email address', 'error');
+            emailField.classList.add('input-error');
+            emailField.focus();
+            return;
+        }
+        emailField.classList.remove('input-error');
+
+        // Validate phone (must have 10 digits)
+        const phoneField = document.getElementById('profile-phone');
+        const phoneDigits = phoneField.value.replace(/\D/g, '');
+        if (!phoneDigits || phoneDigits.length < 10) {
+            showProfileModalMessage('Please enter a valid 10-digit phone number', 'error');
+            phoneField.classList.add('input-error');
+            phoneField.focus();
+            return;
+        }
+        phoneField.classList.remove('input-error');
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+        hideProfileModalMessage();
+
+        const data = {
+            first_name: document.getElementById('profile-first-name').value,
+            last_name: document.getElementById('profile-last-name').value,
+            email: email,
+            phone: phoneField.value || null,
+            password: document.getElementById('profile-password').value || null
+        };
+
+        try {
+            const response = await fetch('/api/profile/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showProfileModalMessage('Profile updated successfully', 'success');
+                // Update the displayed name
+                const nameEl = document.querySelector('.portal-user-name');
+                if (nameEl) {
+                    nameEl.textContent = (data.first_name + ' ' + data.last_name).trim();
+                }
+                setTimeout(() => {
+                    closeProfileModal();
+                }, 1000);
+            } else {
+                showProfileModalMessage(result.error || 'Failed to update profile', 'error');
+            }
+        } catch (error) {
+            showProfileModalMessage('An error occurred', 'error');
+        }
+
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalText;
+    }
+
+    // Format phone number as (XXX) XXX-XXXX
+    function formatPhoneNumber(value) {
+        // Remove all non-digit characters
+        const digits = value.replace(/\D/g, '');
+
+        // Limit to 10 digits
+        const limited = digits.substring(0, 10);
+
+        // Format based on length
+        if (limited.length === 0) return '';
+        if (limited.length <= 3) return `(${limited}`;
+        if (limited.length <= 6) return `(${limited.substring(0, 3)}) ${limited.substring(3)}`;
+        return `(${limited.substring(0, 3)}) ${limited.substring(3, 6)}-${limited.substring(6)}`;
+    }
+
+    // Format and validate email (lowercase and trim)
+    function formatEmail(value) {
+        return value.toLowerCase().trim();
+    }
+
+    // Validate email format
+    function validateEmail(input) {
+        const value = input.value.toLowerCase().trim();
+        input.value = value;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (value && !emailRegex.test(value)) {
+            input.setCustomValidity('Please enter a valid email address');
+            input.classList.add('input-error');
+        } else {
+            input.setCustomValidity('');
+            input.classList.remove('input-error');
+        }
+    }
+
+    // Close profile modal on overlay click and initialize formatters
+    document.addEventListener('DOMContentLoaded', function() {
+        const profileModal = document.getElementById('profile-modal');
+        if (profileModal) {
+            profileModal.addEventListener('click', function(e) {
+                if (e.target === profileModal) {
+                    closeProfileModal();
+                }
+            });
+        }
+
+        // Add phone formatting to profile phone field
+        const profilePhone = document.getElementById('profile-phone');
+        if (profilePhone) {
+            profilePhone.addEventListener('input', function(e) {
+                const cursorPos = e.target.selectionStart;
+                const oldLength = e.target.value.length;
+                e.target.value = formatPhoneNumber(e.target.value);
+                const newLength = e.target.value.length;
+                const newCursorPos = cursorPos + (newLength - oldLength);
+                e.target.setSelectionRange(newCursorPos, newCursorPos);
+            });
+        }
+
+        // Add email validation to profile email field
+        const profileEmail = document.getElementById('profile-email');
+        if (profileEmail) {
+            profileEmail.addEventListener('blur', function(e) {
+                validateEmail(e.target);
+            });
+        }
+
+        // Add phone formatting to admin edit phone field
+        const editPhone = document.getElementById('edit-phone');
+        if (editPhone) {
+            editPhone.addEventListener('input', function(e) {
+                const cursorPos = e.target.selectionStart;
+                const oldLength = e.target.value.length;
+                e.target.value = formatPhoneNumber(e.target.value);
+                const newLength = e.target.value.length;
+                const newCursorPos = cursorPos + (newLength - oldLength);
+                e.target.setSelectionRange(newCursorPos, newCursorPos);
+            });
+        }
+
+        // Add email validation to admin edit email field
+        const editEmail = document.getElementById('edit-email');
+        if (editEmail) {
+            editEmail.addEventListener('blur', function(e) {
+                validateEmail(e.target);
+            });
+        }
     });
     """
 
@@ -594,6 +1332,7 @@ def portal_page(user: dict = None):
     # Build tabs based on role
     tabs = [
         ("dashboard", "Dashboard"),
+        ("staging", "Staging"),
     ]
     if is_admin:
         tabs.append(("users", "Users"))
@@ -627,6 +1366,16 @@ def portal_page(user: dict = None):
         ),
         id="tab-dashboard",
         cls="portal-tab-content active"
+    )
+
+    # Staging tab content
+    staging_content = Div(
+        Div(
+            id="staging-container",
+            cls="staging-container"
+        ),
+        id="tab-staging",
+        cls="portal-tab-content"
     )
 
     # Users tab content (admin only)
@@ -716,6 +1465,58 @@ def portal_page(user: dict = None):
         cls="modal-overlay"
     ) if is_admin else ""
 
+    # Profile edit modal (for all users to edit their own profile)
+    profile_modal = Div(
+        Div(
+            Div(
+                H3("Edit Profile", cls="modal-title"),
+                Button("×", cls="modal-close", onclick="closeProfileModal()"),
+                cls="modal-header"
+            ),
+            Div(id="profile-modal-message", cls="modal-message"),
+            Form(
+                Div(
+                    Div(
+                        Label("First Name", **{"for": "profile-first-name"}),
+                        Input(type="text", id="profile-first-name", required=True),
+                        cls="form-group"
+                    ),
+                    Div(
+                        Label("Last Name", **{"for": "profile-last-name"}),
+                        Input(type="text", id="profile-last-name", required=True),
+                        cls="form-group"
+                    ),
+                    cls="form-row"
+                ),
+                Div(
+                    Label("Email", **{"for": "profile-email"}),
+                    Input(type="email", id="profile-email", required=True),
+                    cls="form-group"
+                ),
+                Div(
+                    Label("Phone", **{"for": "profile-phone"}),
+                    Input(type="tel", id="profile-phone", required=True),
+                    cls="form-group"
+                ),
+                Div(
+                    Label("New Password (leave blank to keep current)", **{"for": "profile-password"}),
+                    Input(type="password", id="profile-password", placeholder="Enter new password"),
+                    cls="form-group"
+                ),
+                Div(
+                    Button("Cancel", type="button", cls="modal-btn cancel", onclick="closeProfileModal()"),
+                    Button("Save Changes", type="submit", cls="modal-btn save"),
+                    cls="modal-actions"
+                ),
+                cls="modal-form",
+                onsubmit="saveProfile(event)"
+            ),
+            cls="modal-content"
+        ),
+        id="profile-modal",
+        cls="modal-overlay"
+    )
+
     content = Div(
         Section(
             Div(
@@ -723,7 +1524,11 @@ def portal_page(user: dict = None):
                 Div(
                     Span("Welcome back, ", cls="portal-greeting"),
                     Span(full_name, cls="portal-user-name"),
-                    Button("Sign Out", cls="portal-signout", onclick="handleSignOut()"),
+                    Div(
+                        Button("Edit", cls="portal-edit-btn", onclick="openProfileModal()"),
+                        Button("Sign Out", cls="portal-signout", onclick="handleSignOut()"),
+                        cls="portal-header-actions"
+                    ),
                     cls="portal-header"
                 ),
 
@@ -732,6 +1537,7 @@ def portal_page(user: dict = None):
 
                 # Tab contents
                 dashboard_content,
+                staging_content,
                 users_content,
 
                 cls="portal-container"
@@ -739,6 +1545,7 @@ def portal_page(user: dict = None):
             cls="portal-section"
         ),
         edit_modal,
+        profile_modal,
         cls="portal-page"
     )
 

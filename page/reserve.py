@@ -9,11 +9,17 @@ import math
 load_dotenv()
 
 
-def reserve_page(req: Request):
+def reserve_page(req: Request, user: dict = None):
     """Create the staging reservation page with deposit payment"""
 
     # Get Google API key from environment
     google_api_key = os.getenv('GOOGLE_PLACES_API_KEY', '')
+
+    # Extract user info for form pre-fill
+    user_first_name = user.get('first_name', '') if user else ''
+    user_last_name = user.get('last_name', '') if user else ''
+    user_email = user.get('email', '') if user else ''
+    user_phone = user.get('phone', '') if user else ''
 
     reserve_styles = """
         .reserve-container {
@@ -102,6 +108,43 @@ def reserve_page(req: Request):
             background: linear-gradient(135deg, rgba(0, 0, 0, 0.03) 0%, rgba(0, 0, 0, 0.01) 100%);
             border: 1px solid rgba(0, 0, 0, 0.1);
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+        }
+
+        .summary-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .summary-header .section-title {
+            margin-bottom: 0;
+        }
+
+        .summary-edit-btn {
+            padding: 6px 14px;
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: var(--color-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        [data-theme="light"] .summary-edit-btn {
+            border: 1px solid rgba(0, 0, 0, 0.15);
+        }
+
+        .summary-edit-btn:hover {
+            border-color: #4CAF50;
+            color: #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
         }
 
         .price-item {
@@ -981,6 +1024,14 @@ def reserve_page(req: Request):
     """
 
     reserve_scripts = f"""
+        // Logged in user data for pre-filling guest info
+        const loggedInUser = {{
+            firstName: '{user_first_name}',
+            lastName: '{user_last_name}',
+            email: '{user_email}',
+            phone: '{user_phone}'
+        }};
+
         // Staging data from URL parameters or session
         let stagingData = {{
             propertyType: '',
@@ -1213,6 +1264,35 @@ def reserve_page(req: Request):
 
             // Validate form after restoring
             validateForm();
+        }}
+
+        // Pre-fill guest information with logged-in user data if fields are empty
+        function prefillUserInfo() {{
+            if (!loggedInUser.firstName && !loggedInUser.lastName && !loggedInUser.email) {{
+                return; // No user logged in
+            }}
+
+            const firstNameField = document.getElementById('first-name');
+            const lastNameField = document.getElementById('last-name');
+            const emailField = document.getElementById('email');
+            const phoneField = document.getElementById('phone');
+
+            // Only fill if field is empty
+            if (firstNameField && !firstNameField.value && loggedInUser.firstName) {{
+                firstNameField.value = loggedInUser.firstName;
+            }}
+            if (lastNameField && !lastNameField.value && loggedInUser.lastName) {{
+                lastNameField.value = loggedInUser.lastName;
+            }}
+            if (emailField && !emailField.value && loggedInUser.email) {{
+                emailField.value = loggedInUser.email;
+            }}
+            if (phoneField && !phoneField.value && loggedInUser.phone) {{
+                phoneField.value = loggedInUser.phone;
+            }}
+
+            // Save to session after pre-fill
+            saveReserveSession();
         }}
 
         // Add-on prices
@@ -2583,13 +2663,40 @@ def reserve_page(req: Request):
         }}
 
         function formatPhone(input) {{
+            const cursorPos = input.selectionStart;
+            const oldLength = input.value.length;
             let value = input.value.replace(/\\D/g, '');
-            if (value.startsWith('1') && value.length === 11) {{
-                value = '1 (' + value.substring(1, 4) + ') ' + value.substring(4, 7) + '-' + value.substring(7);
-            }} else if (value.length === 10) {{
-                value = '(' + value.substring(0, 3) + ') ' + value.substring(3, 6) + '-' + value.substring(6);
+
+            // Limit to 10 digits (or 11 with country code)
+            if (value.startsWith('1')) {{
+                value = value.substring(0, 11);
+                if (value.length > 1) {{
+                    if (value.length <= 4) {{
+                        value = '1 (' + value.substring(1);
+                    }} else if (value.length <= 7) {{
+                        value = '1 (' + value.substring(1, 4) + ') ' + value.substring(4);
+                    }} else {{
+                        value = '1 (' + value.substring(1, 4) + ') ' + value.substring(4, 7) + '-' + value.substring(7);
+                    }}
+                }}
+            }} else {{
+                value = value.substring(0, 10);
+                if (value.length === 0) {{
+                    value = '';
+                }} else if (value.length <= 3) {{
+                    value = '(' + value;
+                }} else if (value.length <= 6) {{
+                    value = '(' + value.substring(0, 3) + ') ' + value.substring(3);
+                }} else {{
+                    value = '(' + value.substring(0, 3) + ') ' + value.substring(3, 6) + '-' + value.substring(6);
+                }}
             }}
             input.value = value;
+
+            // Adjust cursor position
+            const newLength = input.value.length;
+            const newCursorPos = cursorPos + (newLength - oldLength);
+            input.setSelectionRange(newCursorPos, newCursorPos);
         }}
 
         function formatPostalCode(input) {{
@@ -2829,6 +2936,7 @@ def reserve_page(req: Request):
             // Restore reserve form data from session (after a short delay to let other init complete)
             setTimeout(function() {{
                 restoreReserveSession();
+                prefillUserInfo(); // Pre-fill with logged-in user data if fields are empty
                 validateForm(); // Re-validate after restoring
             }}, 100);
         }});
@@ -3011,7 +3119,7 @@ def reserve_page(req: Request):
                                 Label("Phone *", cls="form-label", For="phone"),
                                 Input(type="tel", id="phone", cls="form-input", required=True,
                                       placeholder="(123) 456-7890",
-                                      onblur="formatPhone(this)"),
+                                      oninput="formatPhone(this)"),
                                 cls="form-group"
                             ),
                             cls="form-grid"
@@ -3213,10 +3321,14 @@ def reserve_page(req: Request):
 
                 # Right Column - Staging Summary
                 Div(
-                    H2(
-                        Span("📝", cls="section-icon"),
-                        "Staging Summary",
-                        cls="section-title"
+                    Div(
+                        H2(
+                            Span("📝", cls="section-icon"),
+                            "Staging Summary",
+                            cls="section-title"
+                        ),
+                        A("Edit", href="/staging-inquiry/", cls="summary-edit-btn"),
+                        cls="summary-header"
                     ),
                     Div(
                         # Property Type
