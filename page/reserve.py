@@ -864,6 +864,7 @@ def reserve_page(req: Request, user: dict = None):
         /* Additional Information toggle button styles */
         .info-toggle-group {
             margin-bottom: 20px;
+            max-width: 100%;
         }
 
         .info-toggle-group-label {
@@ -876,12 +877,14 @@ def reserve_page(req: Request, user: dict = None):
         .info-toggle-selector {
             display: flex;
             gap: 10px;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
+            width: 100%;
+            max-width: 100%;
         }
 
         .info-toggle-btn {
             flex: 1;
-            min-width: 140px;
+            min-width: 0;
             padding: 10px 12px;
             background: rgba(255, 255, 255, 0.03);
             border: 2px solid rgba(255, 255, 255, 0.1);
@@ -963,14 +966,13 @@ def reserve_page(req: Request, user: dict = None):
 
         /* Referral source selector */
         .referral-selector {
-            display: flex;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
             gap: 10px;
-            flex-wrap: wrap;
         }
 
         .referral-btn {
-            flex: 0 1 auto;
-            padding: 12px 16px;
+            padding: 12px 8px;
             background: rgba(255, 255, 255, 0.03);
             border: 2px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
@@ -1028,15 +1030,27 @@ def reserve_page(req: Request, user: dict = None):
 
         @media (max-width: 767px) {
             .info-toggle-btn {
-                min-width: calc(50% - 5px);
-                padding: 14px 10px;
+                min-width: 0;
+                padding: 8px 6px;
+                font-size: 12px;
+            }
+
+            .info-toggle-title {
+                font-size: 14px;
+            }
+
+            .info-toggle-desc {
+                font-size: 11px;
+            }
+
+            .info-multi-btn {
+                padding: 10px 14px;
                 font-size: 13px;
             }
 
-            .info-multi-btn,
             .referral-btn {
-                padding: 10px 14px;
-                font-size: 13px;
+                padding: 8px 4px;
+                font-size: 11px;
             }
         }
     """
@@ -3233,9 +3247,9 @@ def reserve_page(req: Request, user: dict = None):
                         # User Type (can select both)
                         Div(
                             Div(
-                                Button("I'm an owner", cls="info-multi-btn", data_group="user-type", data_value="owner", onclick="toggleMultiSelect(this)"),
-                                Button("I'm a realtor", cls="info-multi-btn", data_group="user-type", data_value="realtor", onclick="toggleMultiSelect(this)"),
-                                cls="info-multi-selector"
+                                Button(Span("Owner", cls="info-toggle-title"), Br(), Span("I'm an owner", cls="info-toggle-desc"), cls="info-toggle-btn", data_group="user-type", data_value="owner", onclick="toggleMultiSelect(this)"),
+                                Button(Span("Realtor", cls="info-toggle-title"), Br(), Span("I'm a realtor", cls="info-toggle-desc"), cls="info-toggle-btn", data_group="user-type", data_value="realtor", onclick="toggleMultiSelect(this)"),
+                                cls="info-toggle-selector"
                             ),
                             Input(type="hidden", id="user-type", name="user-type"),
                             cls="info-toggle-group"
@@ -3243,10 +3257,10 @@ def reserve_page(req: Request, user: dict = None):
                         # Pets on Property
                         Div(
                             Div(
-                                Button("No pets on the property", cls="info-multi-btn", data_group="pets", data_value="none", onclick="togglePetSelect(this)"),
-                                Button("Dogs on the property", cls="info-multi-btn", data_group="pets", data_value="dogs", onclick="togglePetSelect(this)"),
-                                Button("Cats on the property", cls="info-multi-btn", data_group="pets", data_value="cats", onclick="togglePetSelect(this)"),
-                                cls="info-multi-selector"
+                                Button(Span("No Pets", cls="info-toggle-title"), Br(), Span("No pets on the property", cls="info-toggle-desc"), cls="info-toggle-btn", data_group="pets", data_value="none", onclick="togglePetSelect(this)"),
+                                Button(Span("Dogs", cls="info-toggle-title"), Br(), Span("Dogs on the property", cls="info-toggle-desc"), cls="info-toggle-btn", data_group="pets", data_value="dogs", onclick="togglePetSelect(this)"),
+                                Button(Span("Cats", cls="info-toggle-title"), Br(), Span("Cats on the property", cls="info-toggle-desc"), cls="info-toggle-btn", data_group="pets", data_value="cats", onclick="togglePetSelect(this)"),
+                                cls="info-toggle-selector"
                             ),
                             Input(type="hidden", id="pets-status", name="pets-status"),
                             cls="info-toggle-group"
