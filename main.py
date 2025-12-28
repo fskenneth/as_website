@@ -32,7 +32,8 @@ from tools.email_service import send_inquiry_emails
 from tools.user_db import (
     create_user, authenticate_user, get_user_by_session,
     create_session, delete_session, get_or_create_google_user,
-    get_all_users, update_user
+    get_all_users, update_user,
+    save_staging, get_user_stagings, get_staging_by_id, delete_staging
 )
 from starlette.requests import Request
 import httpx
@@ -394,6 +395,80 @@ async def profile_update(request: Request):
     except Exception as e:
         print(f"Profile update error: {e}")
         return JSONResponse({'success': False, 'error': 'Update failed'}, status_code=500)
+
+
+# =============================================================================
+# STAGING API ENDPOINTS
+# =============================================================================
+
+@rt('/api/stagings', methods=['GET'])
+def get_stagings(request: Request):
+    """Get all stagings for the current user"""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({'success': False, 'error': 'Not authenticated'}, status_code=401)
+
+    status = request.query_params.get('status')  # Optional filter: 'quote' or 'confirmed'
+    stagings = get_user_stagings(user['id'], status)
+    return JSONResponse({'success': True, 'stagings': stagings})
+
+
+@rt('/api/stagings', methods=['POST'])
+async def create_or_update_staging(request: Request):
+    """Create or update a staging for the current user"""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({'success': False, 'error': 'Not authenticated'}, status_code=401)
+
+    try:
+        data = await request.json()
+        import sys
+        print(f"Staging save request - user_id: {user['id']}, data: {data}", file=sys.stderr)
+        result = save_staging(user['id'], data)
+        print(f"Staging save result: {result}", file=sys.stderr)
+
+        if result.get('success'):
+            return JSONResponse({
+                'success': True,
+                'staging_id': result['staging_id']
+            })
+        else:
+            return JSONResponse({
+                'success': False,
+                'error': result.get('error', 'Save failed')
+            }, status_code=400)
+
+    except Exception as e:
+        print(f"Staging save error: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({'success': False, 'error': 'Save failed'}, status_code=500)
+
+
+@rt('/api/stagings/{staging_id}')
+def get_single_staging(request: Request, staging_id: int):
+    """Get a single staging by ID"""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({'success': False, 'error': 'Not authenticated'}, status_code=401)
+
+    staging = get_staging_by_id(staging_id, user['id'])
+    if staging:
+        return JSONResponse({'success': True, 'staging': staging})
+    return JSONResponse({'success': False, 'error': 'Staging not found'}, status_code=404)
+
+
+@rt('/api/stagings/{staging_id}', methods=['DELETE'])
+def remove_staging(request: Request, staging_id: int):
+    """Delete a staging"""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({'success': False, 'error': 'Not authenticated'}, status_code=401)
+
+    result = delete_staging(staging_id, user['id'])
+    if result.get('success'):
+        return JSONResponse({'success': True})
+    return JSONResponse({'success': False, 'error': result.get('error', 'Delete failed')}, status_code=400)
 
 
 # =============================================================================

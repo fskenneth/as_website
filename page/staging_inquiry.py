@@ -962,6 +962,9 @@ def property_type_selector():
             const STAGING_SESSION_KEY = 'astra_staging_data';
 
             // Save staging data to session storage
+            // Track current staging ID for updates
+            let currentStagingId = null;
+
             function saveStagingSession() {
                 const { propertyType, propertySize } = getSelections();
 
@@ -991,6 +994,84 @@ def property_type_selector():
                     sessionStorage.setItem(STAGING_SESSION_KEY, JSON.stringify(sessionData));
                 } catch (e) {
                     console.warn('Could not save to sessionStorage:', e);
+                }
+
+                // Auto-save to server if logged in and quote is ready
+                if (propertyType && propertySize && selectedAreas.length > 0) {
+                    saveToServer(sessionData);
+                }
+            }
+
+            // Save staging to server (for logged-in users)
+            async function saveToServer(sessionData) {
+                try {
+                    // Check if user is logged in
+                    const authResponse = await fetch('/api/auth/check');
+                    const authResult = await authResponse.json();
+                    if (!authResult.authenticated) return;
+
+                    const serverData = {
+                        status: 'quote',
+                        property_type: sessionData.propertyType || '',
+                        property_size: sessionData.propertySize || '',
+                        selected_areas: JSON.stringify(sessionData.selectedAreas || []),
+                        selected_items: JSON.stringify(sessionData.areaItemsData || {}),
+                        total_fee: sessionData.totalFee || ''
+                    };
+
+                    // Include staging ID if updating existing
+                    if (currentStagingId) {
+                        serverData.id = currentStagingId;
+                    }
+
+                    const response = await fetch('/api/stagings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(serverData)
+                    });
+
+                    const result = await response.json();
+                    if (result.success && result.staging_id) {
+                        currentStagingId = result.staging_id;
+                        console.log('Staging saved to server, id:', currentStagingId);
+                    }
+                } catch (e) {
+                    console.warn('Could not save to server:', e);
+                }
+            }
+
+            // Load existing staging from server on page load
+            async function loadExistingStagingFromServer() {
+                try {
+                    const authResponse = await fetch('/api/auth/check');
+                    const authResult = await authResponse.json();
+                    if (!authResult.authenticated) return;
+
+                    const response = await fetch('/api/stagings?status=quote');
+                    const result = await response.json();
+                    if (result.success && result.stagings && result.stagings.length > 0) {
+                        // Get the most recent quote
+                        const staging = result.stagings[0];
+                        currentStagingId = staging.id;
+
+                        // Restore data if no local session data exists
+                        const localData = sessionStorage.getItem(STAGING_SESSION_KEY);
+                        if (!localData) {
+                            const serverSessionData = {
+                                propertyType: staging.property_type,
+                                propertySize: staging.property_size,
+                                selectedAreas: staging.selected_areas ? JSON.parse(staging.selected_areas) : [],
+                                areaItemsData: staging.selected_items ? JSON.parse(staging.selected_items) : {},
+                                totalFee: staging.total_fee,
+                                timestamp: Date.now()
+                            };
+                            sessionStorage.setItem(STAGING_SESSION_KEY, JSON.stringify(serverSessionData));
+                            // Reload page to apply restored data
+                            location.reload();
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Could not load from server:', e);
                 }
             }
 
@@ -2069,8 +2150,10 @@ def property_type_selector():
             }
 
             // Restore session data on page load
-            document.addEventListener('DOMContentLoaded', function() {
-                // Small delay to ensure all elements are rendered
+            document.addEventListener('DOMContentLoaded', async function() {
+                // First, try to load from server if logged in
+                await loadExistingStagingFromServer();
+                // Then restore from session storage
                 setTimeout(restoreStagingSession, 50);
             });
         """),
@@ -2177,13 +2260,14 @@ def get_property_selector_styles():
 
     .property-btn.selected {
         border-color: var(--color-primary);
+        border-width: 2px;
         background: var(--bg-secondary);
-        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1), 0 4px 16px rgba(0, 0, 0, 0.08);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
     }
 
     [data-theme="dark"] .property-btn.selected {
         border-color: #fff;
-        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15), 0 4px 16px rgba(255, 255, 255, 0.05);
+        box-shadow: 0 4px 16px rgba(255, 255, 255, 0.08);
     }
 
     .property-btn.dimmed {
@@ -3010,6 +3094,31 @@ def get_property_selector_styles():
             font-size: 13px;
             height: 45px; /* Match WhatsApp button height on mobile */
             padding: 0 16px;
+        }
+
+        /* Area button mobile styles */
+        .area-btn {
+            padding-bottom: 36px;
+        }
+
+        .area-name {
+            font-size: 11px;
+            margin-top: 2px;
+        }
+
+        .area-price {
+            font-size: 10px;
+        }
+
+        .area-actions {
+            gap: 3px;
+            padding: 0 3px 3px 3px;
+        }
+
+        .area-action-btn {
+            font-size: 10px;
+            padding: 3px 2px;
+            border-radius: 3px;
         }
     }
     """

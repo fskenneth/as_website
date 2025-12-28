@@ -58,11 +58,45 @@ def init_db():
         )
     ''')
 
+    # Stagings table - stores both quotes (unpaid) and confirmed stagings (paid)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS stagings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'quote',
+            property_address TEXT,
+            property_type TEXT,
+            property_size TEXT,
+            selected_areas TEXT,
+            selected_items TEXT,
+            total_fee TEXT,
+            staging_date TEXT,
+            addons TEXT,
+            property_status TEXT,
+            user_type TEXT,
+            pets_status TEXT,
+            referral_source TEXT,
+            referral_other TEXT,
+            guest_first_name TEXT,
+            guest_last_name TEXT,
+            guest_email TEXT,
+            guest_phone TEXT,
+            special_requests TEXT,
+            stripe_payment_id TEXT,
+            stripe_customer_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+
     # Create indexes for faster lookups
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_stagings_user_id ON stagings(user_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_stagings_status ON stagings(status)')
 
     conn.commit()
     conn.close()
@@ -387,6 +421,218 @@ def get_or_create_google_user(google_id: str, email: str, first_name: str, last_
         result['is_new'] = True
 
     return result
+
+
+# ============== Staging Functions ==============
+
+def save_staging(user_id: int, staging_data: dict) -> dict:
+    """
+    Save or update a staging for a user.
+    If staging_id is provided in staging_data, updates existing; otherwise creates new.
+    Returns: dict with 'success' and 'staging_id' or 'error'
+    """
+    print(f"[save_staging] user_id={user_id}, staging_data={staging_data}")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        staging_id = staging_data.get('id') or staging_data.get('staging_id')
+        print(f"[save_staging] staging_id={staging_id}")
+
+        if staging_id:
+            # Update existing staging
+            cursor.execute('''
+                UPDATE stagings SET
+                    status = ?,
+                    property_address = ?,
+                    property_type = ?,
+                    property_size = ?,
+                    selected_areas = ?,
+                    selected_items = ?,
+                    total_fee = ?,
+                    staging_date = ?,
+                    addons = ?,
+                    property_status = ?,
+                    user_type = ?,
+                    pets_status = ?,
+                    referral_source = ?,
+                    referral_other = ?,
+                    guest_first_name = ?,
+                    guest_last_name = ?,
+                    guest_email = ?,
+                    guest_phone = ?,
+                    special_requests = ?,
+                    stripe_payment_id = ?,
+                    stripe_customer_id = ?,
+                    updated_at = ?
+                WHERE id = ? AND user_id = ?
+            ''', (
+                staging_data.get('status', 'quote'),
+                staging_data.get('property_address'),
+                staging_data.get('property_type'),
+                staging_data.get('property_size'),
+                staging_data.get('selected_areas'),
+                staging_data.get('selected_items'),
+                staging_data.get('total_fee'),
+                staging_data.get('staging_date'),
+                staging_data.get('addons'),
+                staging_data.get('property_status'),
+                staging_data.get('user_type'),
+                staging_data.get('pets_status'),
+                staging_data.get('referral_source'),
+                staging_data.get('referral_other'),
+                staging_data.get('guest_first_name'),
+                staging_data.get('guest_last_name'),
+                staging_data.get('guest_email'),
+                staging_data.get('guest_phone'),
+                staging_data.get('special_requests'),
+                staging_data.get('stripe_payment_id'),
+                staging_data.get('stripe_customer_id'),
+                datetime.now(),
+                staging_id,
+                user_id
+            ))
+        else:
+            # Create new staging
+            cursor.execute('''
+                INSERT INTO stagings (
+                    user_id, status, property_address, property_type, property_size,
+                    selected_areas, selected_items, total_fee, staging_date, addons,
+                    property_status, user_type, pets_status, referral_source, referral_other,
+                    guest_first_name, guest_last_name, guest_email, guest_phone,
+                    special_requests, stripe_payment_id, stripe_customer_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                user_id,
+                staging_data.get('status', 'quote'),
+                staging_data.get('property_address'),
+                staging_data.get('property_type'),
+                staging_data.get('property_size'),
+                staging_data.get('selected_areas'),
+                staging_data.get('selected_items'),
+                staging_data.get('total_fee'),
+                staging_data.get('staging_date'),
+                staging_data.get('addons'),
+                staging_data.get('property_status'),
+                staging_data.get('user_type'),
+                staging_data.get('pets_status'),
+                staging_data.get('referral_source'),
+                staging_data.get('referral_other'),
+                staging_data.get('guest_first_name'),
+                staging_data.get('guest_last_name'),
+                staging_data.get('guest_email'),
+                staging_data.get('guest_phone'),
+                staging_data.get('special_requests'),
+                staging_data.get('stripe_payment_id'),
+                staging_data.get('stripe_customer_id')
+            ))
+            staging_id = cursor.lastrowid
+            print(f"[save_staging] Created new staging with id={staging_id}")
+
+        conn.commit()
+        print(f"[save_staging] Committed successfully, returning staging_id={staging_id}")
+        return {'success': True, 'staging_id': staging_id}
+    except Exception as e:
+        print(f"[save_staging] ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        return {'success': False, 'error': str(e)}
+    finally:
+        conn.close()
+
+
+def get_user_stagings(user_id: int, status: str = None) -> list:
+    """
+    Get all stagings for a user, optionally filtered by status.
+    Status can be 'quote' (unpaid) or 'confirmed' (paid).
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if status:
+        cursor.execute('''
+            SELECT * FROM stagings
+            WHERE user_id = ? AND status = ?
+            ORDER BY updated_at DESC
+        ''', (user_id, status))
+    else:
+        cursor.execute('''
+            SELECT * FROM stagings
+            WHERE user_id = ?
+            ORDER BY updated_at DESC
+        ''', (user_id,))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [dict(row) for row in rows]
+
+
+def get_staging_by_id(staging_id: int, user_id: int = None) -> dict:
+    """Get a staging by ID, optionally verifying user ownership"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if user_id:
+        cursor.execute('SELECT * FROM stagings WHERE id = ? AND user_id = ?',
+                       (staging_id, user_id))
+    else:
+        cursor.execute('SELECT * FROM stagings WHERE id = ?', (staging_id,))
+
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        return dict(row)
+    return None
+
+
+def delete_staging(staging_id: int, user_id: int) -> dict:
+    """Delete a staging (only if owned by user)"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('DELETE FROM stagings WHERE id = ? AND user_id = ?',
+                       (staging_id, user_id))
+        deleted = cursor.rowcount > 0
+        conn.commit()
+        return {'success': deleted, 'error': None if deleted else 'Staging not found'}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        conn.close()
+
+
+def update_staging_status(staging_id: int, status: str,
+                          stripe_payment_id: str = None,
+                          stripe_customer_id: str = None) -> dict:
+    """Update staging status (e.g., from 'quote' to 'confirmed' after payment)"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        if stripe_payment_id or stripe_customer_id:
+            cursor.execute('''
+                UPDATE stagings SET
+                    status = ?,
+                    stripe_payment_id = COALESCE(?, stripe_payment_id),
+                    stripe_customer_id = COALESCE(?, stripe_customer_id),
+                    updated_at = ?
+                WHERE id = ?
+            ''', (status, stripe_payment_id, stripe_customer_id, datetime.now(), staging_id))
+        else:
+            cursor.execute('''
+                UPDATE stagings SET status = ?, updated_at = ?
+                WHERE id = ?
+            ''', (status, datetime.now(), staging_id))
+
+        conn.commit()
+        return {'success': True}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        conn.close()
 
 
 # Initialize database on module load

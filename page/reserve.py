@@ -1098,6 +1098,9 @@ def reserve_page(req: Request, user: dict = None):
         let currentDisplayMonth = new Date();
         let selectedDateType = 'week';
 
+        // Track current staging ID for server updates
+        let currentStagingId = null;
+
         // Save reserve form data to session storage
         function saveReserveSession() {{
             const formData = {{
@@ -1134,7 +1137,102 @@ def reserve_page(req: Request, user: dict = None):
             }} catch (e) {{
                 console.warn('Could not save to sessionStorage:', e);
             }}
+
+            // Auto-save to server if logged in
+            saveReserveToServer(formData);
         }}
+
+        // Save reserve data to server
+        async function saveReserveToServer(formData) {{
+            try {{
+                // Check if user is logged in
+                const authResponse = await fetch('/api/auth/check');
+                const authResult = await authResponse.json();
+                if (!authResult.authenticated) return;
+
+                // Load staging data from local session
+                const stagingSession = sessionStorage.getItem('astra_staging_data');
+                const stagingInfo = stagingSession ? JSON.parse(stagingSession) : {{}};
+
+                // Fetch existing staging data from server to preserve property type/size/areas
+                let existingStaging = {{}};
+                if (currentStagingId) {{
+                    try {{
+                        const existingResponse = await fetch('/api/stagings/' + currentStagingId);
+                        const existingResult = await existingResponse.json();
+                        if (existingResult.success && existingResult.staging) {{
+                            existingStaging = existingResult.staging;
+                        }}
+                    }} catch (e) {{
+                        console.warn('Could not fetch existing staging:', e);
+                    }}
+                }}
+
+                // Parse existing arrays/objects
+                const existingAreas = existingStaging.selected_areas ? JSON.parse(existingStaging.selected_areas) : [];
+                const existingItems = existingStaging.selected_items ? JSON.parse(existingStaging.selected_items) : {{}};
+
+                const serverData = {{
+                    status: 'quote',
+                    property_address: formData.propertyAddress || existingStaging.property_address || '',
+                    property_type: stagingInfo.propertyType || existingStaging.property_type || '',
+                    property_size: stagingInfo.propertySize || existingStaging.property_size || '',
+                    selected_areas: JSON.stringify(stagingInfo.selectedAreas || existingAreas || []),
+                    selected_items: JSON.stringify(stagingInfo.areaItemsData || existingItems || {{}}),
+                    total_fee: stagingInfo.totalFee || existingStaging.total_fee || '',
+                    staging_date: formData.stagingDateDisplay || formData.stagingDate || existingStaging.staging_date || '',
+                    addons: JSON.stringify(formData.addons || []),
+                    property_status: formData.propertyStatus || existingStaging.property_status || '',
+                    user_type: formData.userType || existingStaging.user_type || '',
+                    pets_status: formData.petsStatus || existingStaging.pets_status || '',
+                    referral_source: formData.referralSource || existingStaging.referral_source || '',
+                    referral_other: formData.referralOtherText || existingStaging.referral_other || '',
+                    guest_first_name: formData.firstName || existingStaging.guest_first_name || '',
+                    guest_last_name: formData.lastName || existingStaging.guest_last_name || '',
+                    guest_email: formData.email || existingStaging.guest_email || '',
+                    guest_phone: formData.phone || existingStaging.guest_phone || '',
+                    special_requests: formData.specialRequests || existingStaging.special_requests || ''
+                }};
+
+                // Include staging ID if updating existing
+                if (currentStagingId) {{
+                    serverData.id = currentStagingId;
+                }}
+
+                const response = await fetch('/api/stagings', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify(serverData)
+                }});
+
+                const result = await response.json();
+                if (result.success && result.staging_id) {{
+                    currentStagingId = result.staging_id;
+                }}
+            }} catch (e) {{
+                console.warn('Could not save to server:', e);
+            }}
+        }}
+
+        // Load existing staging ID from server on page load
+        async function loadStagingIdFromServer() {{
+            try {{
+                const authResponse = await fetch('/api/auth/check');
+                const authResult = await authResponse.json();
+                if (!authResult.authenticated) return;
+
+                const response = await fetch('/api/stagings?status=quote');
+                const result = await response.json();
+                if (result.success && result.stagings && result.stagings.length > 0) {{
+                    currentStagingId = result.stagings[0].id;
+                }}
+            }} catch (e) {{
+                console.warn('Could not load staging ID from server:', e);
+            }}
+        }}
+
+        // Initialize staging ID on page load
+        loadStagingIdFromServer();
 
         // Load reserve form data from session storage
         function loadReserveSession() {{
@@ -1497,8 +1595,8 @@ def reserve_page(req: Request, user: dict = None):
             'bath-accessories': 'Bath Accessories'
         }};
 
-        // Parse URL parameters on load, fallback to session storage
-        function loadStagingData() {{
+        // Parse URL parameters on load, fallback to session storage, then server
+        async function loadStagingData() {{
             const urlParams = new URLSearchParams(window.location.search);
 
             // Check if URL has parameters
@@ -1527,23 +1625,50 @@ def reserve_page(req: Request, user: dict = None):
                 }}
             }} else {{
                 // Try to load from session storage (from staging-inquiry page)
+                let loadedFromSession = false;
                 try {{
                     const savedData = sessionStorage.getItem(STAGING_SESSION_KEY);
                     if (savedData) {{
                         const data = JSON.parse(savedData);
-                        stagingData.propertyType = data.propertyType || '';
-                        stagingData.propertySize = data.propertySize || '';
-                        stagingData.selectedAreas = data.selectedAreas || [];
-                        stagingData.selectedItems = data.areaItemsData || {{}};
+                        if (data.propertyType || data.propertySize || (data.selectedAreas && data.selectedAreas.length > 0)) {{
+                            stagingData.propertyType = data.propertyType || '';
+                            stagingData.propertySize = data.propertySize || '';
+                            stagingData.selectedAreas = data.selectedAreas || [];
+                            stagingData.selectedItems = data.areaItemsData || {{}};
 
-                        // Parse total fee from string like "$1,450.00"
-                        if (data.totalFee) {{
-                            const feeStr = data.totalFee.replace(/[$,]/g, '');
-                            stagingData.totalFee = parseFloat(feeStr) || 0;
+                            // Parse total fee from string like "$1,450.00"
+                            if (data.totalFee) {{
+                                const feeStr = data.totalFee.replace(/[$,]/g, '');
+                                stagingData.totalFee = parseFloat(feeStr) || 0;
+                            }}
+                            loadedFromSession = true;
                         }}
                     }}
                 }} catch (e) {{
                     console.warn('Could not load from sessionStorage:', e);
+                }}
+
+                // If no session data, try to load from server
+                if (!loadedFromSession) {{
+                    try {{
+                        const response = await fetch('/api/stagings?status=quote');
+                        const result = await response.json();
+                        if (result.success && result.stagings && result.stagings.length > 0) {{
+                            const serverStaging = result.stagings[0];
+                            stagingData.propertyType = serverStaging.property_type || '';
+                            stagingData.propertySize = serverStaging.property_size || '';
+                            stagingData.selectedAreas = serverStaging.selected_areas ? JSON.parse(serverStaging.selected_areas) : [];
+                            stagingData.selectedItems = serverStaging.selected_items ? JSON.parse(serverStaging.selected_items) : {{}};
+
+                            // Parse total fee from string like "$1,450.00 CAD"
+                            if (serverStaging.total_fee) {{
+                                const feeStr = serverStaging.total_fee.replace(/[$,CAD\s]/g, '');
+                                stagingData.totalFee = parseFloat(feeStr) || 0;
+                            }}
+                        }}
+                    }} catch (e) {{
+                        console.warn('Could not load from server:', e);
+                    }}
                 }}
             }}
 
@@ -1600,8 +1725,11 @@ def reserve_page(req: Request, user: dict = None):
                     'basement-2nd-bedroom': 'Basement 2nd Bed'
                 }};
 
-                if (Object.keys(stagingData.selectedItems).length > 0) {{
-                    // Build display by area
+                const hasItems = Object.keys(stagingData.selectedItems).length > 0;
+                const hasAreas = stagingData.selectedAreas && stagingData.selectedAreas.length > 0;
+
+                if (hasItems) {{
+                    // Build display by area with items
                     const areaLines = [];
                     for (const [areaSlug, items] of Object.entries(stagingData.selectedItems)) {{
                         const areaName = areaDisplayNames[areaSlug] || areaSlug;
@@ -1628,6 +1756,10 @@ def reserve_page(req: Request, user: dict = None):
                     }} else {{
                         areasItemsEl.textContent = 'None selected';
                     }}
+                }} else if (hasAreas) {{
+                    // Show selected areas without specific items
+                    const areaNames = stagingData.selectedAreas.map(slug => areaDisplayNames[slug] || slug);
+                    areasItemsEl.textContent = areaNames.join(', ');
                 }} else {{
                     areasItemsEl.textContent = 'None selected';
                 }}

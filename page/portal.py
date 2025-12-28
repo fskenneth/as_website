@@ -910,75 +910,131 @@ def get_portal_scripts():
         'basement-2nd-bedroom': 'Basement 2nd Bed'
     };
 
-    // Load staging data from session/local storage
-    function loadStagingData() {
+    // Load staging data from server and merge with local storage
+    async function loadStagingData() {
         const container = document.getElementById('staging-container');
         if (!container) return;
 
         const stagingItems = [];
 
-        // Load confirmed bookings from localStorage
+        // First, try to load from server
         try {
-            const reservationData = localStorage.getItem('reservationData');
-            const reservationId = localStorage.getItem('reservationId');
-            if (reservationData && reservationId) {
-                const data = JSON.parse(reservationData);
-                stagingItems.push({
-                    ...data,
-                    status: 'confirmed',
-                    reservationId: reservationId
+            const response = await fetch('/api/stagings');
+            const result = await response.json();
+            if (result.success && result.stagings) {
+                result.stagings.forEach(staging => {
+                    stagingItems.push({
+                        id: staging.id,
+                        propertyAddress: staging.property_address,
+                        propertyType: staging.property_type,
+                        propertySize: staging.property_size,
+                        selectedAreas: staging.selected_areas ? JSON.parse(staging.selected_areas) : [],
+                        selectedItems: staging.selected_items ? JSON.parse(staging.selected_items) : {},
+                        totalFee: staging.total_fee,
+                        stagingDate: staging.staging_date,
+                        stagingDateDisplay: staging.staging_date,
+                        addons: staging.addons ? JSON.parse(staging.addons) : [],
+                        status: staging.status,
+                        fromServer: true
+                    });
                 });
             }
         } catch (e) {
-            console.warn('Error loading reservation data:', e);
+            console.warn('Error loading stagings from server:', e);
         }
 
-        // Load staging inquiry data (partial quotes without address)
+        // Load local session storage data
         let stagingInfo = {};
-        try {
-            const stagingData = sessionStorage.getItem(STAGING_SESSION_KEY);
-            if (stagingData) {
-                stagingInfo = JSON.parse(stagingData);
-            }
-        } catch (e) {
-            console.warn('Error loading staging data:', e);
-        }
-
-        // Load reserve page data (quotes with address info)
         let reserveInfo = {};
         try {
+            const stagingData = sessionStorage.getItem(STAGING_SESSION_KEY);
+            if (stagingData) stagingInfo = JSON.parse(stagingData);
+        } catch (e) {}
+        try {
             const reserveData = sessionStorage.getItem(RESERVE_SESSION_KEY);
-            if (reserveData) {
-                reserveInfo = JSON.parse(reserveData);
-            }
-        } catch (e) {
-            console.warn('Error loading reserve data:', e);
-        }
+            if (reserveData) reserveInfo = JSON.parse(reserveData);
+        } catch (e) {}
 
-        // Check if we have any quote data (either from staging inquiry or reserve page)
+        // Check if we have local quote data not yet synced
         const hasPropertyType = stagingInfo.propertyType || reserveInfo.propertyType;
         const hasPropertySize = stagingInfo.propertySize || reserveInfo.propertySize;
         const hasSelectedAreas = (stagingInfo.selectedAreas && stagingInfo.selectedAreas.length > 0);
 
         if (hasPropertyType || hasPropertySize || hasSelectedAreas) {
-            const propertyAddress = reserveInfo.propertyAddress || '';
+            const localData = { ...stagingInfo, ...reserveInfo, status: 'quote' };
 
-            // Check if not already confirmed
-            const isAlreadyConfirmed = propertyAddress && stagingItems.some(
-                item => item.propertyAddress === propertyAddress && item.status === 'confirmed'
+            // Check if this local data already exists on server (by property address or similar data)
+            const existsOnServer = stagingItems.some(item =>
+                item.propertyAddress && localData.propertyAddress &&
+                item.propertyAddress === localData.propertyAddress
             );
 
-            if (!isAlreadyConfirmed) {
-                stagingItems.push({
-                    ...stagingInfo,
-                    ...reserveInfo,
-                    propertyAddress: propertyAddress,
-                    status: 'quote'
-                });
+            if (!existsOnServer) {
+                // Sync local data to server
+                await syncLocalToServer(localData);
+                // Reload to get the synced data
+                return loadStagingData();
             }
         }
 
         renderStagingItems(container, stagingItems);
+    }
+
+    // Sync local storage data to server
+    async function syncLocalToServer(localData, existingStagingId = null) {
+        try {
+            // First, check if there's an existing unpaid quote on server
+            let stagingId = existingStagingId;
+            if (!stagingId) {
+                const checkResponse = await fetch('/api/stagings?status=quote');
+                const checkResult = await checkResponse.json();
+                if (checkResult.success && checkResult.stagings && checkResult.stagings.length > 0) {
+                    stagingId = checkResult.stagings[0].id;
+                }
+            }
+
+            const serverData = {
+                status: 'quote',
+                property_address: localData.propertyAddress || '',
+                property_type: localData.propertyType || '',
+                property_size: localData.propertySize || '',
+                selected_areas: JSON.stringify(localData.selectedAreas || []),
+                selected_items: JSON.stringify(localData.selectedItems || {}),
+                total_fee: localData.totalFee || '',
+                staging_date: localData.stagingDateDisplay || localData.stagingDate || '',
+                addons: JSON.stringify(localData.addons || []),
+                property_status: localData.propertyStatus || '',
+                user_type: localData.userType || '',
+                pets_status: localData.petsStatus || '',
+                referral_source: localData.referralSource || '',
+                guest_first_name: localData.guestFirstName || '',
+                guest_last_name: localData.guestLastName || '',
+                guest_email: localData.guestEmail || '',
+                guest_phone: localData.guestPhone || '',
+                special_requests: localData.specialRequests || ''
+            };
+
+            // Include staging ID if updating existing quote
+            if (stagingId) {
+                serverData.id = stagingId;
+            }
+
+            const response = await fetch('/api/stagings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(serverData)
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                // Clear local storage after successful sync
+                sessionStorage.removeItem(STAGING_SESSION_KEY);
+                sessionStorage.removeItem(RESERVE_SESSION_KEY);
+                console.log('Local quote synced to server, staging_id:', result.staging_id);
+            }
+        } catch (e) {
+            console.warn('Error syncing to server:', e);
+        }
     }
 
     // Render staging items
@@ -1056,10 +1112,11 @@ def get_portal_scripts():
         // Action buttons
         let actionsHtml = '';
         if (item.status === 'quote') {
+            const stagingId = item.id || '';
             actionsHtml = `
                 <div class="staging-actions">
                     <a href="/reserve/" class="staging-action-btn primary">Complete Booking</a>
-                    <button class="staging-action-btn secondary" onclick="clearQuote()">Remove Quote</button>
+                    <button class="staging-action-btn secondary" onclick="clearQuote(${stagingId || 'null'})">Remove Quote</button>
                 </div>
             `;
         }
@@ -1105,13 +1162,24 @@ def get_portal_scripts():
         `;
     }
 
-    // Clear quote from session storage
-    function clearQuote() {
-        if (confirm('Are you sure you want to remove this quote?')) {
-            sessionStorage.removeItem(STAGING_SESSION_KEY);
-            sessionStorage.removeItem(RESERVE_SESSION_KEY);
-            loadStagingData();
+    // Clear quote from session storage and server
+    async function clearQuote(stagingId) {
+        if (!confirm('Are you sure you want to remove this quote?')) return;
+
+        // Clear local storage
+        sessionStorage.removeItem(STAGING_SESSION_KEY);
+        sessionStorage.removeItem(RESERVE_SESSION_KEY);
+
+        // Delete from server if we have a staging ID
+        if (stagingId) {
+            try {
+                await fetch('/api/stagings/' + stagingId, { method: 'DELETE' });
+            } catch (e) {
+                console.warn('Error deleting staging from server:', e);
+            }
         }
+
+        loadStagingData();
     }
 
     // Profile modal functions
