@@ -849,50 +849,50 @@ def property_type_selector():
             Div(
                 # Row 1: Living Room, Dining Room, Family Room
                 Div(
-                    Button(Span("Living Room", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="living-room", onclick="toggleArea(this)"),
-                    Button(Span("Dining Room", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="dining-room", onclick="toggleArea(this)"),
-                    Button(Span("Family Room", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="family-room", onclick="toggleArea(this)"),
+                    Button(Span("Living Room", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="living-room", onclick="toggleArea(this)"),
+                    Button(Span("Dining Room", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="dining-room", onclick="toggleArea(this)"),
+                    Button(Span("Family Room", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="family-room", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 2: Kitchen Only, Kitchen with Island, Breakfast Area
                 Div(
-                    Button(Span("Kitchen Only", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="kitchen-only", onclick="toggleArea(this)"),
-                    Button(Span("Kitchen Island", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="kitchen-island", onclick="toggleArea(this)"),
-                    Button(Span("Breakfast Area", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="breakfast-area", onclick="toggleArea(this)"),
+                    Button(Span("Kitchen Only", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="kitchen-only", onclick="toggleArea(this)"),
+                    Button(Span("Kitchen Island", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="kitchen-island", onclick="toggleArea(this)"),
+                    Button(Span("Breakfast Area", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="breakfast-area", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 3: Master Bedroom, 2nd Bedroom, 3rd Bedroom
                 Div(
-                    Button(Span("Master Bedroom", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="master-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("2nd Bedroom", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="2nd-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("3rd Bedroom", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="3rd-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("Master Bedroom", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="master-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("2nd Bedroom", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="2nd-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("3rd Bedroom", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="3rd-bedroom", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 4: 4th Bedroom, 5th Bedroom, 6th Bedroom
                 Div(
-                    Button(Span("4th Bedroom", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="4th-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("5th Bedroom", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="5th-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("6th Bedroom", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="6th-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("4th Bedroom", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="4th-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("5th Bedroom", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="5th-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("6th Bedroom", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="6th-bedroom", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 5: Office, Bathrooms, Outdoor
                 Div(
-                    Button(Span("Office", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="office", onclick="toggleArea(this)"),
-                    Button(Span("Bathrooms", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="bathrooms", onclick="toggleArea(this)"),
-                    Button(Span("Outdoor", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="outdoor", onclick="toggleArea(this)"),
+                    Button(Span("Office", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="office", onclick="toggleArea(this)"),
+                    Button(Span("Bathrooms", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="bathrooms", onclick="toggleArea(this)"),
+                    Button(Span("Outdoor", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="outdoor", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 6: Basement Living, Basement Dining, Basement Office
                 Div(
-                    Button(Span("Basement Living", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="basement-living", onclick="toggleArea(this)"),
-                    Button(Span("Basement Dining", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="basement-dining", onclick="toggleArea(this)"),
-                    Button(Span("Basement Office", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="basement-office", onclick="toggleArea(this)"),
+                    Button(Span("Basement Living", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-living", onclick="toggleArea(this)"),
+                    Button(Span("Basement Dining", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-dining", onclick="toggleArea(this)"),
+                    Button(Span("Basement Office", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-office", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 7: Basement 1st Bedroom, Basement 2nd Bedroom
                 Div(
-                    Button(Span("Basement 1st Bed", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="basement-1st-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("Basement 2nd Bed", cls="area-name"), Span("", cls="area-price"), Span("Selected Items", cls="area-selected-items", onclick="openItemsModal(event, this)"), cls="property-btn area-btn", data_area="basement-2nd-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("Basement 1st Bed", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-1st-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("Basement 2nd Bed", cls="area-name"), Span("", cls="area-price"), Div(Span("Items", cls="area-action-btn", onclick="openItemsModal(event, this)"), Span("Photos", cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-2nd-bedroom", onclick="toggleArea(this)"),
                     Div(cls="property-btn-spacer"),
                     cls="property-selector"
                 ),
@@ -1706,6 +1706,15 @@ def property_type_selector():
                 currentArea = null;
             }
 
+            function openPhotosModal(event, element) {
+                event.stopPropagation();
+                buttonFeedback();
+                // Placeholder - link to be added later
+                const areaBtn = element.closest('.area-btn');
+                const area = areaBtn.getAttribute('data-area');
+                console.log('Photos clicked for area:', area);
+            }
+
             function loadAreaItems(area) {
                 // Use saved items if exists, otherwise load defaults from CSV data
                 let itemsToLoad = areaItemsData[area];
@@ -2274,6 +2283,11 @@ def get_property_selector_styles():
         margin-top: 0;
     }
 
+    /* Area button specific styles */
+    .area-btn {
+        padding-bottom: 50px;
+    }
+
     /* Area button text styles */
     .area-name {
         font-size: 12px;
@@ -2294,23 +2308,62 @@ def get_property_selector_styles():
         color: var(--color-primary);
     }
 
-    /* Selected Items Link */
-    .area-selected-items {
-        font-size: 10px;
-        font-weight: 500;
+    /* Area Action Buttons Container */
+    .area-actions {
+        display: none;
+        gap: 8px;
+        margin-top: auto;
+        width: 100%;
+        padding: 0 8px 8px 8px;
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        box-sizing: border-box;
+    }
+
+    .area-btn.selected .area-actions {
+        display: flex;
+    }
+
+    .area-action-btn {
+        flex: 1;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 10px 8px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.1);
         color: var(--color-secondary);
-        text-decoration: underline;
-        margin-top: 4px;
         cursor: pointer;
-        transition: color 0.2s ease;
+        transition: all 0.2s ease;
+        border: none;
+        text-align: center;
     }
 
-    .area-selected-items:hover {
+    [data-theme="light"] .area-action-btn {
+        background: rgba(0, 0, 0, 0.06);
+    }
+
+    .area-action-btn:hover {
+        background: rgba(76, 175, 80, 0.25);
         color: var(--color-primary);
     }
 
-    .area-btn.selected .area-selected-items {
+    .area-btn.selected .area-action-btn {
+        background: rgba(255, 255, 255, 0.1);
         color: var(--color-primary);
+    }
+
+    [data-theme="light"] .area-btn.selected .area-action-btn {
+        background: rgba(0, 0, 0, 0.06);
+    }
+
+    .area-btn.selected .area-action-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    [data-theme="light"] .area-btn.selected .area-action-btn:hover {
+        background: rgba(0, 0, 0, 0.1);
     }
 
     /* Items Modal */
