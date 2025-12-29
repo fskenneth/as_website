@@ -693,6 +693,37 @@ def items_modal():
     )
 
 
+def photos_modal():
+    """Modal for photos - same structure as items modal"""
+    return Div(
+        Div(
+            # Modal Header
+            Div(
+                H3("Living Room Photos", cls="modal-title", id="photos-modal-title"),
+                Button("✕", cls="modal-close-btn", onclick="closePhotosModal()"),
+                cls="modal-header"
+            ),
+            # Modal Body - blank for now
+            Div(
+                cls="modal-body photos-content"
+            ),
+            # Modal Footer
+            Div(
+                Div(
+                    Button("Reset", cls="modal-reset-btn", onclick="resetPhotos()"),
+                    Button("Clear", cls="modal-clear-btn", onclick="clearPhotos()"),
+                    cls="modal-footer-left"
+                ),
+                Button("Apply", cls="modal-apply-btn", onclick="applyPhotos()"),
+                cls="modal-footer"
+            ),
+            cls="modal-content"
+        ),
+        id="photos-modal",
+        cls="photos-modal hidden"
+    )
+
+
 def inquiry_modal():
     """Modal for inquiry form with fields from reserve page (except Payment and Policies)"""
     return Div(
@@ -901,6 +932,8 @@ def property_type_selector():
             ),
             # Items Modal
             items_modal(),
+            # Photos Modal
+            photos_modal(),
             # Inquiry Modal
             inquiry_modal(),
             # Floating Action Buttons
@@ -1787,13 +1820,65 @@ def property_type_selector():
                 currentArea = null;
             }
 
+            let currentPhotosArea = null;
+
             function openPhotosModal(event, element) {
                 event.stopPropagation();
                 buttonFeedback();
-                // Placeholder - link to be added later
                 const areaBtn = element.closest('.area-btn');
                 const area = areaBtn.getAttribute('data-area');
-                console.log('Photos clicked for area:', area);
+                currentPhotosArea = area;
+
+                // Get area name for title
+                const areaNames = {
+                    'living-room': 'Living Room',
+                    'dining-room': 'Dining Room',
+                    'family-room': 'Family Room',
+                    'kitchen-only': 'Kitchen Only',
+                    'kitchen-island': 'Kitchen Island',
+                    'breakfast-area': 'Breakfast Area',
+                    'master-bedroom': 'Master Bedroom',
+                    '2nd-bedroom': '2nd Bedroom',
+                    '3rd-bedroom': '3rd Bedroom',
+                    '4th-bedroom': '4th Bedroom',
+                    '5th-bedroom': '5th Bedroom',
+                    '6th-bedroom': '6th Bedroom',
+                    'office': 'Office',
+                    'bathrooms': 'Bathrooms',
+                    'outdoor': 'Outdoor',
+                    'basement-living': 'Basement Living',
+                    'basement-dining': 'Basement Dining',
+                    'basement-office': 'Basement Office',
+                    'basement-1st-bedroom': 'Basement 1st Bedroom',
+                    'basement-2nd-bedroom': 'Basement 2nd Bedroom'
+                };
+                const areaName = areaNames[area] || area;
+
+                document.getElementById('photos-modal-title').textContent = areaName + ' Photos';
+                document.getElementById('photos-modal').classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closePhotosModal() {
+                document.getElementById('photos-modal').classList.add('hidden');
+                document.body.style.overflow = '';
+                currentPhotosArea = null;
+            }
+
+            function resetPhotos() {
+                // Placeholder - to be implemented
+                console.log('Reset photos for:', currentPhotosArea);
+            }
+
+            function clearPhotos() {
+                // Placeholder - to be implemented
+                console.log('Clear photos for:', currentPhotosArea);
+            }
+
+            function applyPhotos() {
+                // Placeholder - to be implemented
+                console.log('Apply photos for:', currentPhotosArea);
+                closePhotosModal();
             }
 
             function loadAreaItems(area) {
@@ -2467,6 +2552,29 @@ def get_property_selector_styles():
 
     .items-modal.hidden {
         display: none;
+    }
+
+    /* Photos Modal */
+    .photos-modal {
+        position: fixed;
+        top: 70px;
+        left: 0;
+        right: 0;
+        bottom: 80px;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 15px;
+    }
+
+    .photos-modal.hidden {
+        display: none;
+    }
+
+    .photos-content {
+        min-height: 200px;
     }
 
     .modal-content {
