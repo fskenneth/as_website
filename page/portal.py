@@ -666,31 +666,12 @@ def get_portal_styles():
             flex-direction: column;
         }
 
-        .staging-card-body {
-            grid-template-columns: 1fr;
-        }
-
-        .staging-card-header {
-            flex-direction: column;
-            gap: 8px;
-        }
-
         .staging-address {
             font-size: 16px;
         }
 
-        .staging-total {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 4px;
-        }
-
-        .staging-actions {
-            flex-direction: column;
-        }
-
         .staging-action-btn {
-            width: 100%;
+            flex: 1;
             text-align: center;
         }
     }
@@ -1112,11 +1093,10 @@ def get_portal_scripts():
         // Action buttons
         let actionsHtml = '';
         if (item.status === 'quote') {
-            const stagingId = item.id || '';
             actionsHtml = `
                 <div class="staging-actions">
+                    <a href="/staging-inquiry/" class="staging-action-btn secondary">Edit Quote</a>
                     <a href="/reserve/" class="staging-action-btn primary">Complete Booking</a>
-                    <button class="staging-action-btn secondary" onclick="clearQuote(${stagingId || 'null'})">Remove Quote</button>
                 </div>
             `;
         }
