@@ -636,23 +636,65 @@ def reserve_page(req: Request, user: dict = None):
             display: flex;
             flex-direction: column;
             gap: 24px;
-            max-height: 400px;
-            overflow-y: auto;
+        }
+
+        /* Week-based calendar styles */
+        .weeks-calendar {
             padding: 16px;
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
-            scrollbar-width: none;
-            -ms-overflow-style: none;
         }
 
-        .mobile-months-container::-webkit-scrollbar {
-            display: none;
-        }
-
-        [data-theme="light"] .mobile-months-container {
+        [data-theme="light"] .weeks-calendar {
             background: rgba(0, 0, 0, 0.02);
             border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .weeks-calendar-header {
+            display: grid;
+            grid-template-columns: 45px repeat(7, 1fr);
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .weeks-calendar-header span {
+            text-align: center;
+            padding: 8px 4px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--color-secondary);
+        }
+
+        .weeks-calendar-header .month-label-header {
+            /* Empty header for month column */
+        }
+
+        .weeks-calendar-body {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .week-row {
+            display: grid;
+            grid-template-columns: 45px repeat(7, 1fr);
+            gap: 4px;
+        }
+
+        .week-row .month-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--color-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding-left: 2px;
+        }
+
+        .week-row .calendar-day {
+            font-size: 13px;
+            padding: 8px 4px;
         }
 
         .calendar-month {
@@ -730,6 +772,11 @@ def reserve_page(req: Request, user: dict = None):
             color: var(--color-secondary);
             opacity: 0.3;
             cursor: not-allowed;
+        }
+
+        .calendar-day.today {
+            border: 2px solid var(--color-primary);
+            font-weight: 600;
         }
 
         .calendar-day.empty {
@@ -816,37 +863,31 @@ def reserve_page(req: Request, user: dict = None):
                 box-shadow: none;
             }
 
-            /* Mobile calendar - compact square cells */
-            .mobile-months-container {
-                gap: 16px;
+            /* Mobile calendar - compact cells for weeks view */
+            .weeks-calendar {
+                padding: 12px;
             }
 
-            .mobile-months-container .calendar-grid {
-                gap: 2px;
+            .weeks-calendar-header {
+                grid-template-columns: 35px repeat(7, 1fr);
             }
 
-            .mobile-months-container .calendar-day {
-                aspect-ratio: 1;
-                padding: 0;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 13px;
-                border-radius: 6px;
+            .weeks-calendar-header span {
+                font-size: 10px;
+                padding: 6px 2px;
             }
 
-            .mobile-months-container .calendar-day-header {
-                padding: 6px 4px;
-                font-size: 11px;
+            .week-row {
+                grid-template-columns: 35px repeat(7, 1fr);
             }
 
-            .mobile-months-container .calendar-header {
-                padding: 8px 0;
-                margin-bottom: 4px;
+            .week-row .month-label {
+                font-size: 10px;
             }
 
-            .mobile-months-container .calendar-month-year {
-                font-size: 14px;
+            .week-row .calendar-day {
+                font-size: 12px;
+                padding: 6px 2px;
             }
 
         }
@@ -2167,7 +2208,7 @@ def reserve_page(req: Request, user: dict = None):
             return statHolidays.includes(dateStr);
         }}
 
-        // Generate calendar months
+        // Generate week-based calendar (8 weeks from current week)
         function generateCalendarMonths() {{
             const container = document.getElementById('mobile-months');
             const desktopContainer = document.getElementById('desktop-calendar');
@@ -2176,220 +2217,117 @@ def reserve_page(req: Request, user: dict = None):
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
-            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-                               'July', 'August', 'September', 'October', 'November', 'December'];
             const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-            // Mobile: Generate 3 months (current + 2)
+            // Both mobile and desktop use the same week-based calendar
             if (container) {{
-                container.innerHTML = '';
-                for (let m = 0; m < 3; m++) {{
-                    const monthDate = new Date(today.getFullYear(), today.getMonth() + m, 1);
-                    container.appendChild(createMonthElement(monthDate, today, monthNames, dayNames));
-                }}
+                renderWeeksCalendar(container, today, dayNames);
             }}
 
-            // Desktop: Generate single month with navigation
             if (desktopContainer) {{
-                renderDesktopCalendar(today, monthNames, dayNames);
+                renderWeeksCalendar(desktopContainer, today, dayNames);
             }}
         }}
 
-        function createMonthElement(monthDate, today, monthNames, dayNames) {{
-            const monthDiv = document.createElement('div');
-            monthDiv.className = 'calendar-month';
-
-            // Header
-            const header = document.createElement('div');
-            header.className = 'calendar-header';
-            const monthYear = document.createElement('span');
-            monthYear.className = 'calendar-month-year';
-            monthYear.textContent = monthNames[monthDate.getMonth()] + ' ' + monthDate.getFullYear();
-            header.appendChild(monthYear);
-            monthDiv.appendChild(header);
-
-            // Day headers
-            const grid = document.createElement('div');
-            grid.className = 'calendar-grid';
-
-            dayNames.forEach(day => {{
-                const dayHeader = document.createElement('div');
-                dayHeader.className = 'calendar-day-header';
-                dayHeader.textContent = day;
-                grid.appendChild(dayHeader);
-            }});
-
-            // Calculate days
-            const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-            const lastDay = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-            const startingDay = firstDay.getDay();
-
-            // Empty cells before first day
-            for (let i = 0; i < startingDay; i++) {{
-                const emptyCell = document.createElement('div');
-                emptyCell.className = 'calendar-day empty';
-                grid.appendChild(emptyCell);
-            }}
-
-            // Days of month
-            for (let day = 1; day <= lastDay.getDate(); day++) {{
-                const dayCell = document.createElement('div');
-                dayCell.className = 'calendar-day';
-                dayCell.textContent = day;
-
-                const cellDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
-
-                // Disable past dates, today, weekends (Sat=6, Sun=0), and stat holidays
-                const dayOfWeek = cellDate.getDay();
-                if (cellDate <= today || dayOfWeek === 0 || dayOfWeek === 6 || isStatHoliday(cellDate)) {{
-                    dayCell.classList.add('disabled');
-                }} else {{
-                    dayCell.onclick = () => selectDate(cellDate);
-                }}
-
-                // Highlight selected date or week
-                if (selectedDateType === 'week' && selectedWeekStart && selectedWeekEnd) {{
-                    // Check if this date is within the selected week
-                    const cellTime = cellDate.getTime();
-                    const startTime = new Date(selectedWeekStart.getFullYear(), selectedWeekStart.getMonth(), selectedWeekStart.getDate()).getTime();
-                    const endTime = new Date(selectedWeekEnd.getFullYear(), selectedWeekEnd.getMonth(), selectedWeekEnd.getDate()).getTime();
-                    if (cellTime >= startTime && cellTime <= endTime) {{
-                        dayCell.classList.add('selected');
-                    }}
-                }} else if (selectedDate &&
-                    cellDate.getDate() === selectedDate.getDate() &&
-                    cellDate.getMonth() === selectedDate.getMonth() &&
-                    cellDate.getFullYear() === selectedDate.getFullYear()) {{
-                    dayCell.classList.add('selected');
-                }}
-
-                grid.appendChild(dayCell);
-            }}
-
-            monthDiv.appendChild(grid);
-            return monthDiv;
-        }}
-
-        function renderDesktopCalendar(today, monthNames, dayNames) {{
-            const container = document.getElementById('desktop-calendar');
-            if (!container) return;
-
+        // Render 8 weeks starting from current week
+        function renderWeeksCalendar(container, today, dayNames) {{
             container.innerHTML = '';
 
-            // Navigation header
-            const navHeader = document.createElement('div');
-            navHeader.className = 'calendar-header';
-            navHeader.style.justifyContent = 'space-between';
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                               'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-            const prevBtn = document.createElement('button');
-            prevBtn.className = 'calendar-nav-btn';
-            prevBtn.innerHTML = '&larr;';
-            prevBtn.onclick = () => navigateMonth(-1);
+            // Create weeks calendar container
+            const weeksCalendar = document.createElement('div');
+            weeksCalendar.className = 'weeks-calendar';
 
-            const monthYear = document.createElement('span');
-            monthYear.className = 'calendar-month-year';
-            monthYear.textContent = monthNames[currentDisplayMonth.getMonth()] + ' ' + currentDisplayMonth.getFullYear();
-
-            const nextBtn = document.createElement('button');
-            nextBtn.className = 'calendar-nav-btn';
-            nextBtn.innerHTML = '&rarr;';
-            nextBtn.onclick = () => navigateMonth(1);
-
-            // Disable prev if current month
-            const currentMonth = new Date();
-            currentMonth.setDate(1);
-            currentMonth.setHours(0, 0, 0, 0);
-            const displayFirst = new Date(currentDisplayMonth.getFullYear(), currentDisplayMonth.getMonth(), 1);
-            if (displayFirst <= currentMonth) {{
-                prevBtn.disabled = true;
-                prevBtn.style.opacity = '0.3';
-            }}
-
-            // Disable next if 2 months ahead
-            const maxMonth = new Date(today.getFullYear(), today.getMonth() + 2, 1);
-            if (displayFirst >= maxMonth) {{
-                nextBtn.disabled = true;
-                nextBtn.style.opacity = '0.3';
-            }}
-
-            navHeader.appendChild(prevBtn);
-            navHeader.appendChild(monthYear);
-            navHeader.appendChild(nextBtn);
-            container.appendChild(navHeader);
-
-            // Calendar grid
-            const grid = document.createElement('div');
-            grid.className = 'calendar-grid';
-
+            // Day headers (with empty first column for month labels)
+            const header = document.createElement('div');
+            header.className = 'weeks-calendar-header';
+            const emptyHeader = document.createElement('span');
+            emptyHeader.className = 'month-label-header';
+            header.appendChild(emptyHeader);
             dayNames.forEach(day => {{
-                const dayHeader = document.createElement('div');
-                dayHeader.className = 'calendar-day-header';
-                dayHeader.textContent = day;
-                grid.appendChild(dayHeader);
+                const span = document.createElement('span');
+                span.textContent = day;
+                header.appendChild(span);
             }});
+            weeksCalendar.appendChild(header);
 
-            const firstDay = new Date(currentDisplayMonth.getFullYear(), currentDisplayMonth.getMonth(), 1);
-            const lastDay = new Date(currentDisplayMonth.getFullYear(), currentDisplayMonth.getMonth() + 1, 0);
-            const startingDay = firstDay.getDay();
+            // Get the start of current week (Sunday)
+            const currentWeekStart = new Date(today);
+            currentWeekStart.setDate(today.getDate() - today.getDay());
 
-            for (let i = 0; i < startingDay; i++) {{
-                const emptyCell = document.createElement('div');
-                emptyCell.className = 'calendar-day empty';
-                grid.appendChild(emptyCell);
-            }}
+            // Body with 8 weeks
+            const body = document.createElement('div');
+            body.className = 'weeks-calendar-body';
 
-            for (let day = 1; day <= lastDay.getDate(); day++) {{
-                const dayCell = document.createElement('div');
-                dayCell.className = 'calendar-day';
-                dayCell.textContent = day;
+            let lastMonth = -1;
 
-                const cellDate = new Date(currentDisplayMonth.getFullYear(), currentDisplayMonth.getMonth(), day);
+            for (let week = 0; week < 8; week++) {{
+                const weekRow = document.createElement('div');
+                weekRow.className = 'week-row';
 
-                // Disable past dates, today, weekends (Sat=6, Sun=0), and stat holidays
-                const dayOfWeek = cellDate.getDay();
-                if (cellDate <= today || dayOfWeek === 0 || dayOfWeek === 6 || isStatHoliday(cellDate)) {{
-                    dayCell.classList.add('disabled');
-                }} else {{
-                    dayCell.onclick = () => selectDate(cellDate);
+                // Calculate the Monday of this week to determine month label
+                const mondayOfWeek = new Date(currentWeekStart);
+                mondayOfWeek.setDate(currentWeekStart.getDate() + (week * 7) + 1);
+                const weekMonth = mondayOfWeek.getMonth();
+
+                // Month label cell
+                const monthLabel = document.createElement('div');
+                monthLabel.className = 'month-label';
+                if (weekMonth !== lastMonth) {{
+                    monthLabel.textContent = monthNames[weekMonth];
+                    lastMonth = weekMonth;
                 }}
+                weekRow.appendChild(monthLabel);
 
-                // Highlight selected date or week
-                if (selectedDateType === 'week' && selectedWeekStart && selectedWeekEnd) {{
-                    // Check if this date is within the selected week
-                    const cellTime = cellDate.getTime();
-                    const startTime = new Date(selectedWeekStart.getFullYear(), selectedWeekStart.getMonth(), selectedWeekStart.getDate()).getTime();
-                    const endTime = new Date(selectedWeekEnd.getFullYear(), selectedWeekEnd.getMonth(), selectedWeekEnd.getDate()).getTime();
-                    if (cellTime >= startTime && cellTime <= endTime) {{
+                for (let day = 0; day < 7; day++) {{
+                    const cellDate = new Date(currentWeekStart);
+                    cellDate.setDate(currentWeekStart.getDate() + (week * 7) + day);
+
+                    const dayCell = document.createElement('div');
+                    dayCell.className = 'calendar-day';
+                    dayCell.textContent = cellDate.getDate();
+
+                    // Check if this is today
+                    const isToday = cellDate.getDate() === today.getDate() &&
+                                   cellDate.getMonth() === today.getMonth() &&
+                                   cellDate.getFullYear() === today.getFullYear();
+                    if (isToday) {{
+                        dayCell.classList.add('today');
+                    }}
+
+                    // Disable past dates, today, weekends (Sat=6, Sun=0), and stat holidays
+                    const dayOfWeek = cellDate.getDay();
+                    if (cellDate <= today || dayOfWeek === 0 || dayOfWeek === 6 || isStatHoliday(cellDate)) {{
+                        dayCell.classList.add('disabled');
+                    }} else {{
+                        dayCell.onclick = () => selectDate(cellDate);
+                    }}
+
+                    // Highlight selected date or week
+                    if (selectedDateType === 'week' && selectedWeekStart && selectedWeekEnd) {{
+                        const cellTime = cellDate.getTime();
+                        const startTime = new Date(selectedWeekStart.getFullYear(), selectedWeekStart.getMonth(), selectedWeekStart.getDate()).getTime();
+                        const endTime = new Date(selectedWeekEnd.getFullYear(), selectedWeekEnd.getMonth(), selectedWeekEnd.getDate()).getTime();
+                        if (cellTime >= startTime && cellTime <= endTime) {{
+                            dayCell.classList.add('selected');
+                        }}
+                    }} else if (selectedDate &&
+                        cellDate.getDate() === selectedDate.getDate() &&
+                        cellDate.getMonth() === selectedDate.getMonth() &&
+                        cellDate.getFullYear() === selectedDate.getFullYear()) {{
                         dayCell.classList.add('selected');
                     }}
-                }} else if (selectedDate &&
-                    cellDate.getDate() === selectedDate.getDate() &&
-                    cellDate.getMonth() === selectedDate.getMonth() &&
-                    cellDate.getFullYear() === selectedDate.getFullYear()) {{
-                    dayCell.classList.add('selected');
+
+                    weekRow.appendChild(dayCell);
                 }}
 
-                grid.appendChild(dayCell);
+                body.appendChild(weekRow);
             }}
 
-            container.appendChild(grid);
-        }}
-
-        function navigateMonth(direction) {{
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            const newMonth = new Date(currentDisplayMonth.getFullYear(), currentDisplayMonth.getMonth() + direction, 1);
-            const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-            const maxMonth = new Date(today.getFullYear(), today.getMonth() + 2, 1);
-
-            if (newMonth >= currentMonth && newMonth <= maxMonth) {{
-                currentDisplayMonth = newMonth;
-                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-                                   'July', 'August', 'September', 'October', 'November', 'December'];
-                const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                renderDesktopCalendar(today, monthNames, dayNames);
-            }}
+            weeksCalendar.appendChild(body);
+            container.appendChild(weeksCalendar);
         }}
 
         // Date type selection function
