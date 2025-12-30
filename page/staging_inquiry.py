@@ -2824,6 +2824,66 @@ def get_property_selector_styles():
         .photos-modal .modal-header {
             border-bottom: none;
         }
+
+        /* Full-screen photo modal on mobile */
+        .photos-modal {
+            top: 0;
+            bottom: 0;
+            padding: 0;
+            z-index: 10000;
+            background: var(--bg-primary);
+        }
+
+        .photos-modal .modal-content {
+            max-width: 100%;
+            height: 100%;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        .photos-modal .modal-header {
+            padding: 15px;
+            background: var(--bg-primary);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .photos-modal .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 15px 15px 15px;
+        }
+
+        /* Full-screen items modal on mobile */
+        .items-modal {
+            top: 0;
+            bottom: 0;
+            padding: 0;
+            z-index: 10000;
+            background: var(--bg-primary);
+        }
+
+        .items-modal .modal-content {
+            max-width: 100%;
+            height: 100%;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        .items-modal .modal-header {
+            padding: 15px;
+            background: var(--bg-primary);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .items-modal .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 15px 15px 15px;
+        }
     }
 
     .camera-preview-container {
