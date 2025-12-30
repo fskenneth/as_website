@@ -694,7 +694,7 @@ def items_modal():
 
 
 def photos_modal():
-    """Modal for photos - same structure as items modal"""
+    """Modal for photos - camera capture and file upload"""
     return Div(
         Div(
             # Modal Header
@@ -703,18 +703,44 @@ def photos_modal():
                 Button("✕", cls="modal-close-btn", onclick="closePhotosModal()"),
                 cls="modal-header"
             ),
-            # Modal Body - blank for now
+            # Modal Body - camera and upload
             Div(
+                # Camera section (mobile only)
+                Div(
+                    Div(
+                        Video(id="camera-preview", autoplay=True, playsinline=True, cls="camera-preview"),
+                        Canvas(id="camera-canvas", cls="camera-canvas hidden"),
+                        cls="camera-preview-container"
+                    ),
+                    Div(
+                        Button("Take Photo", cls="camera-capture-btn", id="camera-capture-btn", onclick="capturePhoto()"),
+                        Button("Upload Photos", cls="camera-switch-btn", id="camera-upload-btn", onclick="document.getElementById('photo-upload-input').click()"),
+                        cls="camera-controls"
+                    ),
+                    id="camera-section",
+                    cls="camera-section"
+                ),
+                # Hidden file input for photo upload
+                Input(type="file", id="photo-upload-input", accept="image/*", multiple=True, onchange="handlePhotoUpload(event)", style="display:none"),
+                # Upload section (desktop only - hidden on mobile since camera section has upload button)
+                Div(
+                    Button("Upload Photos", cls="photo-upload-btn", onclick="document.getElementById('photo-upload-input').click()"),
+                    cls="upload-section"
+                ),
+                # Photos preview grid
+                Div(
+                    id="photos-preview-grid",
+                    cls="photos-preview-grid"
+                ),
                 cls="modal-body photos-content"
             ),
             # Modal Footer
             Div(
                 Div(
-                    Button("Reset", cls="modal-reset-btn", onclick="resetPhotos()"),
-                    Button("Clear", cls="modal-clear-btn", onclick="clearPhotos()"),
+                    Button("Clear All", cls="modal-clear-btn", onclick="clearPhotos()"),
                     cls="modal-footer-left"
                 ),
-                Button("Apply", cls="modal-apply-btn", onclick="applyPhotos()"),
+                Button("Done", cls="modal-apply-btn", onclick="applyPhotos()"),
                 cls="modal-footer"
             ),
             cls="modal-content"
@@ -1821,6 +1847,8 @@ def property_type_selector():
             }
 
             let currentPhotosArea = null;
+            let cameraStream = null;
+            let areaPhotos = {}; // Store photos per area
 
             function openPhotosModal(event, element) {
                 event.stopPropagation();
@@ -1857,27 +1885,140 @@ def property_type_selector():
                 document.getElementById('photos-modal-title').textContent = areaName + ' Photos';
                 document.getElementById('photos-modal').classList.remove('hidden');
                 document.body.style.overflow = 'hidden';
+
+                // Initialize photos array for this area if not exists
+                if (!areaPhotos[area]) {
+                    areaPhotos[area] = [];
+                }
+
+                // Render existing photos
+                renderPhotosGrid();
+
+                // Start camera on mobile
+                if (window.innerWidth <= 767) {
+                    startCamera();
+                }
             }
 
             function closePhotosModal() {
+                stopCamera();
                 document.getElementById('photos-modal').classList.add('hidden');
                 document.body.style.overflow = '';
                 currentPhotosArea = null;
             }
 
-            function resetPhotos() {
-                // Placeholder - to be implemented
-                console.log('Reset photos for:', currentPhotosArea);
+            async function startCamera() {
+                try {
+                    const constraints = {
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        }
+                    };
+                    cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    const video = document.getElementById('camera-preview');
+                    video.srcObject = cameraStream;
+                } catch (err) {
+                    console.error('Camera error:', err);
+                    // Hide camera section if camera not available
+                    document.getElementById('camera-section').style.display = 'none';
+                }
+            }
+
+            function stopCamera() {
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(track => track.stop());
+                    cameraStream = null;
+                }
+            }
+
+
+            function capturePhoto() {
+                buttonFeedback();
+                const video = document.getElementById('camera-preview');
+                const canvas = document.getElementById('camera-canvas');
+                const ctx = canvas.getContext('2d');
+
+                // Set canvas size to video size
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                // Draw video frame to canvas
+                ctx.drawImage(video, 0, 0);
+
+                // Get image data as base64
+                const imageData = canvas.toDataURL('image/jpeg', 0.8);
+
+                // Add to area photos
+                if (!areaPhotos[currentPhotosArea]) {
+                    areaPhotos[currentPhotosArea] = [];
+                }
+                areaPhotos[currentPhotosArea].push(imageData);
+
+                // Render updated grid
+                renderPhotosGrid();
+            }
+
+            function handlePhotoUpload(event) {
+                const files = event.target.files;
+                if (!files || files.length === 0) return;
+
+                // Initialize photos array for this area if not exists
+                if (!areaPhotos[currentPhotosArea]) {
+                    areaPhotos[currentPhotosArea] = [];
+                }
+
+                Array.from(files).forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        areaPhotos[currentPhotosArea].push(e.target.result);
+                        renderPhotosGrid();
+                    };
+                    reader.readAsDataURL(file);
+                });
+
+                // Reset input so same file can be selected again
+                event.target.value = '';
+            }
+
+            function renderPhotosGrid() {
+                const grid = document.getElementById('photos-preview-grid');
+                const photos = areaPhotos[currentPhotosArea] || [];
+
+                if (photos.length === 0) {
+                    grid.innerHTML = `<p style="color: var(--color-secondary); text-align: center; grid-column: 1/-1; padding: 20px;">Take or upload photos from 4 different directions of the ${currentPhotosArea.toLowerCase()}</p>`;
+                    return;
+                }
+
+                grid.innerHTML = photos.map((photo, index) => `
+                    <div class="photo-preview-item">
+                        <img src="${photo}" alt="Photo ${index + 1}">
+                        <button class="photo-remove-btn" onclick="removePhoto(${index})">✕</button>
+                    </div>
+                `).join('');
+            }
+
+            function removePhoto(index) {
+                buttonFeedback();
+                if (areaPhotos[currentPhotosArea]) {
+                    areaPhotos[currentPhotosArea].splice(index, 1);
+                    renderPhotosGrid();
+                }
             }
 
             function clearPhotos() {
-                // Placeholder - to be implemented
-                console.log('Clear photos for:', currentPhotosArea);
+                buttonFeedback();
+                if (currentPhotosArea && areaPhotos[currentPhotosArea]) {
+                    areaPhotos[currentPhotosArea] = [];
+                    renderPhotosGrid();
+                }
             }
 
             function applyPhotos() {
-                // Placeholder - to be implemented
-                console.log('Apply photos for:', currentPhotosArea);
+                buttonFeedback();
+                // Photos are already saved in areaPhotos
+                console.log('Photos saved for:', currentPhotosArea, areaPhotos[currentPhotosArea]?.length || 0, 'photos');
                 closePhotosModal();
             }
 
@@ -2575,6 +2716,164 @@ def get_property_selector_styles():
 
     .photos-content {
         min-height: 200px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    /* Camera Section - hidden on desktop */
+    .camera-section {
+        display: none;
+    }
+
+    @media (max-width: 767px) {
+        .camera-section {
+            display: block;
+        }
+        .upload-section {
+            display: none !important;
+        }
+        .photos-modal .modal-header {
+            border-bottom: none;
+        }
+    }
+
+    .camera-preview-container {
+        width: calc(100% + 30px);
+        margin-left: -15px;
+        margin-right: -15px;
+        aspect-ratio: 4/3;
+        background: #000;
+        border-radius: 0;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .camera-preview {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .camera-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    .camera-canvas.hidden {
+        display: none;
+    }
+
+    .camera-controls {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-top: 12px;
+    }
+
+    .camera-capture-btn {
+        padding: 12px 24px;
+        background: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .camera-capture-btn:hover {
+        background: #45a049;
+    }
+
+    .camera-switch-btn {
+        padding: 12px 16px;
+        background: var(--bg-secondary);
+        color: var(--color-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .camera-switch-btn:hover {
+        border-color: var(--border-hover);
+    }
+
+    /* Upload Section */
+    .upload-section {
+        display: flex;
+        justify-content: center;
+        padding: 12px 0;
+    }
+
+    .photo-upload-btn {
+        padding: 12px 24px;
+        background: var(--bg-secondary);
+        color: var(--color-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .photo-upload-btn:hover {
+        border-color: #4CAF50;
+        background: rgba(76, 175, 80, 0.1);
+    }
+
+    /* Photos Preview Grid */
+    .photos-preview-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        padding: 8px 0;
+    }
+
+    .photo-preview-item {
+        position: relative;
+        aspect-ratio: 1;
+        border-radius: 8px;
+        overflow: hidden;
+        background: var(--bg-secondary);
+    }
+
+    .photo-preview-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .photo-remove-btn {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 24px;
+        height: 24px;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        font-size: 14px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+
+    .photo-remove-btn:hover {
+        background: rgba(220, 38, 38, 0.8);
     }
 
     .modal-content {
@@ -2657,25 +2956,23 @@ def get_property_selector_styles():
     .item-btn {
         aspect-ratio: 2 / 3;
         background: var(--bg-secondary);
-        border: 2px solid var(--border-color);
+        border: 2px solid transparent;
         border-radius: 12px;
         cursor: pointer;
         transition: all 0.2s ease;
         overflow: visible;
-    }
-
-    .item-btn:hover {
-        border-color: var(--border-hover);
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
     }
 
     .item-btn.selected {
         border-color: var(--color-primary);
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
     }
 
     [data-theme="dark"] .item-btn.selected {
         border-color: #fff;
-        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
     }
 
     .item-btn-content {

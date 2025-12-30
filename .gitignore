@@ -49,3 +49,4 @@ logs/
 
 # User database
 data/
+users.db
