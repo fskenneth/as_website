@@ -710,6 +710,14 @@ def photos_modal():
                     Div(
                         Video(id="camera-preview", autoplay=True, playsinline=True, cls="camera-preview"),
                         Canvas(id="camera-canvas", cls="camera-canvas hidden"),
+                        # Zoom slider overlay
+                        Div(
+                            Span("0.5x", cls="zoom-label zoom-min"),
+                            Input(type="range", id="camera-zoom-slider", min="0.5", max="4", step="0.1", value="0.5", oninput="handleZoom(this.value)"),
+                            Span("4x", cls="zoom-label zoom-max"),
+                            cls="zoom-controls",
+                            id="zoom-controls"
+                        ),
                         cls="camera-preview-container"
                     ),
                     Div(
@@ -1848,6 +1856,7 @@ def property_type_selector():
 
             let currentPhotosArea = null;
             let cameraStream = null;
+            let zoomCapabilities = null;
             let areaPhotos = {}; // Store photos per area
 
             function openPhotosModal(event, element) {
@@ -1909,20 +1918,68 @@ def property_type_selector():
 
             async function startCamera() {
                 try {
+                    // Use back camera
                     const constraints = {
                         video: {
                             facingMode: 'environment',
-                            width: { ideal: 1280 },
-                            height: { ideal: 720 }
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 }
                         }
                     };
+
                     cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
                     const video = document.getElementById('camera-preview');
                     video.srcObject = cameraStream;
+
+                    // Set up zoom capabilities
+                    const track = cameraStream.getVideoTracks()[0];
+                    const capabilities = track.getCapabilities();
+                    const zoomSlider = document.getElementById('camera-zoom-slider');
+                    const zoomControls = document.getElementById('zoom-controls');
+
+                    if (capabilities.zoom) {
+                        zoomCapabilities = capabilities.zoom;
+
+                        // Set zoom range from device min to 2x max
+                        // If device supports wide-angle (min < 1), it will show e.g. 0.5x to 2x
+                        // Otherwise it will show 1x to 2x
+                        const minZoom = zoomCapabilities.min;
+                        const maxZoom = Math.min(zoomCapabilities.max, 2);
+
+                        zoomSlider.min = minZoom;
+                        zoomSlider.max = maxZoom;
+                        zoomSlider.step = zoomCapabilities.step || 0.1;
+                        zoomSlider.value = minZoom; // Start at minimum (widest)
+
+                        // Update zoom labels
+                        document.querySelector('.zoom-min').textContent = minZoom + 'x';
+                        document.querySelector('.zoom-max').textContent = maxZoom + 'x';
+
+                        // Apply initial zoom (widest)
+                        await track.applyConstraints({ advanced: [{ zoom: minZoom }] });
+                        currentZoom = minZoom;
+                        zoomControls.style.display = 'flex';
+                    } else {
+                        // Hide zoom controls if not supported
+                        zoomControls.style.display = 'none';
+                    }
                 } catch (err) {
                     console.error('Camera error:', err);
                     // Hide camera section if camera not available
                     document.getElementById('camera-section').style.display = 'none';
+                }
+            }
+
+            async function handleZoom(value) {
+                if (!cameraStream || !zoomCapabilities) return;
+
+                const track = cameraStream.getVideoTracks()[0];
+                const zoomValue = parseFloat(value);
+
+                try {
+                    await track.applyConstraints({ advanced: [{ zoom: zoomValue }] });
+                } catch (err) {
+                    console.error('Zoom error:', err);
                 }
             }
 
@@ -2765,6 +2822,59 @@ def get_property_selector_styles():
 
     .camera-canvas.hidden {
         display: none;
+    }
+
+    .zoom-controls {
+        position: absolute;
+        bottom: 15px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(0, 0, 0, 0.5);
+        padding: 8px 15px;
+        border-radius: 20px;
+        backdrop-filter: blur(5px);
+    }
+
+    .zoom-label {
+        color: white;
+        font-size: 12px;
+        font-weight: 500;
+        min-width: 30px;
+        text-align: center;
+    }
+
+    #camera-zoom-slider {
+        width: 120px;
+        height: 4px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 2px;
+        outline: none;
+    }
+
+    #camera-zoom-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        background: white;
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    #camera-zoom-slider::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        background: white;
+        border-radius: 50%;
+        cursor: pointer;
+        border: none;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
     }
 
     .camera-controls {
