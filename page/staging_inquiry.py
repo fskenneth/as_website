@@ -3401,10 +3401,12 @@ def get_property_selector_styles():
             border-radius: 0;
             border: none;
             box-shadow: none;
+            background: transparent;
+            position: relative;
         }
 
         .items-modal .modal-content {
-            position: relative;
+            overflow-y: auto;
         }
 
         .items-modal .modal-header {
@@ -3428,9 +3430,10 @@ def get_property_selector_styles():
         }
 
         .items-modal .modal-body {
-            flex: 1;
-            overflow-y: auto;
+            flex: none;
             padding: 0;
+            background: var(--bg-primary);
+            overflow: visible;
         }
 
         .items-modal .items-grid {
@@ -3447,6 +3450,7 @@ def get_property_selector_styles():
             border-top: none;
             padding: 12px 15px;
             z-index: 10;
+            align-items: center;
         }
 
         .items-modal .modal-apply-btn {
