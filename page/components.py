@@ -1363,6 +1363,13 @@ def get_shared_styles():
             width: 25px;
             height: 25px;
         }
+        .whatsapp-button,
+        .whatsapp-button:focus,
+        .whatsapp-button:active {
+            outline: none !important;
+            box-shadow: 0 6px 25px rgba(37, 211, 102, 0.3) !important;
+            -webkit-tap-highlight-color: transparent;
+        }
         .floating-buttons-container {
             left: 10px;
             right: 65px;
@@ -2130,6 +2137,39 @@ def get_shared_scripts():
         }
     };
 
+    // Global click sound using Web Audio API
+    let globalAudioContext = null;
+    function playClickSound() {
+        try {
+            if (!globalAudioContext) {
+                globalAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            const oscillator = globalAudioContext.createOscillator();
+            const gainNode = globalAudioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(globalAudioContext.destination);
+            oscillator.frequency.value = 3500;
+            oscillator.type = 'square';
+            gainNode.gain.setValueAtTime(0.08, globalAudioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, globalAudioContext.currentTime + 0.02);
+            oscillator.start(globalAudioContext.currentTime);
+            oscillator.stop(globalAudioContext.currentTime + 0.02);
+        } catch (e) {}
+    }
+
+    // Global haptic feedback
+    function hapticFeedback() {
+        if (navigator.vibrate) {
+            navigator.vibrate(10);
+        }
+    }
+
+    // Global button feedback (sound + haptic)
+    function globalButtonFeedback() {
+        hapticFeedback();
+        playClickSound();
+    }
+
     // Initialize on DOM load
     document.addEventListener('DOMContentLoaded', function() {
         // Initialize theme
@@ -2302,6 +2342,7 @@ def whatsapp_button():
         href="https://api.whatsapp.com/send?phone=16475585677",
         target="_blank",
         cls="whatsapp-button",
+        onclick="globalButtonFeedback()",
         **{"aria-label": "Contact us on WhatsApp"}
     )
 

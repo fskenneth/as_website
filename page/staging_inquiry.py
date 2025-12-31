@@ -1478,6 +1478,7 @@ def property_type_selector():
 
             // Navigate to reserve page (data is passed via session storage)
             function goToReserve() {
+                buttonFeedback();
                 // Save current selections to session storage before navigating
                 saveStagingSession();
                 // Redirect to reserve page without URL parameters
@@ -2712,6 +2713,7 @@ def property_type_selector():
 
             // Inquiry Modal Functions
             function openInquiryModal() {
+                buttonFeedback();
                 const { propertyType, propertySize } = getSelections();
 
                 // Populate hidden fields with current staging data
@@ -2738,10 +2740,12 @@ def property_type_selector():
 
                 // Show modal
                 document.getElementById('inquiry-modal').classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
             }
 
             function closeInquiryModal() {
                 document.getElementById('inquiry-modal').classList.add('hidden');
+                document.body.style.overflow = '';
             }
 
             // Close inquiry modal on backdrop click
@@ -4344,6 +4348,59 @@ def get_property_selector_styles():
             font-size: 13px;
             padding: 6px 4px;
             border-radius: 6px;
+        }
+
+        /* Full-screen inquiry modal on mobile */
+        .inquiry-modal {
+            top: 0;
+            bottom: 0;
+            padding: 0;
+            z-index: 10000;
+            background: var(--bg-primary);
+        }
+
+        .inquiry-modal .modal-content,
+        .inquiry-modal .inquiry-modal-content {
+            max-width: 100%;
+            width: 100%;
+            height: 100%;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        .inquiry-modal .modal-header {
+            padding: 15px;
+            background: var(--bg-primary);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-bottom: none;
+        }
+
+        .inquiry-modal .modal-body,
+        .inquiry-modal .inquiry-form-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 15px 15px 15px;
+        }
+
+        .inquiry-modal .modal-footer {
+            padding: 15px;
+            background: var(--bg-primary);
+            position: sticky;
+            bottom: 0;
+        }
+
+        /* Disable focus/active blue highlight on mobile for action buttons */
+        .staging-inquiry-btn,
+        .staging-inquiry-btn:focus,
+        .staging-inquiry-btn:active,
+        .staging-continue-btn,
+        .staging-continue-btn:focus,
+        .staging-continue-btn:active {
+            outline: none !important;
+            box-shadow: none !important;
+            -webkit-tap-highlight-color: transparent;
         }
     }
     """
