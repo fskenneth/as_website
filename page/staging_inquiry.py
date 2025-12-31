@@ -3403,6 +3403,10 @@ def get_property_selector_styles():
             box-shadow: none;
         }
 
+        .items-modal .modal-content {
+            position: relative;
+        }
+
         .items-modal .modal-header {
             padding: 15px;
             position: sticky;
@@ -3412,15 +3416,15 @@ def get_property_selector_styles():
         }
 
         [data-theme="light"] .items-modal .modal-header {
-            background: rgba(255, 255, 255, 0.3);
-            backdrop-filter: blur(20px) saturate(150%);
-            -webkit-backdrop-filter: blur(20px) saturate(150%);
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(12px) saturate(120%);
+            -webkit-backdrop-filter: blur(12px) saturate(120%);
         }
 
         [data-theme="dark"] .items-modal .modal-header {
-            background: rgba(26, 26, 26, 0.3);
-            backdrop-filter: blur(20px) saturate(150%);
-            -webkit-backdrop-filter: blur(20px) saturate(150%);
+            background: rgba(26, 26, 26, 0.5);
+            backdrop-filter: blur(12px) saturate(120%);
+            -webkit-backdrop-filter: blur(12px) saturate(120%);
         }
 
         .items-modal .modal-body {
@@ -3431,12 +3435,18 @@ def get_property_selector_styles():
 
         .items-modal .items-grid {
             padding: 8px;
+            padding-bottom: 80px;
         }
 
         .items-modal .modal-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
             background: transparent;
             border-top: none;
             padding: 12px 15px;
+            z-index: 10;
         }
 
         .items-modal .modal-apply-btn {
