@@ -3320,20 +3320,106 @@ def get_property_selector_styles():
             border-radius: 0;
             border: none;
             box-shadow: none;
+            background: transparent;
+            position: relative;
+            overflow-y: auto;
         }
 
         .photos-modal .modal-header {
             padding: 15px;
-            background: var(--bg-primary);
             position: sticky;
             top: 0;
             z-index: 10;
+            border-bottom: none;
+        }
+
+        [data-theme="light"] .photos-modal .modal-header {
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(12px) saturate(120%);
+            -webkit-backdrop-filter: blur(12px) saturate(120%);
+        }
+
+        [data-theme="dark"] .photos-modal .modal-header {
+            background: rgba(26, 26, 26, 0.5);
+            backdrop-filter: blur(12px) saturate(120%);
+            -webkit-backdrop-filter: blur(12px) saturate(120%);
         }
 
         .photos-modal .modal-body {
-            flex: 1;
-            overflow-y: auto;
-            padding: 0 15px 15px 15px;
+            flex: none;
+            padding: 0 15px 80px 15px;
+            background: var(--bg-primary);
+            overflow: visible;
+        }
+
+        .photos-modal .modal-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: transparent;
+            border-top: none;
+            padding: 12px 15px;
+            z-index: 10;
+            align-items: center;
+        }
+
+        .photos-modal .modal-apply-btn {
+            padding: 0 28px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 700;
+            height: 45px;
+            border: none;
+            backdrop-filter: blur(20px) saturate(150%);
+            -webkit-backdrop-filter: blur(20px) saturate(150%);
+            transition: all 0.3s ease;
+        }
+
+        [data-theme="light"] .photos-modal .modal-apply-btn {
+            background: rgba(0, 0, 0, 0.06);
+            color: #000000;
+            border: 2px solid rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 8px 40px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        [data-theme="light"] .photos-modal .modal-apply-btn:active {
+            background: rgba(0, 0, 0, 0.15);
+            transform: scale(0.98);
+        }
+
+        [data-theme="dark"] .photos-modal .modal-apply-btn {
+            background: rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15), 0 8px 40px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        [data-theme="dark"] .photos-modal .modal-apply-btn:active {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0.98);
+        }
+
+        .photos-modal .modal-upload-btn {
+            padding: 0 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            height: 36px;
+            backdrop-filter: blur(20px) saturate(150%);
+            -webkit-backdrop-filter: blur(20px) saturate(150%);
+        }
+
+        [data-theme="light"] .photos-modal .modal-upload-btn {
+            background: rgba(0, 0, 0, 0.04) !important;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            color: rgba(0, 0, 0, 0.6);
+        }
+
+        [data-theme="dark"] .photos-modal .modal-upload-btn {
+            background: rgba(255, 255, 255, 0.08) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.6);
         }
 
         /* Disable focus/hover effects on mobile buttons */
