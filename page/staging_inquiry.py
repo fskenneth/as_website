@@ -710,42 +710,38 @@ def photos_modal():
                     Div(
                         Video(id="camera-preview", autoplay=True, playsinline=True, cls="camera-preview"),
                         Canvas(id="camera-canvas", cls="camera-canvas hidden"),
-                        # Zoom slider overlay
-                        Div(
-                            Span("0.5x", cls="zoom-label zoom-min"),
-                            Input(type="range", id="camera-zoom-slider", min="0.5", max="4", step="0.1", value="0.5", oninput="handleZoom(this.value)"),
-                            Span("4x", cls="zoom-label zoom-max"),
-                            cls="zoom-controls",
-                            id="zoom-controls"
+                        # Shutter button at bottom center
+                        Button(
+                            Div(cls="shutter-inner"),
+                            cls="shutter-btn",
+                            id="shutter-btn",
+                            onclick="capturePhoto()"
                         ),
                         cls="camera-preview-container"
-                    ),
-                    Div(
-                        Button("Take Photo", cls="camera-capture-btn", id="camera-capture-btn", onclick="capturePhoto()"),
-                        Button("Upload Photos", cls="camera-switch-btn", id="camera-upload-btn", onclick="document.getElementById('photo-upload-input').click()"),
-                        cls="camera-controls"
                     ),
                     id="camera-section",
                     cls="camera-section"
                 ),
                 # Hidden file input for photo upload
                 Input(type="file", id="photo-upload-input", accept="image/*", multiple=True, onchange="handlePhotoUpload(event)", style="display:none"),
-                # Upload section (desktop only - hidden on mobile since camera section has upload button)
+                # Photos carousel
                 Div(
-                    Button("Upload Photos", cls="photo-upload-btn", onclick="document.getElementById('photo-upload-input').click()"),
-                    cls="upload-section"
-                ),
-                # Photos preview grid
-                Div(
+                    Div(
+                        id="photos-carousel-container",
+                        cls="photos-carousel-container"
+                    ),
+                    Button("‹", cls="carousel-nav-btn carousel-prev", onclick="prevPhoto()", id="photos-prev-btn"),
+                    Button("›", cls="carousel-nav-btn carousel-next", onclick="nextPhoto()", id="photos-next-btn"),
+                    Div(id="photos-carousel-counter", cls="photos-carousel-counter"),
                     id="photos-preview-grid",
-                    cls="photos-preview-grid"
+                    cls="photos-carousel-wrapper"
                 ),
                 cls="modal-body photos-content"
             ),
             # Modal Footer
             Div(
                 Div(
-                    Button("Clear All", cls="modal-clear-btn", onclick="clearPhotos()"),
+                    Button("Upload Photos", cls="modal-upload-btn", onclick="document.getElementById('photo-upload-input').click()"),
                     cls="modal-footer-left"
                 ),
                 Button("Done", cls="modal-apply-btn", onclick="applyPhotos()"),
@@ -914,50 +910,50 @@ def property_type_selector():
             Div(
                 # Row 1: Living Room, Dining Room, Family Room
                 Div(
-                    Button(Span("Living Room", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="living-room", onclick="toggleArea(this)"),
-                    Button(Span("Dining Room", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="dining-room", onclick="toggleArea(this)"),
-                    Button(Span("Family Room", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="family-room", onclick="toggleArea(this)"),
+                    Button(Span("Living Room", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="living-room", onclick="toggleArea(this)"),
+                    Button(Span("Dining Room", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="dining-room", onclick="toggleArea(this)"),
+                    Button(Span("Family Room", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="family-room", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 2: Kitchen Only, Kitchen with Island, Breakfast Area
                 Div(
-                    Button(Span("Kitchen Only", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="kitchen-only", onclick="toggleArea(this)"),
-                    Button(Span("Kitchen Island", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="kitchen-island", onclick="toggleArea(this)"),
-                    Button(Span("Breakfast Area", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="breakfast-area", onclick="toggleArea(this)"),
+                    Button(Span("Kitchen Only", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="kitchen-only", onclick="toggleArea(this)"),
+                    Button(Span("Kitchen Island", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="kitchen-island", onclick="toggleArea(this)"),
+                    Button(Span("Breakfast Area", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="breakfast-area", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 3: Master Bedroom, 2nd Bedroom, 3rd Bedroom
                 Div(
-                    Button(Span("Master Bedroom", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="master-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("2nd Bedroom", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="2nd-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("3rd Bedroom", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="3rd-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("Master Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="master-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("2nd Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="2nd-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("3rd Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="3rd-bedroom", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 4: 4th Bedroom, 5th Bedroom, 6th Bedroom
                 Div(
-                    Button(Span("4th Bedroom", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="4th-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("5th Bedroom", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="5th-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("6th Bedroom", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="6th-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("4th Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="4th-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("5th Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="5th-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("6th Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="6th-bedroom", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 5: Office, Bathrooms, Outdoor
                 Div(
-                    Button(Span("Office", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="office", onclick="toggleArea(this)"),
-                    Button(Span("Bathrooms", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="bathrooms", onclick="toggleArea(this)"),
-                    Button(Span("Outdoor", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="outdoor", onclick="toggleArea(this)"),
+                    Button(Span("Office", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="office", onclick="toggleArea(this)"),
+                    Button(Span("Bathrooms", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="bathrooms", onclick="toggleArea(this)"),
+                    Button(Span("Outdoor", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="outdoor", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 6: Basement Living, Basement Dining, Basement Office
                 Div(
-                    Button(Span("Basement Living", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-living", onclick="toggleArea(this)"),
-                    Button(Span("Basement Dining", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-dining", onclick="toggleArea(this)"),
-                    Button(Span("Basement Office", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-office", onclick="toggleArea(this)"),
+                    Button(Span("Basement Living", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-living", onclick="toggleArea(this)"),
+                    Button(Span("Basement Dining", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-dining", onclick="toggleArea(this)"),
+                    Button(Span("Basement Office", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-office", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 7: Basement 1st Bedroom, Basement 2nd Bedroom
                 Div(
-                    Button(Span("Basement 1st Bed", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-1st-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("Basement 2nd Bed", cls="area-name"), Span("", cls="area-price"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn", onclick="openPhotosModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-2nd-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("Basement 1st Bed", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-1st-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("Basement 2nd Bed", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-2nd-bedroom", onclick="toggleArea(this)"),
                     Div(cls="property-btn-spacer"),
                     cls="property-selector"
                 ),
@@ -1019,6 +1015,91 @@ def property_type_selector():
                 playClickSound();
             }
 
+            function playShutterSound() {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const t = audioContext.currentTime;
+
+                // Whoosh (filtered noise sweep)
+                const bufferSize = audioContext.sampleRate * 0.1;
+                const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+                const data = buffer.getChannelData(0);
+
+                for (let i = 0; i < bufferSize; i++) {
+                    const envelope = Math.sin(Math.PI * i / bufferSize);
+                    data[i] = (Math.random() * 2 - 1) * envelope;
+                }
+
+                const noise = audioContext.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = audioContext.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(500, t);
+                filter.frequency.exponentialRampToValueAtTime(3000, t + 0.05);
+                filter.frequency.exponentialRampToValueAtTime(800, t + 0.1);
+                filter.Q.value = 2;
+
+                const gainNode = audioContext.createGain();
+                gainNode.gain.setValueAtTime(0.2, t);
+
+                noise.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                noise.start();
+
+                // Click at end
+                const osc = audioContext.createOscillator();
+                const clickGain = audioContext.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1000, t + 0.06);
+                osc.frequency.exponentialRampToValueAtTime(300, t + 0.08);
+                clickGain.gain.setValueAtTime(0.3, t + 0.06);
+                clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+                osc.connect(clickGain);
+                clickGain.connect(audioContext.destination);
+                osc.start(t + 0.06);
+                osc.stop(t + 0.09);
+
+                // Close AudioContext after sound finishes to prevent browser limit
+                setTimeout(() => audioContext.close(), 200);
+            }
+
+            function playDeleteSound() {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const t = audioContext.currentTime;
+
+                // Swoosh noise
+                const bufferSize = audioContext.sampleRate * 0.15;
+                const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+                const data = buffer.getChannelData(0);
+
+                for (let i = 0; i < bufferSize; i++) {
+                    const envelope = Math.sin(Math.PI * i / bufferSize);
+                    data[i] = (Math.random() * 2 - 1) * envelope;
+                }
+
+                const noise = audioContext.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = audioContext.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(2000, t);
+                filter.frequency.exponentialRampToValueAtTime(500, t + 0.15);
+                filter.Q.value = 1;
+
+                const gain = audioContext.createGain();
+                gain.gain.setValueAtTime(0.3, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioContext.destination);
+                noise.start();
+
+                // Close AudioContext after sound finishes to prevent browser limit
+                setTimeout(() => audioContext.close(), 250);
+            }
+
             // Pricing constants
             const BASE_STAGING_FEE = 1450.00;
             const HUGE_AREA = 700.00;
@@ -1031,8 +1112,14 @@ def property_type_selector():
             // Save staging data to session storage
             // Track current staging ID for updates
             let currentStagingId = null;
+            // Flag to prevent auto-save during initial restore
+            let isRestoring = true;
 
             function saveStagingSession() {
+                // Don't save to server during initial page restore
+                if (isRestoring) {
+                    return;
+                }
                 const { propertyType, propertySize } = getSelections();
 
                 // Get selected areas
@@ -1053,6 +1140,7 @@ def property_type_selector():
                     propertySize: propertySize || null,
                     selectedAreas: selectedAreas,
                     areaItemsData: typeof areaItemsData !== 'undefined' ? areaItemsData : {},
+                    areaPhotos: typeof areaPhotos !== 'undefined' ? areaPhotos : {},
                     totalFee: totalFee,
                     timestamp: Date.now()
                 };
@@ -1083,6 +1171,7 @@ def property_type_selector():
                         property_size: sessionData.propertySize || '',
                         selected_areas: JSON.stringify(sessionData.selectedAreas || []),
                         selected_items: JSON.stringify(sessionData.areaItemsData || {}),
+                        area_photos: JSON.stringify(sessionData.areaPhotos || {}),
                         total_fee: sessionData.totalFee || ''
                     };
 
@@ -1121,14 +1210,27 @@ def property_type_selector():
                         const staging = result.stagings[0];
                         currentStagingId = staging.id;
 
-                        // Restore data if no local session data exists
-                        const localData = sessionStorage.getItem(STAGING_SESSION_KEY);
-                        if (!localData) {
+                        // Parse server photos
+                        const serverPhotos = staging.area_photos ? JSON.parse(staging.area_photos) : {};
+
+                        // Check if local session data exists
+                        const localDataStr = sessionStorage.getItem(STAGING_SESSION_KEY);
+                        if (localDataStr) {
+                            // Merge server photos into local data (only if server has photos)
+                            const localData = JSON.parse(localDataStr);
+                            // Only update local photos if server has photos (don't overwrite with empty)
+                            if (Object.keys(serverPhotos).length > 0) {
+                                localData.areaPhotos = serverPhotos;
+                                sessionStorage.setItem(STAGING_SESSION_KEY, JSON.stringify(localData));
+                            }
+                        } else {
+                            // No local data - create from server
                             const serverSessionData = {
                                 propertyType: staging.property_type,
                                 propertySize: staging.property_size,
                                 selectedAreas: staging.selected_areas ? JSON.parse(staging.selected_areas) : [],
                                 areaItemsData: staging.selected_items ? JSON.parse(staging.selected_items) : {},
+                                areaPhotos: serverPhotos,
                                 totalFee: staging.total_fee,
                                 timestamp: Date.now()
                             };
@@ -1157,7 +1259,10 @@ def property_type_selector():
             // Restore selections from session data
             function restoreStagingSession() {
                 const data = loadStagingSession();
-                if (!data) return;
+                if (!data) {
+                    isRestoring = false;
+                    return;
+                }
 
                 // Restore property type
                 if (data.propertyType) {
@@ -1165,6 +1270,10 @@ def property_type_selector():
                     if (propertyBtn) {
                         selectPropertyType(propertyBtn, true); // true = skip save
                     }
+                } else {
+                    // No property type, mark restore complete
+                    isRestoring = false;
+                    return;
                 }
 
                 // Restore property size (after a slight delay to allow size selector to show)
@@ -1190,9 +1299,29 @@ def property_type_selector():
                                     Object.assign(areaItemsData, data.areaItemsData);
                                     calculateTotalFee();
                                 }
+
+                                // Restore photos
+                                if (data.areaPhotos && typeof areaPhotos !== 'undefined') {
+                                    Object.assign(areaPhotos, data.areaPhotos);
+                                    // Update carousels for each area with photos
+                                    Object.keys(data.areaPhotos).forEach(area => {
+                                        if (data.areaPhotos[area] && data.areaPhotos[area].length > 0) {
+                                            updateAreaCarousel(area);
+                                        }
+                                    });
+                                }
+
+                                // Mark restore as complete - allow saving now
+                                isRestoring = false;
                             }, 100);
+                        } else {
+                            // No areas to restore, mark complete
+                            isRestoring = false;
                         }
                     }, 100);
+                } else {
+                    // No size to restore, mark complete
+                    isRestoring = false;
                 }
             }
 
@@ -1856,7 +1985,6 @@ def property_type_selector():
 
             let currentPhotosArea = null;
             let cameraStream = null;
-            let zoomCapabilities = null;
             let areaPhotos = {}; // Store photos per area
 
             function openPhotosModal(event, element) {
@@ -1900,6 +2028,9 @@ def property_type_selector():
                     areaPhotos[area] = [];
                 }
 
+                // Reset carousel to first photo
+                currentPhotoIndex = 0;
+
                 // Render existing photos
                 renderPhotosGrid();
 
@@ -1909,11 +2040,71 @@ def property_type_selector():
                 }
             }
 
-            function closePhotosModal() {
+            async function closePhotosModal() {
                 stopCamera();
+                const area = currentPhotosArea;
+
+                // Upload photos same as Done button
+                if (area) {
+                    const photos = areaPhotos[area] || [];
+
+                    if (photos.length > 0) {
+                        // Separate new base64 photos from already-uploaded URLs
+                        const newPhotos = photos.filter(p => p.startsWith('data:'));
+                        const existingUrls = photos.filter(p => p.startsWith('/static/'));
+
+                        if (newPhotos.length > 0) {
+                            try {
+                                const response = await fetch('/api/staging-photos', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ area: area, photos: newPhotos })
+                                });
+
+                                const result = await response.json();
+
+                                if (result.success && result.urls) {
+                                    // Replace base64 with server URLs
+                                    areaPhotos[area] = [...existingUrls, ...result.urls];
+                                }
+                            } catch (error) {
+                                console.error('Upload error:', error);
+                            }
+                        }
+                    }
+
+                    updateAreaCarousel(area);
+                    saveStagingSession();
+                }
+
                 document.getElementById('photos-modal').classList.add('hidden');
                 document.body.style.overflow = '';
                 currentPhotosArea = null;
+                // Clean up orphaned photos
+                await cleanupOrphanedPhotos();
+            }
+
+            async function cleanupOrphanedPhotos() {
+                // Collect all valid photo URLs from all areas
+                const allValidUrls = [];
+                for (const area in areaPhotos) {
+                    const photos = areaPhotos[area] || [];
+                    photos.forEach(url => {
+                        if (url.startsWith('/static/')) {
+                            allValidUrls.push(url);
+                        }
+                    });
+                }
+
+                try {
+                    await fetch('/api/staging-photos/cleanup', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ valid_urls: allValidUrls })
+                    });
+                } catch (e) {
+                    console.warn('Cleanup error:', e);
+                }
             }
 
             async function startCamera() {
@@ -1931,55 +2122,19 @@ def property_type_selector():
                     const video = document.getElementById('camera-preview');
                     video.srcObject = cameraStream;
 
-                    // Set up zoom capabilities
+                    // Always set zoom to 1x if supported
                     const track = cameraStream.getVideoTracks()[0];
                     const capabilities = track.getCapabilities();
-                    const zoomSlider = document.getElementById('camera-zoom-slider');
-                    const zoomControls = document.getElementById('zoom-controls');
 
                     if (capabilities.zoom) {
-                        zoomCapabilities = capabilities.zoom;
-
-                        // Set zoom range from device min to 2x max
-                        // If device supports wide-angle (min < 1), it will show e.g. 0.5x to 2x
-                        // Otherwise it will show 1x to 2x
-                        const minZoom = zoomCapabilities.min;
-                        const maxZoom = Math.min(zoomCapabilities.max, 2);
-
-                        zoomSlider.min = minZoom;
-                        zoomSlider.max = maxZoom;
-                        zoomSlider.step = zoomCapabilities.step || 0.1;
-                        zoomSlider.value = minZoom; // Start at minimum (widest)
-
-                        // Update zoom labels
-                        document.querySelector('.zoom-min').textContent = minZoom + 'x';
-                        document.querySelector('.zoom-max').textContent = maxZoom + 'x';
-
-                        // Apply initial zoom (widest)
-                        await track.applyConstraints({ advanced: [{ zoom: minZoom }] });
-                        currentZoom = minZoom;
-                        zoomControls.style.display = 'flex';
-                    } else {
-                        // Hide zoom controls if not supported
-                        zoomControls.style.display = 'none';
+                        // Set zoom to 1x (or minimum if 1x not available)
+                        const targetZoom = Math.max(1, capabilities.zoom.min);
+                        await track.applyConstraints({ advanced: [{ zoom: targetZoom }] });
                     }
                 } catch (err) {
                     console.error('Camera error:', err);
                     // Hide camera section if camera not available
                     document.getElementById('camera-section').style.display = 'none';
-                }
-            }
-
-            async function handleZoom(value) {
-                if (!cameraStream || !zoomCapabilities) return;
-
-                const track = cameraStream.getVideoTracks()[0];
-                const zoomValue = parseFloat(value);
-
-                try {
-                    await track.applyConstraints({ advanced: [{ zoom: zoomValue }] });
-                } catch (err) {
-                    console.error('Zoom error:', err);
                 }
             }
 
@@ -1992,7 +2147,8 @@ def property_type_selector():
 
 
             function capturePhoto() {
-                buttonFeedback();
+                hapticFeedback();
+                playShutterSound();
                 const video = document.getElementById('camera-preview');
                 const canvas = document.getElementById('camera-canvas');
                 const ctx = canvas.getContext('2d');
@@ -2013,6 +2169,9 @@ def property_type_selector():
                 }
                 areaPhotos[currentPhotosArea].push(imageData);
 
+                // Jump to the last photo (the one just taken)
+                currentPhotoIndex = areaPhotos[currentPhotosArea].length - 1;
+
                 // Render updated grid
                 renderPhotosGrid();
             }
@@ -2030,6 +2189,8 @@ def property_type_selector():
                     const reader = new FileReader();
                     reader.onload = function(e) {
                         areaPhotos[currentPhotosArea].push(e.target.result);
+                        // Jump to the last photo (the one just uploaded)
+                        currentPhotoIndex = areaPhotos[currentPhotosArea].length - 1;
                         renderPhotosGrid();
                     };
                     reader.readAsDataURL(file);
@@ -2039,28 +2200,208 @@ def property_type_selector():
                 event.target.value = '';
             }
 
-            function renderPhotosGrid() {
-                const grid = document.getElementById('photos-preview-grid');
+            let currentPhotoIndex = 0;
+            let touchStartX = 0;
+            let touchEndX = 0;
+            let slideDirection = null;
+
+            function renderPhotosGrid(direction = null) {
+                const container = document.getElementById('photos-carousel-container');
+                const counter = document.getElementById('photos-carousel-counter');
+                const prevBtn = document.getElementById('photos-prev-btn');
+                const nextBtn = document.getElementById('photos-next-btn');
                 const photos = areaPhotos[currentPhotosArea] || [];
+                const isMobile = window.innerWidth <= 767;
 
                 if (photos.length === 0) {
-                    grid.innerHTML = `<p style="color: var(--color-secondary); text-align: center; grid-column: 1/-1; padding: 20px;">Take or upload photos from 4 different directions of the ${currentPhotosArea.toLowerCase()}</p>`;
+                    container.innerHTML = `<p style="color: var(--color-secondary); text-align: center; padding: 40px 20px;">Take or upload photos from 4 different directions of the ${currentPhotosArea.toLowerCase()}</p>`;
+                    counter.innerHTML = '';
+                    prevBtn.style.display = 'none';
+                    nextBtn.style.display = 'none';
+                    currentPhotoIndex = 0;
                     return;
                 }
 
-                grid.innerHTML = photos.map((photo, index) => `
-                    <div class="photo-preview-item">
-                        <img src="${photo}" alt="Photo ${index + 1}">
-                        <button class="photo-remove-btn" onclick="removePhoto(${index})">✕</button>
+                // Reset index if out of bounds
+                if (currentPhotoIndex >= photos.length) {
+                    currentPhotoIndex = photos.length - 1;
+                }
+                if (currentPhotoIndex < 0) {
+                    currentPhotoIndex = 0;
+                }
+
+                // Show/hide nav buttons (hide on mobile)
+                if (isMobile) {
+                    prevBtn.style.display = 'none';
+                    nextBtn.style.display = 'none';
+                } else {
+                    prevBtn.style.display = photos.length > 1 ? 'flex' : 'none';
+                    nextBtn.style.display = photos.length > 1 ? 'flex' : 'none';
+                }
+
+                // Build slides: prev, current, next for smooth swiping
+                const prevIndex = currentPhotoIndex > 0 ? currentPhotoIndex - 1 : null;
+                const nextIndex = currentPhotoIndex < photos.length - 1 ? currentPhotoIndex + 1 : null;
+
+                let slidesHTML = '';
+
+                // Previous slide
+                if (prevIndex !== null) {
+                    slidesHTML += `<div class="photo-carousel-slide carousel-slide-prev"><img src="${photos[prevIndex]}" alt="Photo ${prevIndex + 1}"></div>`;
+                }
+
+                // Current slide
+                slidesHTML += `
+                    <div class="photo-carousel-slide carousel-slide-current" id="photo-slide">
+                        <img src="${photos[currentPhotoIndex]}" alt="Photo ${currentPhotoIndex + 1}">
+                        <button class="photo-delete-btn" onclick="removePhoto(${currentPhotoIndex})">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                <line x1="10" y1="11" x2="10" y2="17"/>
+                                <line x1="14" y1="11" x2="14" y2="17"/>
+                            </svg>
+                        </button>
                     </div>
-                `).join('');
+                `;
+
+                // Next slide
+                if (nextIndex !== null) {
+                    slidesHTML += `<div class="photo-carousel-slide carousel-slide-next"><img src="${photos[nextIndex]}" alt="Photo ${nextIndex + 1}"></div>`;
+                }
+
+                container.innerHTML = `<div class="carousel-track" id="carousel-track">${slidesHTML}</div>`;
+
+                // Render counter: dots on mobile, text on desktop
+                if (isMobile && photos.length > 1) {
+                    const dots = photos.map((_, i) =>
+                        `<span class="carousel-dot ${i === currentPhotoIndex ? 'active' : ''}"></span>`
+                    ).join('');
+                    counter.innerHTML = `<div class="carousel-dots">${dots}</div>`;
+                } else if (photos.length > 1) {
+                    counter.innerHTML = `${currentPhotoIndex + 1} / ${photos.length}`;
+                } else {
+                    counter.innerHTML = '';
+                }
+
+                // Add touch event listeners for swipe
+                if (isMobile) {
+                    const track = document.getElementById('carousel-track');
+                    if (track) {
+                        track.addEventListener('touchstart', handleTouchStart, { passive: true });
+                        track.addEventListener('touchmove', handleTouchMove, { passive: true });
+                        track.addEventListener('touchend', handleTouchEnd, { passive: false });
+                    }
+                }
+            }
+
+            let isDragging = false;
+            let currentTranslateX = 0;
+
+            function handleTouchStart(e) {
+                touchStartX = e.changedTouches[0].screenX;
+                isDragging = true;
+                currentTranslateX = 0;
+                const track = document.getElementById('carousel-track');
+                if (track) {
+                    track.style.transition = 'none';
+                }
+            }
+
+            function handleTouchMove(e) {
+                if (!isDragging) return;
+                const currentX = e.changedTouches[0].screenX;
+                currentTranslateX = currentX - touchStartX;
+
+                const track = document.getElementById('carousel-track');
+                if (track) {
+                    const photos = areaPhotos[currentPhotosArea] || [];
+                    const isAtStart = currentPhotoIndex === 0 && currentTranslateX > 0;
+                    const isAtEnd = currentPhotoIndex === photos.length - 1 && currentTranslateX < 0;
+
+                    if (isAtStart || isAtEnd) {
+                        // Apply resistance at edges
+                        track.style.transform = `translateX(${currentTranslateX * 0.3}px)`;
+                    } else {
+                        track.style.transform = `translateX(${currentTranslateX}px)`;
+                    }
+                }
+            }
+
+            function handleTouchEnd(e) {
+                if (!isDragging) return;
+                isDragging = false;
+                touchEndX = e.changedTouches[0].screenX;
+
+                const track = document.getElementById('carousel-track');
+                const swipeThreshold = 50;
+                const diff = touchStartX - touchEndX;
+                const photos = areaPhotos[currentPhotosArea] || [];
+                const containerWidth = document.getElementById('photos-carousel-container').offsetWidth;
+
+                const gap = 10; // Gap between slides
+                if (Math.abs(diff) > swipeThreshold) {
+                    if (diff > 0 && currentPhotoIndex < photos.length - 1) {
+                        // Swipe left - animate to next then update
+                        if (track) {
+                            track.style.transition = 'transform 0.25s ease-out';
+                            track.style.transform = `translateX(-${containerWidth + gap}px)`;
+                            setTimeout(() => {
+                                currentPhotoIndex++;
+                                renderPhotosGrid();
+                            }, 250);
+                        }
+                    } else if (diff < 0 && currentPhotoIndex > 0) {
+                        // Swipe right - animate to prev then update
+                        if (track) {
+                            track.style.transition = 'transform 0.25s ease-out';
+                            track.style.transform = `translateX(${containerWidth + gap}px)`;
+                            setTimeout(() => {
+                                currentPhotoIndex--;
+                                renderPhotosGrid();
+                            }, 250);
+                        }
+                    } else {
+                        // Snap back at edges
+                        if (track) {
+                            track.style.transition = 'transform 0.25s ease-out';
+                            track.style.transform = 'translateX(0)';
+                        }
+                    }
+                } else {
+                    // Snap back if not enough swipe
+                    if (track) {
+                        track.style.transition = 'transform 0.25s ease-out';
+                        track.style.transform = 'translateX(0)';
+                    }
+                }
+            }
+
+            function prevPhoto(direction = 'right') {
+                const photos = areaPhotos[currentPhotosArea] || [];
+                if (photos.length > 0) {
+                    currentPhotoIndex = (currentPhotoIndex - 1 + photos.length) % photos.length;
+                    renderPhotosGrid(direction);
+                }
+            }
+
+            function nextPhoto(direction = 'left') {
+                const photos = areaPhotos[currentPhotosArea] || [];
+                if (photos.length > 0) {
+                    currentPhotoIndex = (currentPhotoIndex + 1) % photos.length;
+                    renderPhotosGrid(direction);
+                }
             }
 
             function removePhoto(index) {
-                buttonFeedback();
+                hapticFeedback();
+                playDeleteSound();
                 if (areaPhotos[currentPhotosArea]) {
                     areaPhotos[currentPhotosArea].splice(index, 1);
                     renderPhotosGrid();
+                    // Also update the carousel
+                    updateAreaCarousel(currentPhotosArea);
+                    // Save changes to server
+                    saveStagingSession();
                 }
             }
 
@@ -2069,14 +2410,89 @@ def property_type_selector():
                 if (currentPhotosArea && areaPhotos[currentPhotosArea]) {
                     areaPhotos[currentPhotosArea] = [];
                     renderPhotosGrid();
+                    // Also update the carousel to remove photos
+                    updateAreaCarousel(currentPhotosArea);
+                    // Save changes to server
+                    saveStagingSession();
                 }
             }
 
-            function applyPhotos() {
+            async function applyPhotos() {
                 buttonFeedback();
-                // Photos are already saved in areaPhotos
-                console.log('Photos saved for:', currentPhotosArea, areaPhotos[currentPhotosArea]?.length || 0, 'photos');
-                closePhotosModal();
+                // closePhotosModal handles upload, carousel update, save session, and cleanup
+                await closePhotosModal();
+            }
+
+            function updateAreaCarousel(area) {
+                const areaBtn = document.querySelector('.area-btn[data-area="' + area + '"]');
+                if (!areaBtn) return;
+
+                const carousel = areaBtn.querySelector('.area-carousel');
+                if (!carousel) return;
+
+                const photos = areaPhotos[area] || [];
+
+                if (photos.length === 0) {
+                    carousel.classList.remove('has-photos');
+                    carousel.innerHTML = '';
+                    return;
+                }
+
+                // Build carousel HTML
+                let slidesHtml = '<div class="area-carousel-inner">';
+                photos.forEach((photo, index) => {
+                    slidesHtml += '<div class="area-carousel-slide" data-index="' + index + '"><img src="' + photo + '" alt="Photo ' + (index + 1) + '"></div>';
+                });
+                slidesHtml += '</div>';
+
+                // Add dots if more than 1 photo
+                if (photos.length > 1) {
+                    slidesHtml += '<div class="area-carousel-dots">';
+                    photos.forEach((_, index) => {
+                        slidesHtml += '<span class="area-carousel-dot' + (index === 0 ? ' active' : '') + '" data-index="' + index + '" onclick="scrollCarouselTo(event, this)"></span>';
+                    });
+                    slidesHtml += '</div>';
+                }
+
+                carousel.innerHTML = slidesHtml;
+                carousel.classList.add('has-photos');
+
+                // Add scroll listener to update dots
+                const inner = carousel.querySelector('.area-carousel-inner');
+                if (inner) {
+                    inner.addEventListener('scroll', () => updateCarouselDots(carousel));
+                }
+
+                // Add click listener to open photos modal
+                carousel.onclick = function(e) {
+                    e.stopPropagation();
+                    const photosBtn = areaBtn.querySelector('.photos-action-btn');
+                    if (photosBtn) {
+                        openPhotosModal(e, photosBtn);
+                    }
+                };
+            }
+
+            function scrollCarouselTo(event, dot) {
+                event.stopPropagation();
+                const carousel = dot.closest('.area-carousel');
+                const inner = carousel.querySelector('.area-carousel-inner');
+                const index = parseInt(dot.dataset.index);
+                const slideWidth = inner.querySelector('.area-carousel-slide').offsetWidth + 6; // 6px gap
+                inner.scrollTo({ left: index * slideWidth, behavior: 'smooth' });
+            }
+
+            function updateCarouselDots(carousel) {
+                const inner = carousel.querySelector('.area-carousel-inner');
+                const dots = carousel.querySelectorAll('.area-carousel-dot');
+                if (!inner || dots.length === 0) return;
+
+                const slideWidth = inner.querySelector('.area-carousel-slide').offsetWidth + 6;
+                const activeIndex = Math.round(inner.scrollLeft / slideWidth);
+
+                dots.forEach((dot, index) => {
+                    dot.classList.toggle('active', index === activeIndex);
+                });
             }
 
             function loadAreaItems(area) {
@@ -2653,6 +3069,7 @@ def get_property_selector_styles():
     /* Area button specific styles */
     .area-btn {
         padding-bottom: 50px;
+        min-height: 180px;
     }
 
     /* Area button text styles */
@@ -2673,6 +3090,81 @@ def get_property_selector_styles():
 
     .area-btn.selected .area-price {
         color: var(--color-primary);
+    }
+
+    /* Area Photo Carousel */
+    .area-carousel {
+        display: none;
+        width: calc(100% - 16px);
+        margin: 8px auto 0;
+        position: relative;
+        flex-shrink: 0;
+    }
+
+    .area-carousel.has-photos {
+        display: block;
+    }
+
+    .area-carousel-inner {
+        display: flex;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        gap: 6px;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        border-radius: 8px;
+    }
+
+    .area-carousel-inner::-webkit-scrollbar {
+        display: none;
+    }
+
+    .area-carousel-slide {
+        flex: 0 0 100%;
+        scroll-snap-align: start;
+        aspect-ratio: 4/3;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .area-carousel-slide img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .area-carousel-dots {
+        display: flex;
+        justify-content: center;
+        gap: 4px;
+        margin-top: 6px;
+    }
+
+    .area-carousel-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--border-color);
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .area-carousel-dot.active {
+        background: var(--color-primary);
+    }
+
+    /* Hide Photos button when carousel has photos */
+    .area-carousel.has-photos + .area-actions .photos-action-btn {
+        display: none;
+    }
+
+    /* Items button full width when Photos is hidden */
+    .area-carousel.has-photos + .area-actions {
+        display: flex;
+    }
+
+    .area-carousel.has-photos + .area-actions .area-action-btn {
+        width: 100%;
     }
 
     /* Area Action Buttons Container */
@@ -2855,6 +3347,56 @@ def get_property_selector_styles():
             padding: 0 15px 15px 15px;
         }
 
+        /* Disable focus/hover effects on mobile buttons */
+        .modal-upload-btn,
+        .modal-upload-btn:hover,
+        .modal-upload-btn:focus,
+        .modal-upload-btn:active {
+            background: var(--bg-secondary) !important;
+            outline: none !important;
+            box-shadow: none !important;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .modal-apply-btn:focus,
+        .modal-apply-btn:active {
+            outline: none !important;
+            box-shadow: none !important;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Mobile carousel adjustments */
+        .photos-carousel-wrapper {
+            width: calc(100% + 30px);
+            margin-left: -15px;
+            margin-right: -15px;
+            padding: 0;
+        }
+
+        .photo-carousel-slide {
+            cursor: grab;
+            touch-action: pan-y pinch-zoom;
+        }
+
+        .photo-carousel-slide:active {
+            cursor: grabbing;
+        }
+
+        .photo-delete-btn {
+            width: 32px;
+            height: 32px;
+        }
+
+        .photo-delete-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .photos-carousel-counter {
+            margin-top: 16px;
+            padding: 0 15px;
+        }
+
         /* Full-screen items modal on mobile */
         .items-modal {
             top: 0;
@@ -2915,95 +3457,49 @@ def get_property_selector_styles():
         display: none;
     }
 
-    .zoom-controls {
+    /* Shutter Button */
+    .shutter-btn {
         position: absolute;
-        bottom: 15px;
+        bottom: 20px;
         left: 50%;
         transform: translateX(-50%);
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+        border: 4px solid white;
+        cursor: pointer;
         display: flex;
         align-items: center;
-        gap: 10px;
-        background: rgba(0, 0, 0, 0.5);
-        padding: 8px 15px;
-        border-radius: 20px;
-        backdrop-filter: blur(5px);
-    }
-
-    .zoom-label {
-        color: white;
-        font-size: 12px;
-        font-weight: 500;
-        min-width: 30px;
-        text-align: center;
-    }
-
-    #camera-zoom-slider {
-        width: 120px;
-        height: 4px;
-        -webkit-appearance: none;
-        appearance: none;
-        background: rgba(255, 255, 255, 0.3);
-        border-radius: 2px;
-        outline: none;
-    }
-
-    #camera-zoom-slider::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        appearance: none;
-        width: 20px;
-        height: 20px;
-        background: white;
-        border-radius: 50%;
-        cursor: pointer;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-    }
-
-    #camera-zoom-slider::-moz-range-thumb {
-        width: 20px;
-        height: 20px;
-        background: white;
-        border-radius: 50%;
-        cursor: pointer;
-        border: none;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-    }
-
-    .camera-controls {
-        display: flex;
-        gap: 12px;
         justify-content: center;
-        margin-top: 12px;
+        transition: all 0.15s ease;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     }
 
-    .camera-capture-btn {
-        padding: 12px 24px;
-        background: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s ease;
+    .shutter-btn:hover {
+        background: rgba(255, 255, 255, 0.4);
     }
 
-    .camera-capture-btn:hover {
-        background: #45a049;
+    .shutter-btn:focus {
+        outline: none;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        -webkit-tap-highlight-color: transparent;
     }
 
-    .camera-switch-btn {
-        padding: 12px 16px;
-        background: var(--bg-secondary);
-        color: var(--color-primary);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        font-size: 14px;
-        cursor: pointer;
-        transition: all 0.2s ease;
+    .shutter-btn:active {
+        transform: translateX(-50%) scale(0.9);
     }
 
-    .camera-switch-btn:hover {
-        border-color: var(--border-hover);
+    .shutter-inner {
+        width: 54px;
+        height: 54px;
+        border-radius: 50%;
+        background: white;
+        transition: all 0.15s ease;
+    }
+
+    .shutter-btn:active .shutter-inner {
+        background: #e0e0e0;
     }
 
     /* Upload Section */
@@ -3033,48 +3529,152 @@ def get_property_selector_styles():
         background: rgba(76, 175, 80, 0.1);
     }
 
-    /* Photos Preview Grid */
-    .photos-preview-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
-        padding: 8px 0;
+    /* Photos Carousel */
+    .photos-carousel-wrapper {
+        position: relative;
+        width: calc(100% + 30px);
+        margin-left: -15px;
+        margin-right: -15px;
+        padding: 0;
+        overflow: hidden;
     }
 
-    .photo-preview-item {
+    .photos-carousel-container {
+        width: 100%;
+        min-height: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         position: relative;
-        aspect-ratio: 1;
-        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .carousel-track {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        position: relative;
+    }
+
+    .photo-carousel-slide {
+        position: relative;
+        min-width: 100%;
+        width: 100%;
+        aspect-ratio: 4/3;
+        border-radius: 0;
         overflow: hidden;
         background: var(--bg-secondary);
+        flex-shrink: 0;
     }
 
-    .photo-preview-item img {
+    .carousel-slide-prev {
+        position: absolute;
+        left: calc(-100% - 10px);
+    }
+
+    .carousel-slide-current {
+        position: relative;
+    }
+
+    .carousel-slide-next {
+        position: absolute;
+        left: calc(100% + 10px);
+    }
+
+    .photo-carousel-slide img {
         width: 100%;
         height: 100%;
         object-fit: cover;
     }
 
-    .photo-remove-btn {
+    .photo-delete-btn {
         position: absolute;
-        top: 4px;
-        right: 4px;
-        width: 24px;
-        height: 24px;
-        background: rgba(0, 0, 0, 0.6);
+        top: 12px;
+        right: 12px;
+        width: 36px;
+        height: 36px;
+        background: rgba(220, 38, 38, 0.9);
         color: white;
         border: none;
         border-radius: 50%;
-        font-size: 14px;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
         transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
 
-    .photo-remove-btn:hover {
-        background: rgba(220, 38, 38, 0.8);
+    .photo-delete-btn:hover {
+        background: rgba(185, 28, 28, 1);
+        transform: scale(1.1);
+    }
+
+    .carousel-nav-btn {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 44px;
+        height: 44px;
+        background: rgba(0, 0, 0, 0.5);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        font-size: 24px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        z-index: 10;
+    }
+
+    .carousel-nav-btn:hover {
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    .carousel-prev {
+        left: 8px;
+    }
+
+    .carousel-next {
+        right: 8px;
+    }
+
+    .photos-carousel-counter {
+        text-align: center;
+        color: var(--color-secondary);
+        font-size: 14px;
+        margin-top: 12px;
+        padding-bottom: 4px;
+    }
+
+    .carousel-dots {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 0;
+        overflow: visible;
+    }
+
+    .carousel-dot {
+        width: 8px;
+        height: 8px;
+        min-width: 8px;
+        min-height: 8px;
+        border-radius: 50%;
+        background: var(--color-secondary);
+        opacity: 0.4;
+        transition: all 0.2s ease;
+        display: block;
+        flex-shrink: 0;
+    }
+
+    .carousel-dot.active {
+        opacity: 1;
+        background: var(--color-accent);
+        transform: scale(1.25);
     }
 
     .modal-content {
@@ -3314,6 +3914,23 @@ def get_property_selector_styles():
 
     .modal-clear-btn:hover {
         background: var(--bg-secondary);
+        border-color: var(--color-secondary);
+    }
+
+    .modal-upload-btn {
+        padding: 12px 20px;
+        background: var(--bg-secondary);
+        color: var(--color-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .modal-upload-btn:hover {
+        background: var(--bg-tertiary, #f0f0f0);
         border-color: var(--color-secondary);
     }
 
@@ -3704,8 +4321,8 @@ def get_property_selector_styles():
 
         /* Area button mobile styles */
         .area-btn {
-            padding-bottom: 70px;
-            min-height: 140px;
+            padding-bottom: 50px;
+            min-height: 200px;
         }
 
         .area-name {

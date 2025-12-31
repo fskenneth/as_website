@@ -471,6 +471,114 @@ def remove_staging(request: Request, staging_id: int):
     return JSONResponse({'success': False, 'error': result.get('error', 'Delete failed')}, status_code=400)
 
 
+@rt('/api/staging-photos', methods=['POST'])
+async def upload_staging_photos(request: Request):
+    """Upload and compress staging area photos"""
+    import base64
+    import io
+    import uuid
+    import os
+    from PIL import Image
+
+    try:
+        data = await request.json()
+        area = data.get('area', 'unknown')
+        photos = data.get('photos', [])  # List of base64 images
+
+        if not photos:
+            return JSONResponse({'success': False, 'error': 'No photos provided'}, status_code=400)
+
+        saved_urls = []
+        target_size = (1920, 1440)  # Target dimensions
+        save_dir = 'static/images/areas'
+
+        # Ensure directory exists
+        os.makedirs(save_dir, exist_ok=True)
+
+        for i, photo_data in enumerate(photos):
+            try:
+                # Remove data URL prefix if present
+                if ',' in photo_data:
+                    photo_data = photo_data.split(',')[1]
+
+                # Decode base64
+                image_bytes = base64.b64decode(photo_data)
+                image = Image.open(io.BytesIO(image_bytes))
+
+                # Convert to RGB if necessary (for PNG with transparency)
+                if image.mode in ('RGBA', 'P'):
+                    image = image.convert('RGB')
+
+                # Resize maintaining aspect ratio, fitting within target size
+                image.thumbnail(target_size, Image.Resampling.LANCZOS)
+
+                # Generate unique filename
+                filename = f"{area}_{uuid.uuid4().hex[:8]}.jpg"
+                filepath = os.path.join(save_dir, filename)
+
+                # Save with compression
+                image.save(filepath, 'JPEG', quality=85, optimize=True)
+
+                # Return URL path
+                saved_urls.append(f'/static/images/areas/{filename}')
+
+            except Exception as e:
+                print(f"Error processing photo {i}: {e}")
+                continue
+
+        if saved_urls:
+            return JSONResponse({'success': True, 'urls': saved_urls})
+        else:
+            return JSONResponse({'success': False, 'error': 'Failed to process photos'}, status_code=500)
+
+    except Exception as e:
+        print(f"Photo upload error: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+
+
+@rt('/api/staging-photos/cleanup', methods=['POST'])
+async def cleanup_staging_photos(request: Request):
+    """Delete orphaned photos that are not associated with any area"""
+    import os
+    import glob
+
+    try:
+        data = await request.json()
+        # Get list of all valid photo URLs currently in use
+        valid_urls = data.get('valid_urls', [])
+
+        # Extract just the filenames from URLs
+        valid_filenames = set()
+        for url in valid_urls:
+            if url.startswith('/static/images/areas/'):
+                filename = url.replace('/static/images/areas/', '')
+                valid_filenames.add(filename)
+
+        # Scan the areas folder
+        areas_dir = 'static/images/areas'
+        if not os.path.exists(areas_dir):
+            return JSONResponse({'success': True, 'deleted': 0})
+
+        deleted_count = 0
+        for filepath in glob.glob(os.path.join(areas_dir, '*.jpg')):
+            filename = os.path.basename(filepath)
+            if filename not in valid_filenames:
+                try:
+                    os.remove(filepath)
+                    deleted_count += 1
+                    print(f"Deleted orphaned photo: {filename}")
+                except Exception as e:
+                    print(f"Error deleting {filename}: {e}")
+
+        return JSONResponse({'success': True, 'deleted': deleted_count})
+
+    except Exception as e:
+        print(f"Cleanup error: {e}")
+        return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+
+
 # =============================================================================
 # ADMIN API ENDPOINTS
 # =============================================================================

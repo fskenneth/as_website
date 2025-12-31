@@ -84,11 +84,18 @@ def init_db():
             special_requests TEXT,
             stripe_payment_id TEXT,
             stripe_customer_id TEXT,
+            area_photos TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id)
         )
     ''')
+
+    # Migration: Add area_photos column if it doesn't exist (for existing databases)
+    try:
+        cursor.execute('ALTER TABLE stagings ADD COLUMN area_photos TEXT')
+    except:
+        pass  # Column already exists
 
     # Create indexes for faster lookups
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)')
@@ -464,6 +471,7 @@ def save_staging(user_id: int, staging_data: dict) -> dict:
                     special_requests = ?,
                     stripe_payment_id = ?,
                     stripe_customer_id = ?,
+                    area_photos = ?,
                     updated_at = ?
                 WHERE id = ? AND user_id = ?
             ''', (
@@ -488,6 +496,7 @@ def save_staging(user_id: int, staging_data: dict) -> dict:
                 staging_data.get('special_requests'),
                 staging_data.get('stripe_payment_id'),
                 staging_data.get('stripe_customer_id'),
+                staging_data.get('area_photos'),
                 datetime.now(),
                 staging_id,
                 user_id
@@ -500,8 +509,8 @@ def save_staging(user_id: int, staging_data: dict) -> dict:
                     selected_areas, selected_items, total_fee, staging_date, addons,
                     property_status, user_type, pets_status, referral_source, referral_other,
                     guest_first_name, guest_last_name, guest_email, guest_phone,
-                    special_requests, stripe_payment_id, stripe_customer_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    special_requests, stripe_payment_id, stripe_customer_id, area_photos
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 user_id,
                 staging_data.get('status', 'quote'),
@@ -524,7 +533,8 @@ def save_staging(user_id: int, staging_data: dict) -> dict:
                 staging_data.get('guest_phone'),
                 staging_data.get('special_requests'),
                 staging_data.get('stripe_payment_id'),
-                staging_data.get('stripe_customer_id')
+                staging_data.get('stripe_customer_id'),
+                staging_data.get('area_photos')
             ))
             staging_id = cursor.lastrowid
             print(f"[save_staging] Created new staging with id={staging_id}")
