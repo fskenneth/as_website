@@ -2214,7 +2214,7 @@ def property_type_selector():
                 const isMobile = window.innerWidth <= 767;
 
                 if (photos.length === 0) {
-                    container.innerHTML = `<p style="color: var(--color-secondary); text-align: center; padding: 40px 20px;">Take or upload photos from 4 different directions of the ${currentPhotosArea.toLowerCase()}</p>`;
+                    container.innerHTML = `<p style="color: var(--color-secondary); text-align: center; padding: 40px 20px;">Take or upload photos from 4 different directions of the ${currentPhotosArea.toLowerCase().replace(/-/g, ' ')}</p>`;
                     counter.innerHTML = '';
                     prevBtn.style.display = 'none';
                     nextBtn.style.display = 'none';
