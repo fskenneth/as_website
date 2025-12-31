@@ -3414,7 +3414,7 @@ def get_property_selector_styles():
         .items-modal .modal-body {
             flex: 1;
             overflow-y: auto;
-            padding: 0 8px 8px 8px;
+            padding: 0;
         }
     }
 
@@ -3742,15 +3742,14 @@ def get_property_selector_styles():
     .items-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
-        padding: 8px;
+        gap: 6px;
+        padding: 6px;
     }
 
     .item-btn {
-        aspect-ratio: 2 / 3;
         background: var(--bg-secondary);
         border: 2px solid var(--border-color);
-        border-radius: 12px;
+        border-radius: 10px;
         cursor: pointer;
         transition: all 0.2s ease;
         overflow: visible;
@@ -3758,6 +3757,7 @@ def get_property_selector_styles():
         -webkit-touch-callout: none;
         -webkit-user-select: none;
         user-select: none;
+        padding: 6px 4px;
     }
 
     .item-btn.selected {
@@ -3772,9 +3772,6 @@ def get_property_selector_styles():
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: flex-start;
-        height: 100%;
-        padding: 0;
         gap: 0;
     }
 
@@ -3782,41 +3779,38 @@ def get_property_selector_styles():
         display: flex;
         align-items: center;
         justify-content: center;
-        height: 45%;
-        width: 100%;
-        padding: 4px;
+        width: 36px;
+        height: 36px;
     }
 
     .item-emoji svg {
         width: 100%;
         height: 100%;
-        max-width: 64px;
-        max-height: 64px;
         stroke: var(--color-primary);
     }
 
     .item-name {
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 600;
         color: var(--color-primary);
         text-align: center;
         line-height: 1.1;
-        margin-top: 2px;
+        margin-top: 0;
     }
 
     .item-unit-price {
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 500;
         color: var(--color-secondary);
-        margin-top: 1px;
+        margin-top: 0;
     }
 
     .item-total-price {
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 500;
         color: var(--color-primary);
         display: none;
-        margin-top: 1px;
+        margin-top: 0;
     }
 
     .item-btn.selected .item-total-price {
@@ -3830,17 +3824,17 @@ def get_property_selector_styles():
     .item-qty-controls {
         display: flex;
         align-items: center;
-        gap: 6px;
-        margin-top: 2px;
+        gap: 4px;
+        margin-top: 1px;
     }
 
     .qty-btn {
-        width: 24px;
-        height: 24px;
+        width: 22px;
+        height: 22px;
         border: 1px solid var(--border-color);
         background: var(--bg-primary);
         border-radius: 50%;
-        font-size: 16px;
+        font-size: 14px;
         font-weight: 600;
         color: var(--color-primary);
         cursor: pointer;
@@ -3861,10 +3855,10 @@ def get_property_selector_styles():
     }
 
     .item-qty {
-        font-size: 14px;
+        font-size: 12px;
         font-weight: 600;
         color: var(--color-primary);
-        min-width: 20px;
+        min-width: 16px;
         text-align: center;
     }
 
