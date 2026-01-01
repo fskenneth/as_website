@@ -3054,13 +3054,24 @@ def get_property_selector_styles():
     /* Area button specific styles - mobile first */
     .area-btn {
         padding-top: 10px;
-        padding-bottom: 70px;
+        padding-bottom: 10px;
         min-height: auto;
         justify-content: flex-start;
     }
 
     /* Taller height when area has photos */
     .area-btn:has(.area-carousel.has-photos) {
+        min-height: 220px;
+        padding-bottom: 70px;
+    }
+
+    /* Taller height when selected (for buttons) */
+    .area-btn.selected {
+        min-height: 120px;
+        padding-bottom: 70px;
+    }
+
+    .area-btn.selected:has(.area-carousel.has-photos) {
         min-height: 220px;
     }
 
@@ -4309,10 +4320,20 @@ def get_property_selector_styles():
         .area-btn {
             min-height: auto;
             padding-top: 12px;
-            padding-bottom: 80px;
+            padding-bottom: 12px;
         }
 
         .area-btn:has(.area-carousel.has-photos) {
+            min-height: 240px;
+            padding-bottom: 80px;
+        }
+
+        .area-btn.selected {
+            min-height: 130px;
+            padding-bottom: 80px;
+        }
+
+        .area-btn.selected:has(.area-carousel.has-photos) {
             min-height: 240px;
         }
 
