@@ -1405,7 +1405,7 @@ def property_type_selector():
 
                 const priceSpan = btn.querySelector('.area-price');
                 if (priceSpan) {
-                    priceSpan.textContent = displayPrice > 0 ? '+$' + displayPrice : 'Included';
+                    priceSpan.textContent = displayPrice > 0 ? '+$' + displayPrice : '$0';
                 }
             }
 
@@ -3055,8 +3055,13 @@ def get_property_selector_styles():
     .area-btn {
         padding-top: 10px;
         padding-bottom: 70px;
-        min-height: 220px;
+        min-height: auto;
         justify-content: flex-start;
+    }
+
+    /* Taller height when area has photos */
+    .area-btn:has(.area-carousel.has-photos) {
+        min-height: 220px;
     }
 
     /* Area button text styles */
@@ -4302,9 +4307,13 @@ def get_property_selector_styles():
 
         /* Area buttons - ensure title, carousel, and buttons fit */
         .area-btn {
-            min-height: 240px;
+            min-height: auto;
             padding-top: 12px;
             padding-bottom: 80px;
+        }
+
+        .area-btn:has(.area-carousel.has-photos) {
+            min-height: 240px;
         }
 
         .area-btn .area-carousel {
