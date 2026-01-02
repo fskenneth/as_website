@@ -2091,12 +2091,12 @@ def property_type_selector():
 
             async function startCamera() {
                 try {
-                    // Use back camera with portrait orientation
+                    // Use back camera
                     const constraints = {
                         video: {
                             facingMode: 'environment',
-                            width: { ideal: 1080 },
-                            height: { ideal: 1920 }
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 }
                         }
                     };
 
@@ -3624,7 +3624,7 @@ def get_property_selector_styles():
         width: calc(100% + 30px);
         margin-left: -15px;
         margin-right: -15px;
-        aspect-ratio: 3/4;
+        aspect-ratio: 4/3;
         background: #000;
         border-radius: 0;
         overflow: hidden;
@@ -3755,7 +3755,7 @@ def get_property_selector_styles():
         aspect-ratio: 4/3;
         border-radius: 0;
         overflow: hidden;
-        background: #000;  /* Black background for letterboxing */
+        background: var(--bg-secondary);
         flex-shrink: 0;
     }
 
@@ -3776,7 +3776,7 @@ def get_property_selector_styles():
     .photo-carousel-slide img {
         width: 100%;
         height: 100%;
-        object-fit: contain;  /* Preserve aspect ratio, add letterboxing as needed */
+        object-fit: cover;
     }
 
     .photo-delete-btn {
