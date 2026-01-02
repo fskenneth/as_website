@@ -3624,17 +3624,21 @@ def get_property_selector_styles():
         width: calc(100% + 30px);
         margin-left: -15px;
         margin-right: -15px;
-        aspect-ratio: 4/3;
+        min-height: 400px;
+        max-height: 80vh;
         background: #000;
         border-radius: 0;
         overflow: hidden;
         position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     .camera-preview {
         width: 100%;
         height: 100%;
-        object-fit: cover;
+        object-fit: contain;
     }
 
     .camera-canvas {
