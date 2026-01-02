@@ -689,21 +689,18 @@ async def vacate_photo(request: Request):
 @rt('/api/test-inpainting', methods=['POST'])
 async def test_inpainting(request: Request):
     """
-    Test endpoint to compare 3 inpainting methods
+    Test endpoint to compare inpainting methods (runs one method at a time to save memory)
 
     Request body:
         {
-            "image": "base64-encoded image"
+            "image": "base64-encoded image",
+            "method": 1, 2, or 3 (optional, runs single method if specified)
         }
 
     Returns:
         {
             "success": true,
-            "results": {
-                "method_1": {...},
-                "method_2": {...},
-                "method_3": {...}
-            }
+            "result": {...}  # single method result
         }
     """
     import base64
@@ -714,6 +711,7 @@ async def test_inpainting(request: Request):
     try:
         data = await request.json()
         image_data = data.get('image', '')
+        method = data.get('method', 1)  # Default to method 1
 
         # Decode base64 image
         if image_data.startswith('data:image'):
@@ -725,18 +723,26 @@ async def test_inpainting(request: Request):
         # Initialize tester
         tester = InpaintingTester()
 
-        # Run all 3 methods
-        results = tester.compare_all_methods(image)
+        # Run only the requested method
+        result = None
+        if method == 1:
+            result = tester.method_1_lama(image)
+        elif method == 2:
+            result = tester.method_2_opencv(image)
+        elif method == 3:
+            result = tester.method_3_opencv_telea(image)
+        else:
+            return JSONResponse({'success': False, 'error': f'Invalid method: {method}'}, status_code=400)
 
-        # Convert PIL images to base64 for response
-        for method_key in results:
-            if 'result' in results[method_key]:
-                result_image = results[method_key].pop('result')
-                results[method_key]['result_base64'] = image_to_base64(result_image)
+        # Convert PIL image to base64 for response
+        if 'result' in result:
+            result_image = result.pop('result')
+            result['result_base64'] = image_to_base64(result_image)
 
         return JSONResponse({
             'success': True,
-            'results': results
+            'method': method,
+            'result': result
         })
 
     except Exception as e:

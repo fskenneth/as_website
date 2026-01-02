@@ -2128,18 +2128,16 @@ def property_type_selector():
             }
 
 
-            function capturePhoto() {
+            async function capturePhoto() {
                 hapticFeedback();
                 playShutterSound();
                 const video = document.getElementById('camera-preview');
                 const canvas = document.getElementById('camera-canvas');
                 const ctx = canvas.getContext('2d');
 
-                // Set canvas size to video size
+                // Just capture as-is - let user rotate if needed
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
-
-                // Draw video frame to canvas
                 ctx.drawImage(video, 0, 0);
 
                 // Get image data as base64
@@ -2236,6 +2234,11 @@ def property_type_selector():
                 slidesHTML += `
                     <div class="photo-carousel-slide carousel-slide-current" id="photo-slide">
                         <img src="${photos[currentPhotoIndex]}" alt="Photo ${currentPhotoIndex + 1}">
+                        <button class="photo-rotate-btn" onclick="rotatePhoto(${currentPhotoIndex})">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                            </svg>
+                        </button>
                         <button class="photo-delete-btn" onclick="removePhoto(${currentPhotoIndex})">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
@@ -2278,8 +2281,10 @@ def property_type_selector():
 
             let isDragging = false;
             let currentTranslateX = 0;
+            let isAnimating = false;
 
             function handleTouchStart(e) {
+                if (isAnimating) return;
                 touchStartX = e.changedTouches[0].screenX;
                 isDragging = true;
                 currentTranslateX = 0;
@@ -2290,7 +2295,7 @@ def property_type_selector():
             }
 
             function handleTouchMove(e) {
-                if (!isDragging) return;
+                if (!isDragging || isAnimating) return;
                 const currentX = e.changedTouches[0].screenX;
                 currentTranslateX = currentX - touchStartX;
 
@@ -2310,36 +2315,40 @@ def property_type_selector():
             }
 
             function handleTouchEnd(e) {
-                if (!isDragging) return;
+                if (!isDragging || isAnimating) return;
                 isDragging = false;
                 touchEndX = e.changedTouches[0].screenX;
 
                 const track = document.getElementById('carousel-track');
-                const swipeThreshold = 50;
+                const swipeThreshold = 30; // Reduced threshold for easier swiping
                 const diff = touchStartX - touchEndX;
                 const photos = areaPhotos[currentPhotosArea] || [];
                 const containerWidth = document.getElementById('photos-carousel-container').offsetWidth;
 
                 const gap = 10; // Gap between slides
+                // Always move exactly one photo, regardless of swipe distance
                 if (Math.abs(diff) > swipeThreshold) {
+                    isAnimating = true;
                     if (diff > 0 && currentPhotoIndex < photos.length - 1) {
-                        // Swipe left - animate to next then update
+                        // Swipe left - move to next photo only
                         if (track) {
                             track.style.transition = 'transform 0.25s ease-out';
                             track.style.transform = `translateX(-${containerWidth + gap}px)`;
                             setTimeout(() => {
                                 currentPhotoIndex++;
                                 renderPhotosGrid();
+                                isAnimating = false;
                             }, 250);
                         }
                     } else if (diff < 0 && currentPhotoIndex > 0) {
-                        // Swipe right - animate to prev then update
+                        // Swipe right - move to prev photo only
                         if (track) {
                             track.style.transition = 'transform 0.25s ease-out';
                             track.style.transform = `translateX(${containerWidth + gap}px)`;
                             setTimeout(() => {
                                 currentPhotoIndex--;
                                 renderPhotosGrid();
+                                isAnimating = false;
                             }, 250);
                         }
                     } else {
@@ -2348,6 +2357,7 @@ def property_type_selector():
                             track.style.transition = 'transform 0.25s ease-out';
                             track.style.transform = 'translateX(0)';
                         }
+                        isAnimating = false;
                     }
                 } else {
                     // Snap back if not enough swipe
@@ -2355,6 +2365,7 @@ def property_type_selector():
                         track.style.transition = 'transform 0.25s ease-out';
                         track.style.transform = 'translateX(0)';
                     }
+                    isAnimating = false;
                 }
             }
 
@@ -2385,6 +2396,38 @@ def property_type_selector():
                     // Save changes to server
                     saveStagingSession();
                 }
+            }
+
+            function rotatePhoto(index) {
+                hapticFeedback();
+                if (!areaPhotos[currentPhotosArea] || !areaPhotos[currentPhotosArea][index]) return;
+
+                const imageData = areaPhotos[currentPhotosArea][index];
+                const img = new Image();
+
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    // Rotate 90 degrees counter-clockwise - swap dimensions
+                    canvas.width = img.height;
+                    canvas.height = img.width;
+
+                    // Rotate 90 degrees counter-clockwise
+                    ctx.translate(0, canvas.height);
+                    ctx.rotate(-90 * Math.PI / 180);
+                    ctx.drawImage(img, 0, 0);
+
+                    // Replace the photo with rotated version
+                    areaPhotos[currentPhotosArea][index] = canvas.toDataURL('image/jpeg', 0.8);
+
+                    // Re-render to show the rotated photo
+                    renderPhotosGrid();
+                    updateAreaCarousel(currentPhotosArea);
+                    saveStagingSession();
+                };
+
+                img.src = imageData;
             }
 
             function clearPhotos() {
@@ -3126,15 +3169,21 @@ def get_property_selector_styles():
     .area-carousel-slide {
         flex: 0 0 100%;
         scroll-snap-align: start;
-        aspect-ratio: 4/3;
+        aspect-ratio: 1/1;
         border-radius: 8px;
         overflow: hidden;
+        background: transparent;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     .area-carousel-slide img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
+        max-width: 100%;
+        max-height: 100%;
+        height: auto;
+        width: auto;
+        object-fit: contain;
     }
 
     .area-carousel-dots {
@@ -3476,6 +3525,17 @@ def get_property_selector_styles():
             cursor: grabbing;
         }
 
+        .photo-rotate-btn {
+            width: 32px;
+            height: 32px;
+            right: 52px;
+        }
+
+        .photo-rotate-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
         .photo-delete-btn {
             width: 32px;
             height: 32px;
@@ -3756,11 +3816,14 @@ def get_property_selector_styles():
         position: relative;
         min-width: 100%;
         width: 100%;
-        aspect-ratio: 4/3;
+        aspect-ratio: 1/1;
         border-radius: 0;
         overflow: hidden;
-        background: var(--bg-secondary);
+        background: transparent;
         flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     .carousel-slide-prev {
@@ -3778,9 +3841,34 @@ def get_property_selector_styles():
     }
 
     .photo-carousel-slide img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
+        max-width: 100%;
+        max-height: 100%;
+        height: auto;
+        width: auto;
+        object-fit: contain;
+    }
+
+    .photo-rotate-btn {
+        position: absolute;
+        top: 12px;
+        right: 60px;
+        width: 36px;
+        height: 36px;
+        background: rgba(59, 130, 246, 0.9);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .photo-rotate-btn:hover {
+        background: rgba(37, 99, 235, 1);
+        transform: scale(1.1);
     }
 
     .photo-delete-btn {

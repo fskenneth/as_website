@@ -184,46 +184,56 @@ def get_design_styles():
         position: relative;
         width: 100%;
         aspect-ratio: 4/3;
-        background: var(--bg-secondary);
+        background: var(--bg-primary);
         border-radius: 12px;
         overflow: hidden;
     }
 
+    [data-theme="dark"] .area-carousel {
+        background: #000000;
+    }
+
     .carousel-track {
-        display: flex;
-        align-items: center;
+        position: absolute;
+        top: 0;
+        left: 0;
         width: 100%;
         height: 100%;
-        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     .carousel-slide {
-        position: relative;
-        min-width: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
         width: 100%;
         height: 100%;
-        object-fit: cover;
-        flex-shrink: 0;
-    }
-
-    .carousel-slide-prev {
-        position: absolute;
-        left: calc(-100% - 10px);
-    }
-
-    .carousel-slide-current {
-        position: relative;
-    }
-
-    .carousel-slide-next {
-        position: absolute;
-        left: calc(100% + 10px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.25s ease-out;
     }
 
     .carousel-slide img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
+        max-width: 100%;
+        max-height: 100%;
+        height: auto;
+        width: auto;
+        object-fit: contain;
+    }
+
+    .carousel-slide-prev {
+        transform: translateX(calc(-100% - 10px));
+    }
+
+    .carousel-slide-current {
+        transform: translateX(0);
+    }
+
+    .carousel-slide-next {
+        transform: translateX(calc(100% + 10px));
     }
 
     /* Carousel Navigation - Same as photo modal */
@@ -853,15 +863,15 @@ def get_design_scripts(staging_id):
 
             // Previous slide
             if (prevIndex !== null) {{
-                slidesHtml += `<img src="${{area.photos[prevIndex]}}" class="carousel-slide carousel-slide-prev" alt="${{area.name}} photo ${{prevIndex + 1}}">`;
+                slidesHtml += `<div class="carousel-slide carousel-slide-prev"><img src="${{area.photos[prevIndex]}}" alt="${{area.name}} photo ${{prevIndex + 1}}"></div>`;
             }}
 
             // Current slide
-            slidesHtml += `<img src="${{area.photos[currentPhotoIndex]}}" class="carousel-slide carousel-slide-current" alt="${{area.name}} photo ${{currentPhotoIndex + 1}}">`;
+            slidesHtml += `<div class="carousel-slide carousel-slide-current"><img src="${{area.photos[currentPhotoIndex]}}" alt="${{area.name}} photo ${{currentPhotoIndex + 1}}"></div>`;
 
             // Next slide
             if (nextIndex !== null) {{
-                slidesHtml += `<img src="${{area.photos[nextIndex]}}" class="carousel-slide carousel-slide-next" alt="${{area.name}} photo ${{nextIndex + 1}}">`;
+                slidesHtml += `<div class="carousel-slide carousel-slide-next"><img src="${{area.photos[nextIndex]}}" alt="${{area.name}} photo ${{nextIndex + 1}}"></div>`;
             }}
 
             const dotsHtml = area.photos.map((_, photoIndex) => {{
@@ -981,35 +991,9 @@ def get_design_scripts(staging_id):
         if (nextIndex < 0) nextIndex = photos.length - 1;
         if (nextIndex >= photos.length) nextIndex = 0;
 
-        // Get track element for animation
-        const track = document.getElementById(`carousel-track-${{areaIndex}}`);
-        if (!track) {{
-            // Fallback: no animation if track not found
-            carouselIndices[areaIndex] = nextIndex;
-            renderAreaContent(area, areaIndex);
-            return;
-        }}
-
-        // Get carousel width for animation
-        const carousel = document.getElementById(`carousel-${{areaIndex}}`);
-        const containerWidth = carousel ? carousel.offsetWidth : 0;
-        const gap = 10;
-
-        // Animate the transition
-        track.style.transition = 'transform 0.25s ease-out';
-        if (direction > 0) {{
-            // Going to next photo - slide left
-            track.style.transform = `translateX(-${{containerWidth + gap}}px)`;
-        }} else {{
-            // Going to previous photo - slide right
-            track.style.transform = `translateX(${{containerWidth + gap}}px)`;
-        }}
-
-        // Update content after animation completes
-        setTimeout(() => {{
-            carouselIndices[areaIndex] = nextIndex;
-            renderAreaContent(area, areaIndex);
-        }}, 250);
+        // Update index and re-render
+        carouselIndices[areaIndex] = nextIndex;
+        renderAreaContent(area, areaIndex);
     }}
 
     // Touch/swipe support for carousel
@@ -1018,42 +1002,14 @@ def get_design_scripts(staging_id):
     }}
 
     function handleTouchStart(e) {{
-        const track = e.target.closest('.carousel-track');
-        if (!track) return;
-
         touchStartX = e.changedTouches[0].screenX;
         isDragging = true;
-        currentTranslateX = 0;
-
-        if (track) {{
-            track.style.transition = 'none';
-        }}
     }}
 
     function handleTouchMove(e) {{
         if (!isDragging) return;
-
-        const track = e.target.closest('.carousel-track');
-        if (!track) return;
-
-        const currentX = e.changedTouches[0].screenX;
-        currentTranslateX = currentX - touchStartX;
-
-        const areas = currentStaging.areas;
-        const areaKeys = Object.keys(areas);
-        const area = areas[areaKeys[currentAreaIndex]];
-        const photos = area.photos || [];
-        const currentPhotoIndex = carouselIndices[currentAreaIndex] || 0;
-
-        const isAtStart = currentPhotoIndex === 0 && currentTranslateX > 0;
-        const isAtEnd = currentPhotoIndex === photos.length - 1 && currentTranslateX < 0;
-
-        if (isAtStart || isAtEnd) {{
-            // Apply resistance at edges
-            track.style.transform = `translateX(${{currentTranslateX * 0.3}}px)`;
-        }} else {{
-            track.style.transform = `translateX(${{currentTranslateX}}px)`;
-        }}
+        // Prevent default to avoid scrolling
+        e.preventDefault();
     }}
 
     function handleTouchEnd(e) {{
@@ -1074,45 +1030,13 @@ def get_design_scripts(staging_id):
         const photos = area.photos || [];
         const currentPhotoIndex = carouselIndices[currentAreaIndex] || 0;
 
-        const carousel = document.getElementById(`carousel-${{currentAreaIndex}}`);
-        const containerWidth = carousel ? carousel.offsetWidth : 0;
-        const gap = 10;
-
         if (Math.abs(diff) > swipeThreshold) {{
             if (diff > 0 && currentPhotoIndex < photos.length - 1) {{
-                // Swipe left - animate to next then update
-                if (track) {{
-                    track.style.transition = 'transform 0.25s ease-out';
-                    track.style.transform = `translateX(-${{containerWidth + gap}}px)`;
-                    setTimeout(() => {{
-                        carouselIndices[currentAreaIndex] = currentPhotoIndex + 1;
-                        const updatedArea = areas[areaKeys[currentAreaIndex]];
-                        renderAreaContent(updatedArea, currentAreaIndex);
-                    }}, 250);
-                }}
+                // Swipe left - go to next
+                updateCarousel(currentAreaIndex, 1);
             }} else if (diff < 0 && currentPhotoIndex > 0) {{
-                // Swipe right - animate to prev then update
-                if (track) {{
-                    track.style.transition = 'transform 0.25s ease-out';
-                    track.style.transform = `translateX(${{containerWidth + gap}}px)`;
-                    setTimeout(() => {{
-                        carouselIndices[currentAreaIndex] = currentPhotoIndex - 1;
-                        const updatedArea = areas[areaKeys[currentAreaIndex]];
-                        renderAreaContent(updatedArea, currentAreaIndex);
-                    }}, 250);
-                }}
-            }} else {{
-                // Snap back at edges
-                if (track) {{
-                    track.style.transition = 'transform 0.25s ease-out';
-                    track.style.transform = 'translateX(0)';
-                }}
-            }}
-        }} else {{
-            // Snap back if not enough swipe
-            if (track) {{
-                track.style.transition = 'transform 0.25s ease-out';
-                track.style.transform = 'translateX(0)';
+                // Swipe right - go to previous
+                updateCarousel(currentAreaIndex, -1);
             }}
         }}
     }}
