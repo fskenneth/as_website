@@ -2091,12 +2091,13 @@ def property_type_selector():
 
             async function startCamera() {
                 try {
-                    // Use back camera
+                    // Use back camera with 4:3 aspect ratio
                     const constraints = {
                         video: {
                             facingMode: 'environment',
-                            width: { ideal: 1920 },
-                            height: { ideal: 1080 }
+                            width: { ideal: 1600 },
+                            height: { ideal: 1200 },
+                            aspectRatio: { ideal: 4/3 }
                         }
                     };
 
