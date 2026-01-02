@@ -691,6 +691,12 @@ def photos_modal():
                     Div(
                         Video(id="camera-preview", autoplay=True, playsinline=True, cls="camera-preview"),
                         Canvas(id="camera-canvas", cls="camera-canvas hidden"),
+                        # Photo thumbnail preview (left of shutter)
+                        Button(
+                            id="photo-thumbnail-preview",
+                            cls="photo-thumbnail-preview hidden",
+                            onclick="scrollToCarousel()"
+                        ),
                         # Shutter button at bottom center
                         Button(
                             Div(cls="shutter-inner"),
@@ -2016,6 +2022,42 @@ def property_type_selector():
                 // Render existing photos
                 renderPhotosGrid();
 
+                // Update thumbnail
+                updateThumbnail();
+
+                // Add scroll listener to modal content to show/hide thumbnail and shutter button
+                const modalContent = document.querySelector('.photos-modal .modal-content');
+                const shutterButton = document.querySelector('.shutter-btn');
+                const thumbnail = document.getElementById('photo-thumbnail-preview');
+
+                if (modalContent) {
+                    // Remove existing listener if any
+                    modalContent.removeEventListener('scroll', handleModalScroll);
+
+                    // Add scroll listener
+                    modalContent.addEventListener('scroll', handleModalScroll);
+
+                    function handleModalScroll() {
+                        const scrollTop = modalContent.scrollTop;
+                        const cameraSection = document.querySelector('.camera-section');
+
+                        if (!cameraSection) return;
+
+                        const cameraSectionHeight = cameraSection.offsetHeight;
+
+                        // If scrolled past halfway of camera section, hide thumbnail and shutter
+                        if (scrollTop > cameraSectionHeight / 2) {
+                            if (thumbnail) thumbnail.classList.add('hidden');
+                            if (shutterButton) shutterButton.classList.add('hidden');
+                        } else {
+                            if (thumbnail && areaPhotos[currentPhotosArea] && areaPhotos[currentPhotosArea].length > 0) {
+                                thumbnail.classList.remove('hidden');
+                            }
+                            if (shutterButton) shutterButton.classList.remove('hidden');
+                        }
+                    }
+                }
+
                 // Start camera on mobile
                 if (window.innerWidth <= 767) {
                     startCamera();
@@ -2155,6 +2197,9 @@ def property_type_selector():
 
                 // Render updated grid
                 renderPhotosGrid();
+
+                // Update thumbnail
+                updateThumbnail();
             }
 
             function handlePhotoUpload(event) {
@@ -2173,6 +2218,7 @@ def property_type_selector():
                         // Jump to the last photo (the one just uploaded)
                         currentPhotoIndex = areaPhotos[currentPhotosArea].length - 1;
                         renderPhotosGrid();
+                        updateThumbnail();
                     };
                     reader.readAsDataURL(file);
                 });
@@ -2425,10 +2471,37 @@ def property_type_selector():
                     // Re-render to show the rotated photo
                     renderPhotosGrid();
                     updateAreaCarousel(currentPhotosArea);
+                    updateThumbnail();
                     saveStagingSession();
                 };
 
                 img.src = imageData;
+            }
+
+            function updateThumbnail() {
+                const photos = areaPhotos[currentPhotosArea] || [];
+                const thumbnail = document.getElementById('photo-thumbnail-preview');
+
+                if (!thumbnail) return;
+
+                if (photos.length > 0) {
+                    // Show thumbnail with last photo
+                    const lastPhoto = photos[photos.length - 1];
+                    thumbnail.style.backgroundImage = `url(${lastPhoto})`;
+                    thumbnail.classList.remove('hidden');
+                } else {
+                    // Hide thumbnail if no photos
+                    thumbnail.classList.add('hidden');
+                }
+            }
+
+            function scrollToCarousel() {
+                hapticFeedback();
+                const modalContent = document.querySelector('.photos-modal .modal-content');
+                if (modalContent) {
+                    // Scroll to bottom to show carousel
+                    modalContent.scrollTo({ top: modalContent.scrollHeight, behavior: 'smooth' });
+                }
             }
 
             function clearPhotos() {
@@ -2436,6 +2509,8 @@ def property_type_selector():
                 if (currentPhotosArea && areaPhotos[currentPhotosArea]) {
                     areaPhotos[currentPhotosArea] = [];
                     renderPhotosGrid();
+                    // Hide thumbnail
+                    updateThumbnail();
                     // Also update the carousel to remove photos
                     updateAreaCarousel(currentPhotosArea);
                     // Save changes to server
@@ -2449,6 +2524,9 @@ def property_type_selector():
                 await closePhotosModal();
             }
 
+            // Track current index for each area carousel
+            const areaCarouselIndices = {};
+
             function updateAreaCarousel(area) {
                 const areaBtn = document.querySelector('.area-btn[data-area="' + area + '"]');
                 if (!areaBtn) return;
@@ -2461,64 +2539,176 @@ def property_type_selector():
                 if (photos.length === 0) {
                     carousel.classList.remove('has-photos');
                     carousel.innerHTML = '';
+                    delete areaCarouselIndices[area];
                     return;
                 }
 
-                // Build carousel HTML
-                let slidesHtml = '<div class="area-carousel-inner">';
-                photos.forEach((photo, index) => {
-                    slidesHtml += '<div class="area-carousel-slide" data-index="' + index + '"><img src="' + photo + '" alt="Photo ' + (index + 1) + '"></div>';
-                });
-                slidesHtml += '</div>';
-
-                // Add dots if more than 1 photo
-                if (photos.length > 1) {
-                    slidesHtml += '<div class="area-carousel-dots">';
-                    photos.forEach((_, index) => {
-                        slidesHtml += '<span class="area-carousel-dot' + (index === 0 ? ' active' : '') + '" data-index="' + index + '" onclick="scrollCarouselTo(event, this)"></span>';
-                    });
-                    slidesHtml += '</div>';
+                // Initialize index for this area if not exists
+                if (typeof areaCarouselIndices[area] === 'undefined') {
+                    areaCarouselIndices[area] = 0;
                 }
 
-                carousel.innerHTML = slidesHtml;
+                const currentIndex = areaCarouselIndices[area];
+
+                // Reset index if out of bounds
+                if (currentIndex >= photos.length) {
+                    areaCarouselIndices[area] = photos.length - 1;
+                }
+                if (currentIndex < 0) {
+                    areaCarouselIndices[area] = 0;
+                }
+
+                renderAreaCarousel(area, areaBtn, carousel);
+            }
+
+            function renderAreaCarousel(area, areaBtn, carousel) {
+                const photos = areaPhotos[area] || [];
+                const currentIndex = areaCarouselIndices[area] || 0;
+
+                // Build slides: prev, current, next
+                const prevIndex = currentIndex > 0 ? currentIndex - 1 : null;
+                const nextIndex = currentIndex < photos.length - 1 ? currentIndex + 1 : null;
+
+                let slidesHTML = '';
+
+                // Previous slide
+                if (prevIndex !== null) {
+                    slidesHTML += `<div class="area-carousel-slide area-slide-prev"><img src="${photos[prevIndex]}" alt="Photo ${prevIndex + 1}"></div>`;
+                }
+
+                // Current slide
+                slidesHTML += `<div class="area-carousel-slide area-slide-current"><img src="${photos[currentIndex]}" alt="Photo ${currentIndex + 1}"></div>`;
+
+                // Next slide
+                if (nextIndex !== null) {
+                    slidesHTML += `<div class="area-carousel-slide area-slide-next"><img src="${photos[nextIndex]}" alt="Photo ${nextIndex + 1}"></div>`;
+                }
+
+                const trackHTML = `<div class="area-carousel-track">${slidesHTML}</div>`;
+
+                // Add dots if more than 1 photo
+                let dotsHTML = '';
+                if (photos.length > 1) {
+                    dotsHTML = '<div class="area-carousel-dots">';
+                    photos.forEach((_, index) => {
+                        dotsHTML += '<span class="area-carousel-dot' + (index === currentIndex ? ' active' : '') + '"></span>';
+                    });
+                    dotsHTML += '</div>';
+                }
+
+                carousel.innerHTML = trackHTML + dotsHTML;
                 carousel.classList.add('has-photos');
 
-                // Add scroll listener to update dots
-                const inner = carousel.querySelector('.area-carousel-inner');
-                if (inner) {
-                    inner.addEventListener('scroll', () => updateCarouselDots(carousel));
+                // Add touch event listeners for swipe
+                const track = carousel.querySelector('.area-carousel-track');
+                if (track) {
+                    let isAnimating = false;
+                    let touchStartX = 0;
+                    let currentTranslateX = 0;
+                    let isDragging = false;
+
+                    function handleTouchStart(e) {
+                        if (isAnimating) return;
+                        touchStartX = e.touches ? e.touches[0].clientX : e.clientX;
+                        isDragging = true;
+                        currentTranslateX = 0;
+                        track.style.transition = 'none';
+                    }
+
+                    function handleTouchMove(e) {
+                        if (!isDragging || isAnimating) return;
+                        const currentX = e.touches ? e.touches[0].clientX : e.clientX;
+                        currentTranslateX = currentX - touchStartX;
+
+                        const isAtStart = currentIndex === 0 && currentTranslateX > 0;
+                        const isAtEnd = currentIndex === photos.length - 1 && currentTranslateX < 0;
+
+                        if (isAtStart || isAtEnd) {
+                            // Apply resistance at edges
+                            track.style.transform = `translateX(${currentTranslateX * 0.3}px)`;
+                        } else {
+                            track.style.transform = `translateX(${currentTranslateX}px)`;
+                        }
+                    }
+
+                    function handleTouchEnd(e) {
+                        if (!isDragging || isAnimating) return;
+                        isDragging = false;
+                        const touchEndX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+
+                        const swipeThreshold = 30;
+                        const diff = touchStartX - touchEndX;
+                        const containerWidth = carousel.offsetWidth;
+
+                        if (Math.abs(diff) > swipeThreshold) {
+                            isAnimating = true;
+                            if (diff > 0 && currentIndex < photos.length - 1) {
+                                // Swipe left - next photo only
+                                track.style.transition = 'transform 0.25s ease-out';
+                                track.style.transform = `translateX(-${containerWidth}px)`;
+                                setTimeout(() => {
+                                    areaCarouselIndices[area]++;
+                                    renderAreaCarousel(area, areaBtn, carousel);
+                                    isAnimating = false;
+                                }, 250);
+                            } else if (diff < 0 && currentIndex > 0) {
+                                // Swipe right - prev photo only
+                                track.style.transition = 'transform 0.25s ease-out';
+                                track.style.transform = `translateX(${containerWidth}px)`;
+                                setTimeout(() => {
+                                    areaCarouselIndices[area]--;
+                                    renderAreaCarousel(area, areaBtn, carousel);
+                                    isAnimating = false;
+                                }, 250);
+                            } else {
+                                // Snap back at edges
+                                track.style.transition = 'transform 0.25s ease-out';
+                                track.style.transform = 'translateX(0)';
+                                isAnimating = false;
+                            }
+                        } else {
+                            // Snap back if not enough swipe
+                            track.style.transition = 'transform 0.25s ease-out';
+                            track.style.transform = 'translateX(0)';
+                            isAnimating = false;
+                        }
+                    }
+
+                    // Touch events
+                    track.addEventListener('touchstart', handleTouchStart, { passive: true });
+                    track.addEventListener('touchmove', handleTouchMove, { passive: true });
+                    track.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+                    // Mouse events (for desktop/testing)
+                    track.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        handleTouchStart(e);
+                    });
+
+                    track.addEventListener('mousemove', (e) => {
+                        if (isDragging) {
+                            handleTouchMove(e);
+                        }
+                    });
+
+                    track.addEventListener('mouseup', handleTouchEnd);
+                    track.addEventListener('mouseleave', (e) => {
+                        if (isDragging) {
+                            handleTouchEnd(e);
+                        }
+                    });
                 }
 
                 // Add click listener to open photos modal
                 carousel.onclick = function(e) {
-                    e.stopPropagation();
-                    const photosBtn = areaBtn.querySelector('.photos-action-btn');
-                    if (photosBtn) {
-                        openPhotosModal(e, photosBtn);
+                    if (!isDragging) {
+                        e.stopPropagation();
+                        const photosBtn = areaBtn.querySelector('.photos-action-btn');
+                        if (photosBtn) {
+                            openPhotosModal(e, photosBtn);
+                        }
                     }
                 };
-            }
-
-            function scrollCarouselTo(event, dot) {
-                event.stopPropagation();
-                const carousel = dot.closest('.area-carousel');
-                const inner = carousel.querySelector('.area-carousel-inner');
-                const index = parseInt(dot.dataset.index);
-                const slideWidth = inner.querySelector('.area-carousel-slide').offsetWidth + 6; // 6px gap
-                inner.scrollTo({ left: index * slideWidth, behavior: 'smooth' });
-            }
-
-            function updateCarouselDots(carousel) {
-                const inner = carousel.querySelector('.area-carousel-inner');
-                const dots = carousel.querySelectorAll('.area-carousel-dot');
-                if (!inner || dots.length === 0) return;
-
-                const slideWidth = inner.querySelector('.area-carousel-slide').offsetWidth + 6;
-                const activeIndex = Math.round(inner.scrollLeft / slideWidth);
-
-                dots.forEach((dot, index) => {
-                    dot.classList.toggle('active', index === activeIndex);
-                });
             }
 
             function loadAreaItems(area) {
@@ -3147,36 +3337,44 @@ def get_property_selector_styles():
         margin: 8px auto 0;
         position: relative;
         flex-shrink: 0;
+        overflow: hidden;
+        border-radius: 8px;
     }
 
     .area-carousel.has-photos {
         display: block;
     }
 
-    .area-carousel-inner {
+    .area-carousel-track {
         display: flex;
-        overflow-x: auto;
-        scroll-snap-type: x mandatory;
-        gap: 6px;
-        scrollbar-width: none;
-        -ms-overflow-style: none;
-        border-radius: 8px;
-    }
-
-    .area-carousel-inner::-webkit-scrollbar {
-        display: none;
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1/1;
+        touch-action: pan-y;
     }
 
     .area-carousel-slide {
-        flex: 0 0 100%;
-        scroll-snap-align: start;
-        aspect-ratio: 1/1;
-        border-radius: 8px;
-        overflow: hidden;
-        background: transparent;
+        position: absolute;
+        width: 100%;
+        height: 100%;
         display: flex;
         align-items: center;
         justify-content: center;
+        background: transparent;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .area-carousel-slide.area-slide-prev {
+        left: -100%;
+    }
+
+    .area-carousel-slide.area-slide-current {
+        left: 0;
+    }
+
+    .area-carousel-slide.area-slide-next {
+        left: 100%;
     }
 
     .area-carousel-slide img {
@@ -3692,7 +3890,7 @@ def get_property_selector_styles():
         margin-left: -15px;
         margin-right: -15px;
         height: calc(100vh - 120px);
-        background: #000;
+        background: transparent;
         border-radius: 0;
         overflow: hidden;
         position: relative;
@@ -3719,6 +3917,35 @@ def get_property_selector_styles():
         display: none;
     }
 
+    /* Photo Thumbnail Preview */
+    .photo-thumbnail-preview {
+        position: absolute;
+        bottom: 20px;
+        left: 25%;
+        transform: translateX(-50%);
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        border: 4px solid white;
+        cursor: pointer;
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        opacity: 1;
+        z-index: 5;
+    }
+
+    .photo-thumbnail-preview.hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .photo-thumbnail-preview:active {
+        transform: translateX(-50%) scale(0.9);
+    }
+
     /* Shutter Button */
     .shutter-btn {
         position: absolute;
@@ -3728,23 +3955,29 @@ def get_property_selector_styles():
         width: 70px;
         height: 70px;
         border-radius: 50%;
-        background: rgba(255, 255, 255, 0.3);
+        background: #000000;
         border: 4px solid white;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: all 0.15s ease;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        opacity: 1;
+    }
+
+    .shutter-btn.hidden {
+        opacity: 0;
+        pointer-events: none;
     }
 
     .shutter-btn:hover {
-        background: rgba(255, 255, 255, 0.4);
+        background: #1a1a1a;
     }
 
     .shutter-btn:focus {
         outline: none;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         -webkit-tap-highlight-color: transparent;
     }
 
@@ -3757,6 +3990,7 @@ def get_property_selector_styles():
         height: 54px;
         border-radius: 50%;
         background: white;
+        border: 3px solid white;
         transition: all 0.15s ease;
     }
 
