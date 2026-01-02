@@ -3363,6 +3363,8 @@ def get_property_selector_styles():
     @media (max-width: 767px) {
         .camera-section {
             display: block;
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
         }
         .upload-section {
             display: none !important;
@@ -3389,6 +3391,8 @@ def get_property_selector_styles():
             background: transparent;
             position: relative;
             overflow-y: auto;
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
         }
 
         .photos-modal .modal-header {
@@ -3515,6 +3519,8 @@ def get_property_selector_styles():
             margin-left: -15px;
             margin-right: -15px;
             padding: 0;
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
         }
 
         .photo-carousel-slide {
