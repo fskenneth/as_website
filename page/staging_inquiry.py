@@ -4329,7 +4329,7 @@ def get_property_selector_styles():
         }
 
         .area-btn.selected {
-            min-height: 130px;
+            min-height: 150px;
             padding-bottom: 80px;
         }
 
