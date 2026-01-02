@@ -2303,14 +2303,12 @@ def property_type_selector():
 
                 container.innerHTML = `<div class="carousel-track" id="carousel-track">${slidesHTML}</div>`;
 
-                // Render counter: dots on mobile, text on desktop
-                if (isMobile && photos.length > 1) {
+                // Render counter: dots on both mobile and desktop
+                if (photos.length > 1) {
                     const dots = photos.map((_, i) =>
                         `<span class="carousel-dot ${i === currentPhotoIndex ? 'active' : ''}"></span>`
                     ).join('');
                     counter.innerHTML = `<div class="carousel-dots">${dots}</div>`;
-                } else if (photos.length > 1) {
-                    counter.innerHTML = `${currentPhotoIndex + 1} / ${photos.length}`;
                 } else {
                     counter.innerHTML = '';
                 }
@@ -2417,18 +2415,44 @@ def property_type_selector():
             }
 
             function prevPhoto(direction = 'right') {
+                buttonFeedback();
                 const photos = areaPhotos[currentPhotosArea] || [];
-                if (photos.length > 0) {
-                    currentPhotoIndex = (currentPhotoIndex - 1 + photos.length) % photos.length;
-                    renderPhotosGrid(direction);
+                if (photos.length > 0 && !isAnimating) {
+                    isAnimating = true;
+                    const track = document.getElementById('carousel-track');
+                    const containerWidth = document.getElementById('photos-carousel-container').offsetWidth;
+                    const gap = 10;
+
+                    if (track) {
+                        track.style.transition = 'transform 0.25s ease-out';
+                        track.style.transform = `translateX(${containerWidth + gap}px)`;
+                        setTimeout(() => {
+                            currentPhotoIndex = (currentPhotoIndex - 1 + photos.length) % photos.length;
+                            renderPhotosGrid();
+                            isAnimating = false;
+                        }, 250);
+                    }
                 }
             }
 
             function nextPhoto(direction = 'left') {
+                buttonFeedback();
                 const photos = areaPhotos[currentPhotosArea] || [];
-                if (photos.length > 0) {
-                    currentPhotoIndex = (currentPhotoIndex + 1) % photos.length;
-                    renderPhotosGrid(direction);
+                if (photos.length > 0 && !isAnimating) {
+                    isAnimating = true;
+                    const track = document.getElementById('carousel-track');
+                    const containerWidth = document.getElementById('photos-carousel-container').offsetWidth;
+                    const gap = 10;
+
+                    if (track) {
+                        track.style.transition = 'transform 0.25s ease-out';
+                        track.style.transform = `translateX(-${containerWidth + gap}px)`;
+                        setTimeout(() => {
+                            currentPhotoIndex = (currentPhotoIndex + 1) % photos.length;
+                            renderPhotosGrid();
+                            isAnimating = false;
+                        }, 250);
+                    }
                 }
             }
 
@@ -2586,6 +2610,16 @@ def property_type_selector():
 
                 const trackHTML = `<div class="area-carousel-track">${slidesHTML}</div>`;
 
+                // Add arrows for desktop
+                const isMobile = window.innerWidth <= 767;
+                let arrowsHTML = '';
+                if (!isMobile && photos.length > 1) {
+                    arrowsHTML = `
+                        <button class="area-carousel-arrow area-carousel-prev" data-area="${area}">‹</button>
+                        <button class="area-carousel-arrow area-carousel-next" data-area="${area}">›</button>
+                    `;
+                }
+
                 // Add dots if more than 1 photo
                 let dotsHTML = '';
                 if (photos.length > 1) {
@@ -2596,7 +2630,7 @@ def property_type_selector():
                     dotsHTML += '</div>';
                 }
 
-                carousel.innerHTML = trackHTML + dotsHTML;
+                carousel.innerHTML = trackHTML + arrowsHTML + dotsHTML;
                 carousel.classList.add('has-photos');
 
                 // Add touch event listeners for swipe
@@ -2697,6 +2731,46 @@ def property_type_selector():
                             handleTouchEnd(e);
                         }
                     });
+                }
+
+                // Add arrow click handlers for desktop
+                const prevArrow = carousel.querySelector('.area-carousel-prev');
+                const nextArrow = carousel.querySelector('.area-carousel-next');
+
+                if (prevArrow) {
+                    prevArrow.onclick = function(e) {
+                        e.stopPropagation();
+                        if (currentIndex > 0 && !isAnimating) {
+                            isAnimating = true;
+                            const track = carousel.querySelector('.area-carousel-track');
+                            const containerWidth = carousel.offsetWidth;
+                            track.style.transition = 'transform 0.25s ease-out';
+                            track.style.transform = `translateX(${containerWidth}px)`;
+                            setTimeout(() => {
+                                areaCarouselIndices[area]--;
+                                renderAreaCarousel(area, areaBtn, carousel);
+                                isAnimating = false;
+                            }, 250);
+                        }
+                    };
+                }
+
+                if (nextArrow) {
+                    nextArrow.onclick = function(e) {
+                        e.stopPropagation();
+                        if (currentIndex < photos.length - 1 && !isAnimating) {
+                            isAnimating = true;
+                            const track = carousel.querySelector('.area-carousel-track');
+                            const containerWidth = carousel.offsetWidth;
+                            track.style.transition = 'transform 0.25s ease-out';
+                            track.style.transform = `translateX(-${containerWidth}px)`;
+                            setTimeout(() => {
+                                areaCarouselIndices[area]++;
+                                renderAreaCarousel(area, areaBtn, carousel);
+                                isAnimating = false;
+                            }, 250);
+                        }
+                    };
                 }
 
                 // Add click listener to open photos modal
@@ -3390,6 +3464,7 @@ def get_property_selector_styles():
         justify-content: center;
         gap: 4px;
         margin-top: 6px;
+        margin-bottom: 10px;
     }
 
     .area-carousel-dot {
@@ -3403,6 +3478,38 @@ def get_property_selector_styles():
 
     .area-carousel-dot.active {
         background: var(--color-primary);
+    }
+
+    /* Area Carousel Arrows - hidden on mobile, shown on desktop */
+    .area-carousel-arrow {
+        display: none;
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 36px;
+        height: 36px;
+        border: none;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.5);
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        z-index: 10;
+        transition: all 0.2s ease;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .area-carousel-arrow:hover {
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    .area-carousel-prev {
+        left: 8px;
+    }
+
+    .area-carousel-next {
+        right: 8px;
     }
 
     /* Hide Photos button when carousel has photos */
@@ -4673,9 +4780,30 @@ def get_property_selector_styles():
             margin-top: 8px;
         }
 
+        .area-carousel-track {
+            max-height: 120px;
+        }
+
+        .area-carousel {
+            margin-bottom: 8px;
+        }
+
+        .area-carousel-arrow {
+            display: flex;
+        }
+
         .area-actions {
             padding: 0 10px 10px 10px;
             gap: 6px;
+        }
+
+        /* Fix photo modal dots positioning on desktop */
+        .photos-content {
+            gap: 0;
+        }
+
+        .photos-carousel-counter {
+            margin-top: 16px;
         }
     }
 
@@ -4835,6 +4963,10 @@ def get_property_selector_styles():
         /* Area button mobile styles */
         .area-carousel-slide {
             max-height: 100px;
+        }
+
+        .area-carousel-dots {
+            margin-bottom: 50px;
         }
 
         .area-actions {
