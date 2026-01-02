@@ -3352,7 +3352,7 @@ def get_property_selector_styles():
         min-height: 200px;
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 60px;
     }
 
     /* Camera Section - hidden on desktop */
@@ -3691,8 +3691,7 @@ def get_property_selector_styles():
         width: calc(100% + 30px);
         margin-left: -15px;
         margin-right: -15px;
-        min-height: 400px;
-        max-height: 80vh;
+        height: calc(100vh - 120px);
         background: #000;
         border-radius: 0;
         overflow: hidden;
