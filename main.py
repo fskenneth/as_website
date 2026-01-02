@@ -20,6 +20,7 @@ from page.services import (
 from page.contact import contact_page
 from page.staging_inquiry import staging_inquiry_page
 from page.reserve import reserve_page
+from page.design import design_page
 from page.areas import AREAS, AREA_PAGE_FUNCTIONS
 from page.blog_listing import blog_listing_page, load_blog_metadata
 from page.signin import signin_page
@@ -1037,6 +1038,13 @@ def reserve(req: Request):
     """Staging reservation page"""
     user = get_current_user(req)
     return reserve_page(req, user=user)
+
+
+@rt('/design')
+def design(req: Request):
+    """Staging design page - visual presentation of staging with areas and items"""
+    staging_id = req.query_params.get('id')
+    return design_page(req, staging_id=staging_id)
 
 
 # =============================================================================

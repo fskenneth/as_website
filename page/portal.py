@@ -18,7 +18,7 @@ def get_portal_styles():
     }
 
     .portal-container {
-        max-width: 1100px;
+        max-width: 960px;
         margin: 0 auto;
     }
 
@@ -521,6 +521,7 @@ def get_portal_styles():
         font-weight: 500;
         cursor: pointer;
         transition: all 0.2s ease;
+        text-decoration: none;
     }
 
     .staging-action-btn.primary {
@@ -1097,6 +1098,7 @@ def get_portal_scripts():
             actionsHtml = `
                 <div class="staging-actions">
                     <a href="/staging-inquiry/" class="staging-action-btn secondary">Edit Quote</a>
+                    <a href="/design?id=${item.id}" class="staging-action-btn secondary">Staging Design</a>
                     <a href="/reserve/" class="staging-action-btn primary">Complete Booking</a>
                 </div>
             `;
