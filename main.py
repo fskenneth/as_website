@@ -21,6 +21,7 @@ from page.contact import contact_page
 from page.staging_inquiry import staging_inquiry_page
 from page.reserve import reserve_page
 from page.design import design_page
+from tools.test.test_inpainting import test_inpainting_page
 from page.areas import AREAS, AREA_PAGE_FUNCTIONS
 from page.blog_listing import blog_listing_page, load_blog_metadata
 from page.signin import signin_page
@@ -605,7 +606,7 @@ async def vacate_photo(request: Request):
     import uuid
     import os
     from PIL import Image
-    from tools.image_vacate import ImageVacator
+    from tools.test.image_vacate import ImageVacator
 
     try:
         data = await request.json()
@@ -680,6 +681,66 @@ async def vacate_photo(request: Request):
 
     except Exception as e:
         print(f"Vacate photo error: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+
+
+@rt('/api/test-inpainting', methods=['POST'])
+async def test_inpainting(request: Request):
+    """
+    Test endpoint to compare 3 inpainting methods
+
+    Request body:
+        {
+            "image": "base64-encoded image"
+        }
+
+    Returns:
+        {
+            "success": true,
+            "results": {
+                "method_1": {...},
+                "method_2": {...},
+                "method_3": {...}
+            }
+        }
+    """
+    import base64
+    import io
+    from PIL import Image
+    from tools.test.image_vacate_test import InpaintingTester, image_to_base64
+
+    try:
+        data = await request.json()
+        image_data = data.get('image', '')
+
+        # Decode base64 image
+        if image_data.startswith('data:image'):
+            image_data = image_data.split(',')[1]
+
+        image_bytes = base64.b64decode(image_data)
+        image = Image.open(io.BytesIO(image_bytes))
+
+        # Initialize tester
+        tester = InpaintingTester()
+
+        # Run all 3 methods
+        results = tester.compare_all_methods(image)
+
+        # Convert PIL images to base64 for response
+        for method_key in results:
+            if 'result' in results[method_key]:
+                result_image = results[method_key].pop('result')
+                results[method_key]['result_base64'] = image_to_base64(result_image)
+
+        return JSONResponse({
+            'success': True,
+            'results': results
+        })
+
+    except Exception as e:
+        print(f"Test inpainting error: {e}")
         import traceback
         traceback.print_exc()
         return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
@@ -1150,6 +1211,12 @@ def design(req: Request):
     """Staging design page - visual presentation of staging with areas and items"""
     staging_id = req.query_params.get('id')
     return design_page(req, staging_id=staging_id)
+
+
+@rt('/test')
+def test():
+    """Test page for comparing inpainting methods - TEMPORARY, will be removed"""
+    return test_inpainting_page()
 
 
 # =============================================================================
