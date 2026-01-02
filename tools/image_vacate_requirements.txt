@@ -1,0 +1,23 @@
+# Image Vacating Dependencies
+# Install with: pip3 install -r tools/image_vacate_requirements.txt
+
+# Core inpainting library
+simple-lama-inpainting>=0.1.2
+
+# Deep learning framework (required by simple-lama-inpainting)
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Image processing
+pillow>=9.5.0,<10.0.0  # Required by simple-lama-inpainting
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# Optional: For GPU acceleration (CUDA 11.8)
+# Uncomment and install separately if you have an NVIDIA GPU:
+# --index-url https://download.pytorch.org/whl/cu118
+# torch>=2.0.0
+# torchvision>=0.15.0
+
+# Note: For CPU-only installation, the above dependencies are sufficient.
+# GPU installation can significantly speed up processing but is not required.

@@ -50,6 +50,10 @@ logs/
 # User database
 data/
 users.db
+user_data.db
 
 # Staging area photos (user uploads)
 static/images/areas/
+
+# AI-vacated photos (generated images)
+static/images/vacated/
