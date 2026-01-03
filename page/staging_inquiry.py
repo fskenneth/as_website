@@ -1199,34 +1199,20 @@ def property_type_selector():
                         const staging = result.stagings[0];
                         currentStagingId = staging.id;
 
-                        // Parse server photos
+                        // Parse server data
                         const serverPhotos = staging.area_photos ? JSON.parse(staging.area_photos) : {};
 
-                        // Check if local session data exists
-                        const localDataStr = sessionStorage.getItem(STAGING_SESSION_KEY);
-                        if (localDataStr) {
-                            // Merge server photos into local data (only if server has photos)
-                            const localData = JSON.parse(localDataStr);
-                            // Only update local photos if server has photos (don't overwrite with empty)
-                            if (Object.keys(serverPhotos).length > 0) {
-                                localData.areaPhotos = serverPhotos;
-                                sessionStorage.setItem(STAGING_SESSION_KEY, JSON.stringify(localData));
-                            }
-                        } else {
-                            // No local data - create from server
-                            const serverSessionData = {
-                                propertyType: staging.property_type,
-                                propertySize: staging.property_size,
-                                selectedAreas: staging.selected_areas ? JSON.parse(staging.selected_areas) : [],
-                                areaItemsData: staging.selected_items ? JSON.parse(staging.selected_items) : {},
-                                areaPhotos: serverPhotos,
-                                totalFee: staging.total_fee,
-                                timestamp: Date.now()
-                            };
-                            sessionStorage.setItem(STAGING_SESSION_KEY, JSON.stringify(serverSessionData));
-                            // Reload page to apply restored data
-                            location.reload();
-                        }
+                        // Always replace sessionStorage with fresh server data to ensure sync across devices
+                        const serverSessionData = {
+                            propertyType: staging.property_type,
+                            propertySize: staging.property_size,
+                            selectedAreas: staging.selected_areas ? JSON.parse(staging.selected_areas) : [],
+                            areaItemsData: staging.selected_items ? JSON.parse(staging.selected_items) : {},
+                            areaPhotos: serverPhotos,
+                            totalFee: staging.total_fee,
+                            timestamp: Date.now()
+                        };
+                        sessionStorage.setItem(STAGING_SESSION_KEY, JSON.stringify(serverSessionData));
                     }
                 } catch (e) {
                     console.warn('Could not load from server:', e);
@@ -2489,7 +2475,7 @@ def property_type_selector():
                     // Re-render to show the rotated photo
                     renderPhotosGrid();
                     updateAreaCarousel(currentPhotosArea);
-                    updateThumbnail();
+                    // Don't update thumbnail here - let scroll position control visibility
                     saveStagingSession();
                 };
 
