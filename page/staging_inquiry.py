@@ -998,6 +998,8 @@ def property_type_selector():
 
             // Combined feedback
             function buttonFeedback() {
+                // Don't play sounds during page load/restore
+                if (isRestoring) return;
                 hapticFeedback();
                 playClickSound();
             }
@@ -1465,7 +1467,6 @@ def property_type_selector():
 
             // Navigate to reserve page (data is passed via session storage)
             function goToReserve() {
-                buttonFeedback();
                 // Save current selections to session storage before navigating
                 saveStagingSession();
                 // Redirect to reserve page without URL parameters
@@ -1518,7 +1519,6 @@ def property_type_selector():
             };
 
             function selectPropertyType(btn, skipSave = false) {
-                buttonFeedback();
                 const allBtns = document.querySelectorAll('.property-btn:not(.size-btn):not(.area-btn):not(.placeholder-btn)');
                 const sizeSelector = document.getElementById('size-selector');
                 const sizePlaceholder = document.getElementById('size-placeholder');
@@ -1578,7 +1578,6 @@ def property_type_selector():
             }
 
             function selectSize(btn, skipSave = false) {
-                buttonFeedback();
                 const allSizeBtns = document.querySelectorAll('.size-btn');
 
                 if (btn.classList.contains('selected')) {
@@ -1943,7 +1942,6 @@ def property_type_selector():
 
             function openItemsModal(event, element) {
                 event.stopPropagation();
-                buttonFeedback();
 
                 const areaBtn = element.closest('.area-btn');
                 currentArea = areaBtn.getAttribute('data-area');
@@ -1965,7 +1963,6 @@ def property_type_selector():
             }
 
             function closeItemsModal() {
-                buttonFeedback();
                 document.getElementById('items-modal').classList.add('hidden');
                 document.body.style.overflow = '';
                 currentArea = null;
@@ -1977,7 +1974,6 @@ def property_type_selector():
 
             function openPhotosModal(event, element) {
                 event.stopPropagation();
-                buttonFeedback();
                 const areaBtn = element.closest('.area-btn');
                 const area = areaBtn.getAttribute('data-area');
                 currentPhotosArea = area;
@@ -2415,7 +2411,6 @@ def property_type_selector():
             }
 
             function prevPhoto(direction = 'right') {
-                buttonFeedback();
                 const photos = areaPhotos[currentPhotosArea] || [];
                 if (photos.length > 0 && !isAnimating) {
                     isAnimating = true;
@@ -2436,7 +2431,6 @@ def property_type_selector():
             }
 
             function nextPhoto(direction = 'left') {
-                buttonFeedback();
                 const photos = areaPhotos[currentPhotosArea] || [];
                 if (photos.length > 0 && !isAnimating) {
                     isAnimating = true;
@@ -2529,7 +2523,6 @@ def property_type_selector():
             }
 
             function clearPhotos() {
-                buttonFeedback();
                 if (currentPhotosArea && areaPhotos[currentPhotosArea]) {
                     areaPhotos[currentPhotosArea] = [];
                     renderPhotosGrid();
@@ -2543,7 +2536,6 @@ def property_type_selector():
             }
 
             async function applyPhotos() {
-                buttonFeedback();
                 // closePhotosModal handles upload, carousel update, save session, and cleanup
                 await closePhotosModal();
             }
@@ -2895,7 +2887,6 @@ def property_type_selector():
             }
 
             function resetItemsToDefault() {
-                buttonFeedback();
                 if (!currentArea) return;
 
                 // Get default items for this area
@@ -2924,8 +2915,6 @@ def property_type_selector():
             }
 
             function clearAllItems() {
-                buttonFeedback();
-
                 // Set all items to 0
                 document.querySelectorAll('.item-btn').forEach(btn => {
                     const itemId = btn.getAttribute('data-item');
@@ -2943,8 +2932,6 @@ def property_type_selector():
             }
 
             function applyItemsSelection() {
-                buttonFeedback();
-
                 if (!currentArea) {
                     closeItemsModal();
                     return;
@@ -3002,7 +2989,6 @@ def property_type_selector():
 
             // Inquiry Modal Functions
             function openInquiryModal() {
-                buttonFeedback();
                 const { propertyType, propertySize } = getSelections();
 
                 // Populate hidden fields with current staging data
