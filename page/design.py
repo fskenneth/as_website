@@ -287,8 +287,6 @@ def get_design_styles():
         transition: background 0.2s;
     }
 
-    @media (max-width: 767px) {
-
     .carousel-dot.active {
         background: white;
     }
