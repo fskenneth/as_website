@@ -454,12 +454,10 @@ def get_design_styles():
 
         .carousel-container {
             padding: 0 40px 24px;
-            max-width: 960px;
         }
 
         .items-container {
             padding: 0 40px 40px;
-            max-width: 960px;
         }
 
         .items-grid {
