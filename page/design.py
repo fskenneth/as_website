@@ -287,106 +287,7 @@ def get_design_styles():
         transition: background 0.2s;
     }
 
-    /* Vacate button - top right corner of carousel */
-    .vacate-btn {
-        position: absolute;
-        top: 12px;
-        right: 12px;
-        padding: 8px 16px;
-        background: rgba(220, 38, 38, 0.9);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        z-index: 15;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    }
-
-    .vacate-btn:hover {
-        background: rgba(220, 38, 38, 1);
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    }
-
-    .vacate-btn:active {
-        transform: translateY(0);
-    }
-
-    .vacate-btn.processing {
-        background: rgba(156, 163, 175, 0.9);
-        cursor: wait;
-        pointer-events: none;
-    }
-
-    .vacate-btn .spinner {
-        width: 14px;
-        height: 14px;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        border-top-color: white;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-    }
-
-    /* Revert button - next to vacate button */
-    .revert-btn {
-        position: absolute;
-        top: 12px;
-        right: 92px; /* Positioned to the left of vacate button */
-        padding: 8px 16px;
-        background: rgba(59, 130, 246, 0.9);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        z-index: 15;
-        display: none; /* Hidden by default */
-        align-items: center;
-        gap: 6px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    }
-
-    .revert-btn.show {
-        display: flex;
-    }
-
-    .revert-btn:hover {
-        background: rgba(59, 130, 246, 1);
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    }
-
-    .revert-btn:active {
-        transform: translateY(0);
-    }
-
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-
     @media (max-width: 767px) {
-        .vacate-btn {
-            padding: 6px 12px;
-            font-size: 13px;
-            top: 8px;
-            right: 8px;
-        }
-
-        .revert-btn {
-            padding: 6px 12px;
-            font-size: 13px;
-            top: 8px;
-            right: 82px;
-        }
-    }
 
     .carousel-dot.active {
         background: white;
@@ -618,10 +519,6 @@ def get_design_scripts(staging_id):
     let touchEndX = 0;
     let isDragging = false;
     let currentTranslateX = 0;
-
-    // Track original images and their vacated versions
-    // Format: {{ 'vacated_url': 'original_url' }}
-    let vacatedImageMap = {{}};
 
     // Load staging data
     async function loadStagingData() {{
@@ -880,28 +777,11 @@ def get_design_scripts(staging_id):
 
             const isMobile = window.innerWidth <= 767;
 
-            // Check if current photo is a vacated version
-            const currentPhotoUrl = area.photos[currentPhotoIndex];
-            const isVacated = vacatedImageMap[currentPhotoUrl] !== undefined;
-
             carouselHtml = `
                 <div class="area-carousel" id="carousel-${{index}}">
                     <div class="carousel-track" id="carousel-track-${{index}}">
                         ${{slidesHtml}}
                     </div>
-                    <button class="revert-btn ${{isVacated ? 'show' : ''}}" id="revert-btn-${{index}}" onclick="revertPhoto(${{index}})">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-                            <path d="M21 3v5h-5"/>
-                        </svg>
-                        Revert
-                    </button>
-                    <button class="vacate-btn" id="vacate-btn-${{index}}" onclick="vacatePhoto(${{index}})">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                        </svg>
-                        Vacate
-                    </button>
                     ${{area.photos.length > 1 ? `
                         <button class="carousel-nav-btn carousel-prev" onclick="prevSlide(${{index}})" style="display: ${{isMobile ? 'none' : 'flex'}}">‹</button>
                         <button class="carousel-nav-btn carousel-next" onclick="nextSlide(${{index}})" style="display: ${{isMobile ? 'none' : 'flex'}}">›</button>
@@ -1039,105 +919,6 @@ def get_design_scripts(staging_id):
                 updateCarousel(currentAreaIndex, -1);
             }}
         }}
-    }}
-
-    // Vacate photo - remove furniture and objects using AI
-    async function vacatePhoto(areaIndex) {{
-        const areas = currentStaging.areas;
-        const areaKeys = Object.keys(areas);
-        const area = areas[areaKeys[areaIndex]];
-        const currentPhotoIndex = carouselIndices[areaIndex] || 0;
-        const photoUrl = area.photos[currentPhotoIndex];
-
-        if (!photoUrl) {{
-            alert('No photo selected');
-            return;
-        }}
-
-        const btn = document.getElementById(`vacate-btn-${{areaIndex}}`);
-        if (!btn) return;
-
-        // Show processing state
-        const originalHTML = btn.innerHTML;
-        btn.classList.add('processing');
-        btn.innerHTML = `
-            <div class="spinner"></div>
-            Processing...
-        `;
-
-        try {{
-            // Call the vacate API endpoint
-            const response = await fetch('/api/vacate-photo', {{
-                method: 'POST',
-                headers: {{
-                    'Content-Type': 'application/json'
-                }},
-                body: JSON.stringify({{
-                    image: photoUrl,
-                    auto_detect: true,
-                    save: true
-                }})
-            }});
-
-            const data = await response.json();
-
-            if (data.success) {{
-                // Replace the current photo with the vacated version
-                if (data.saved_url) {{
-                    // Store the mapping: vacated_url -> original_url
-                    vacatedImageMap[data.saved_url] = photoUrl;
-
-                    // Update the photo in the area photos array
-                    area.photos[currentPhotoIndex] = data.saved_url;
-
-                    // Re-render the carousel to show the new image with revert button
-                    renderAreaContent(area, areaIndex);
-
-                    // Show success message
-                    showNotification('Photo vacated successfully! Click "Revert" to restore original.', 'success');
-                }} else {{
-                    showNotification('Vacated photo generated but not saved', 'warning');
-                }}
-            }} else {{
-                showNotification('Error: ' + (data.error || 'Failed to vacate photo'), 'error');
-            }}
-        }} catch (error) {{
-            console.error('Vacate error:', error);
-            showNotification('Network error: ' + error.message, 'error');
-        }} finally {{
-            // Restore button state
-            btn.classList.remove('processing');
-            btn.innerHTML = originalHTML;
-        }}
-    }}
-
-    // Revert photo - restore original before vacating
-    function revertPhoto(areaIndex) {{
-        const areas = currentStaging.areas;
-        const areaKeys = Object.keys(areas);
-        const area = areas[areaKeys[areaIndex]];
-        const currentPhotoIndex = carouselIndices[areaIndex] || 0;
-        const vacatedUrl = area.photos[currentPhotoIndex];
-
-        // Get the original URL from the map
-        const originalUrl = vacatedImageMap[vacatedUrl];
-
-        if (!originalUrl) {{
-            showNotification('No original image found to revert to', 'warning');
-            return;
-        }}
-
-        // Restore the original photo
-        area.photos[currentPhotoIndex] = originalUrl;
-
-        // Remove from the vacated map
-        delete vacatedImageMap[vacatedUrl];
-
-        // Re-render the carousel to hide the revert button
-        renderAreaContent(area, areaIndex);
-
-        // Show success message
-        showNotification('Reverted to original photo', 'success');
     }}
 
     // Show notification toast
