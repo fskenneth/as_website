@@ -4961,12 +4961,16 @@ def get_property_selector_styles():
         }
 
         /* Area button mobile styles */
+        .area-carousel-track {
+            max-height: 100px;
+        }
+
         .area-carousel-slide {
             max-height: 100px;
         }
 
         .area-carousel-dots {
-            margin-bottom: 50px;
+            margin-bottom: 60px;
         }
 
         .area-actions {
