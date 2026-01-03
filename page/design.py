@@ -303,7 +303,6 @@ def get_design_styles():
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 6px;
-        padding: 6px;
     }
 
     /* Item Card - Same as items modal */
