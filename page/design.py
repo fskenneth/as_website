@@ -431,7 +431,7 @@ def get_design_styles():
         }
 
         .sticky-header {
-            padding: 24px;
+            padding: 24px 40px;
             width: 100%;
             max-width: 960px;
         }
@@ -441,8 +441,8 @@ def get_design_styles():
         }
 
         .area-tabs {
-            padding-left: 40px;
-            padding-right: 40px;
+            padding-left: 0;
+            padding-right: 0;
         }
 
         .content-wrapper {
