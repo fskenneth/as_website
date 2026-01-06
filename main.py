@@ -21,6 +21,8 @@ from page.contact import contact_page
 from page.staging_inquiry import staging_inquiry_page
 from page.reserve import reserve_page
 from page.design import design_page
+# Test routes moved to tools/test/test_api_routes.py
+from tools.test.test_api_routes import register_test_routes
 from tools.test.test_inpainting import test_inpainting_page
 from page.areas import AREAS, AREA_PAGE_FUNCTIONS
 from page.blog_listing import blog_listing_page, load_blog_metadata
@@ -581,70 +583,10 @@ async def cleanup_staging_photos(request: Request):
         return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
 
 
-@rt('/api/test-inpainting', methods=['POST'])
-async def test_inpainting(request: Request):
-    """
-    Test endpoint to compare inpainting methods (runs one method at a time to save memory)
-
-    Request body:
-        {
-            "image": "base64-encoded image",
-            "method": 1, 2, or 3 (optional, runs single method if specified)
-        }
-
-    Returns:
-        {
-            "success": true,
-            "result": {...}  # single method result
-        }
-    """
-    import base64
-    import io
-    from PIL import Image
-    from tools.test.image_vacate_test import InpaintingTester, image_to_base64
-
-    try:
-        data = await request.json()
-        image_data = data.get('image', '')
-        method = data.get('method', 1)  # Default to method 1
-
-        # Decode base64 image
-        if image_data.startswith('data:image'):
-            image_data = image_data.split(',')[1]
-
-        image_bytes = base64.b64decode(image_data)
-        image = Image.open(io.BytesIO(image_bytes))
-
-        # Initialize tester
-        tester = InpaintingTester()
-
-        # Run only the requested method
-        result = None
-        if method == 1:
-            result = tester.method_1_lama(image)
-        elif method == 2:
-            result = tester.method_2_opencv(image)
-        elif method == 3:
-            result = tester.method_3_opencv_telea(image)
-        else:
-            return JSONResponse({'success': False, 'error': f'Invalid method: {method}'}, status_code=400)
-
-        # Convert PIL image to base64 for response
-        if 'result' in result:
-            result_image = result.pop('result')
-            result['result_base64'] = image_to_base64(result_image)
-
-        return JSONResponse({
-            'success': True,
-            'method': method,
-            'result': result
-        })
-
-    except Exception as e:
-        print(f"Test inpainting error: {e}")
-        import traceback
-        traceback.print_exc()
-        return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+# =============================================================================
+# TEST API ENDPOINTS - MOVED TO tools/test/test_api_routes.py
+# =============================================================================
+register_test_routes(rt)
 
 
 # =============================================================================
@@ -1116,7 +1058,7 @@ def design(req: Request):
 
 @rt('/test')
 def test():
-    """Test page for comparing inpainting methods - TEMPORARY, will be removed"""
+    """Test page for comparing inpainting methods"""
     return test_inpainting_page()
 
 
