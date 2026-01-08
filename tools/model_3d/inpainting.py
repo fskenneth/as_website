@@ -893,7 +893,6 @@ def test_inpainting_page():
         let currentLoadedModel = null;
         let isDraggingModel = false;
         let isDraggingRotate = false;
-        let isDraggingRotateY = false;
         let isDraggingScale = false;
         let isDraggingBrightness = false;
         let lastMouseX = 0;
@@ -1029,17 +1028,12 @@ def test_inpainting_page():
             if (!pos) return;
 
             const rotateCtrl = controlOverlay.querySelector('.rotate-control');
-            const rotateYCtrl = controlOverlay.querySelector('.rotate-y-control');
             const scaleCtrl = controlOverlay.querySelector('.scale-control');
             const brightnessCtrl = controlOverlay.querySelector('.brightness-control');
 
             if (rotateCtrl) {
                 rotateCtrl.style.left = pos.centerX + 'px';
                 rotateCtrl.style.top = Math.min(pos.bottomY + 15, viewerContainer.clientHeight - 50) + 'px';
-            }
-            if (rotateYCtrl) {
-                rotateYCtrl.style.left = pos.centerX + 'px';
-                rotateYCtrl.style.top = Math.max(pos.topY - 50, 50) + 'px';
             }
             if (scaleCtrl) {
                 scaleCtrl.style.left = Math.min(pos.rightX + 15, viewerContainer.clientWidth - 50) + 'px';
@@ -1074,18 +1068,6 @@ def test_inpainting_page():
             `;
             rotateBtn.title = 'Drag left/right to rotate (Y axis)';
 
-            // Rotate Z control (left-right arrows) - positioned above object (Z rotation)
-            const rotateYBtn = document.createElement('div');
-            rotateYBtn.className = 'rotate-y-control';
-            rotateYBtn.innerHTML = '↔';
-            rotateYBtn.style.cssText = `
-                position: absolute; top: 50px; left: 50%; transform: translate(-50%, 0);
-                width: 50px; height: 36px; background: rgba(255,255,255,0.9); border-radius: 18px;
-                display: flex; align-items: center; justify-content: center; font-size: 24px;
-                cursor: ew-resize; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                user-select: none; color: #6366f1; font-weight: bold;
-            `;
-            rotateYBtn.title = 'Drag left/right to rotate (Z axis)';
 
             // Scale control (up-down arrows) - positioned to right of object
             const scaleControl = document.createElement('div');
@@ -1137,7 +1119,6 @@ def test_inpainting_page():
             floorBtn.onclick = () => startDefiningFloor(container, floorBtn, moveHint);
 
             overlay.appendChild(rotateBtn);
-            overlay.appendChild(rotateYBtn);
             overlay.appendChild(scaleControl);
             overlay.appendChild(brightnessControl);
             overlay.appendChild(moveHint);
@@ -1151,14 +1132,6 @@ def test_inpainting_page():
                 isDraggingRotate = true;
                 lastMouseX = e.clientX;
                 rotateBtn.style.background = 'rgba(100,200,255,0.9)';
-            });
-
-            // Rotate Z control events (Z axis - top)
-            rotateYBtn.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                isDraggingRotateY = true;
-                lastMouseX = e.clientX;
-                rotateYBtn.style.background = 'rgba(99,102,241,0.9)';
             });
 
             // Scale control events
@@ -1186,11 +1159,6 @@ def test_inpainting_page():
                     rotateAroundFloor(currentLoadedModel, angle);
                     lastMouseX = e.clientX;
                 }
-                if (isDraggingRotateY && currentLoadedModel) {
-                    const deltaX = e.clientX - lastMouseX;
-                    currentLoadedModel.rotation.z += deltaX * 0.02;  // Top arrow = Z axis
-                    lastMouseX = e.clientX;
-                }
                 if (isDraggingScale && currentLoadedModel) {
                     const deltaY = e.clientY - lastMouseY;
                     const scaleFactor = 1 - deltaY * 0.005;
@@ -1214,14 +1182,6 @@ def test_inpainting_page():
                     rotateBtn.style.background = 'rgba(255,255,255,0.9)';
                     // Don't bake Y rotation - just let it accumulate
                     // Y rotation doesn't affect vertical alignment so no need to reset
-                }
-                if (isDraggingRotateY) {
-                    isDraggingRotateY = false;
-                    rotateYBtn.style.background = 'rgba(255,255,255,0.9)';
-                    // Bake Z rotation into geometry, then reset rotation to 0
-                    if (currentLoadedModel) {
-                        bakeRotation(currentLoadedModel);
-                    }
                 }
                 if (isDraggingScale) {
                     isDraggingScale = false;
@@ -1865,7 +1825,7 @@ def test_inpainting_page():
             const mouse = new THREE.Vector2();
 
             canvas.addEventListener('mousedown', (e) => {
-                if (isDraggingRotate || isDraggingRotateY || isDraggingScale || isDraggingBrightness) return;
+                if (isDraggingRotate || isDraggingScale || isDraggingBrightness) return;
 
                 const rect = canvas.getBoundingClientRect();
                 mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
