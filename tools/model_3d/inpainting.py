@@ -904,6 +904,8 @@ def test_inpainting_page():
 
         // Floor plane definition
         let floorPoints = [];  // 4 screen coordinates defining the floor
+        let floorWorldPoints = [];  // 4 world coordinates of the floor corners
+        let floorCenter = null;  // Center of the floor rectangle in world coords
         let isDefiningFloor = false;
         let floorMarkers = [];  // DOM elements showing floor points
         let floorPlaneY = 0;  // Y level of the floor in world coords
@@ -955,6 +957,9 @@ def test_inpainting_page():
             // Add control overlay UI
             addControlOverlay(container);
 
+            // Load saved floor data from localStorage (if any)
+            loadFloorFromStorage(container);
+
             // Load model based on format
             if (format === 'texture') {
                 loadTextureAsPlane(modelData);
@@ -971,6 +976,7 @@ def test_inpainting_page():
                 requestAnimationFrame(animate);
                 threeRenderer.render(threeScene, threeCamera);
                 updateControlPositions();
+                updateContactMarkerPositions();
             }
             animate();
 
@@ -1130,26 +1136,12 @@ def test_inpainting_page():
             floorBtn.title = 'Click to define 4 floor corner points';
             floorBtn.onclick = () => startDefiningFloor(container, floorBtn, moveHint);
 
-            // Define Object Contact Points button (below floor button)
-            const contactBtn = document.createElement('div');
-            contactBtn.className = 'contact-btn';
-            contactBtn.innerHTML = '⊙ Legs';
-            contactBtn.style.cssText = `
-                position: absolute; top: 45px; right: 10px;
-                padding: 8px 16px; background: rgba(255,152,0,0.9); border-radius: 20px;
-                color: white; font-size: 12px; cursor: pointer; pointer-events: auto;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.3); user-select: none;
-            `;
-            contactBtn.title = 'Click to define 4 contact points on object (e.g., chair legs)';
-            contactBtn.onclick = () => startDefiningContactPoints(container, contactBtn, moveHint);
-
             overlay.appendChild(rotateBtn);
             overlay.appendChild(rotateYBtn);
             overlay.appendChild(scaleControl);
             overlay.appendChild(brightnessControl);
             overlay.appendChild(moveHint);
             overlay.appendChild(floorBtn);
-            overlay.appendChild(contactBtn);
             container.style.position = 'relative';
             container.appendChild(overlay);
 
@@ -1189,7 +1181,9 @@ def test_inpainting_page():
             document.addEventListener('mousemove', (e) => {
                 if (isDraggingRotate && currentLoadedModel) {
                     const deltaX = e.clientX - lastMouseX;
-                    currentLoadedModel.rotation.y += deltaX * 0.02;  // Bottom arrow = Y axis
+                    const angle = deltaX * 0.02;
+                    // Use floor pivot rotation to keep legs on floor
+                    rotateAroundFloor(currentLoadedModel, angle);
                     lastMouseX = e.clientX;
                 }
                 if (isDraggingRotateY && currentLoadedModel) {
@@ -1218,15 +1212,13 @@ def test_inpainting_page():
                 if (isDraggingRotate) {
                     isDraggingRotate = false;
                     rotateBtn.style.background = 'rgba(255,255,255,0.9)';
-                    // Bake rotation into geometry, then reset rotation to 0
-                    if (currentLoadedModel) {
-                        bakeRotation(currentLoadedModel);
-                    }
+                    // Don't bake Y rotation - just let it accumulate
+                    // Y rotation doesn't affect vertical alignment so no need to reset
                 }
                 if (isDraggingRotateY) {
                     isDraggingRotateY = false;
                     rotateYBtn.style.background = 'rgba(255,255,255,0.9)';
-                    // Bake rotation into geometry, then reset rotation to 0
+                    // Bake Z rotation into geometry, then reset rotation to 0
                     if (currentLoadedModel) {
                         bakeRotation(currentLoadedModel);
                     }
@@ -1240,6 +1232,12 @@ def test_inpainting_page():
                     brightnessControl.style.background = 'rgba(255,255,255,0.9)';
                 }
             });
+        }
+
+        function rotateAroundFloor(model, angle) {
+            // Simple Y rotation - keeps all legs on floor since Y rotation
+            // only affects horizontal orientation, not vertical position
+            model.rotation.y += angle;
         }
 
         function bakeRotation(model) {
@@ -1282,6 +1280,8 @@ def test_inpainting_page():
             // Start floor definition mode
             isDefiningFloor = true;
             floorPoints = [];
+            floorWorldPoints = [];
+            floorCenter = null;
             clearFloorMarkers();
 
             floorBtn.innerHTML = '✕ Cancel';
@@ -1327,25 +1327,46 @@ def test_inpainting_page():
                     const ndcX = (avgScreenX / rect.width) * 2 - 1;
                     const ndcY = -(avgScreenY / rect.height) * 2 + 1;
 
-                    // Create a ray from camera through the screen point
-                    const raycaster = new THREE.Raycaster();
-                    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), threeCamera);
-
-                    // Find Y on a horizontal plane at z=0 (camera looking at z=0)
-                    // Using parametric ray equation: point = origin + t * direction
-                    // For Y=floorY plane, solve for t where the ray intersects
-                    const ray = raycaster.ray;
-
-                    // Get the lowest screen Y (bottom of floor area) to estimate floor Y
+                    // First, calculate floor Y level from screen coordinates
+                    // Lower on screen (higher Y) = lower in world (lower Y)
                     const maxScreenY = Math.max(...floorPoints.map(p => p.y));
                     const bottomNdcY = -(maxScreenY / rect.height) * 2 + 1;
-
-                    // Project to world: lower on screen = lower Y in world for floor
-                    // Camera is at z=5, looking at origin, so use simple projection
                     floorPlaneY = bottomNdcY * 2;  // Scale factor based on camera setup
 
-                    console.log('Floor defined:', floorPoints, 'Floor Y:', floorPlaneY);
+                    // Convert all 4 floor screen points to world X/Z coordinates
+                    // Use raycasting with a horizontal plane at the calculated floor Y
+                    const raycaster = new THREE.Raycaster();
+                    const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -floorPlaneY);
+
+                    floorWorldPoints = [];
+                    for (const screenPt of floorPoints) {
+                        const ptNdcX = (screenPt.x / rect.width) * 2 - 1;
+                        const ptNdcY = -(screenPt.y / rect.height) * 2 + 1;
+                        raycaster.setFromCamera(new THREE.Vector2(ptNdcX, ptNdcY), threeCamera);
+
+                        const intersection = new THREE.Vector3();
+                        raycaster.ray.intersectPlane(floorPlane, intersection);
+                        if (intersection) {
+                            floorWorldPoints.push(intersection.clone());
+                        }
+                    }
+
+                    // Calculate floor center (average of 4 points)
+                    if (floorWorldPoints.length === 4) {
+                        floorCenter = new THREE.Vector3(0, 0, 0);
+                        for (const wp of floorWorldPoints) {
+                            floorCenter.add(wp);
+                        }
+                        floorCenter.divideScalar(4);
+                    } else {
+                        floorCenter = null;
+                    }
+
+                    console.log('Floor defined:', floorPoints, 'World points:', floorWorldPoints, 'Center:', floorCenter, 'Floor Y:', floorPlaneY);
                     drawFloorOutline(container);
+
+                    // Save floor data to localStorage for persistence across page reloads
+                    saveFloorToStorage();
 
                     // Auto-relocate object to floor and bake position
                     if (currentLoadedModel) {
@@ -1362,6 +1383,31 @@ def test_inpainting_page():
                         const offset = modelBottomY - floorPlaneY;
                         currentLoadedModel.position.y -= offset;
                         console.log('Model auto-placed on floor, offset:', offset);
+
+                        // Center geometry on Y axis so rotation keeps all legs on floor
+                        // Get the center of the model's footprint
+                        const boxForCenter = new THREE.Box3().setFromObject(currentLoadedModel);
+                        const center = boxForCenter.getCenter(new THREE.Vector3());
+
+                        // Translate geometry so center X/Z is at origin
+                        // This makes the Y axis pass through the footprint center
+                        const offsetX = center.x - currentLoadedModel.position.x;
+                        const offsetZ = center.z - currentLoadedModel.position.z;
+
+                        currentLoadedModel.traverse((child) => {
+                            if (child.isMesh && child.geometry) {
+                                child.geometry.translate(-offsetX, 0, -offsetZ);
+                            }
+                        });
+
+                        // Adjust position to compensate (keep visual position same)
+                        currentLoadedModel.position.x += offsetX;
+                        currentLoadedModel.position.z += offsetZ;
+
+                        console.log('Geometry centered for Y rotation, offset X:', offsetX, 'Z:', offsetZ);
+
+                        // Re-detect contact points after geometry modification
+                        autoDetectContactPoints(currentLoadedModel);
                     }
                 }
             };
@@ -1396,6 +1442,10 @@ def test_inpainting_page():
         function drawFloorOutline(container) {
             if (floorPoints.length < 4) return;
 
+            // Remove existing outline first
+            const existingOutline = container.querySelector('.floor-outline');
+            if (existingOutline) existingOutline.remove();
+
             // Create SVG overlay for floor outline
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svg.classList.add('floor-outline');
@@ -1414,6 +1464,72 @@ def test_inpainting_page():
 
             svg.appendChild(polygon);
             container.appendChild(svg);
+        }
+
+        function saveFloorToStorage() {
+            // Save floor data to localStorage
+            const floorData = {
+                floorPoints: floorPoints,
+                floorPlaneY: floorPlaneY,
+                floorWorldPoints: floorWorldPoints.map(p => ({ x: p.x, y: p.y, z: p.z })),
+                floorCenter: floorCenter ? { x: floorCenter.x, y: floorCenter.y, z: floorCenter.z } : null
+            };
+            localStorage.setItem('floor3DData', JSON.stringify(floorData));
+            console.log('Floor data saved to localStorage');
+        }
+
+        function loadFloorFromStorage(container) {
+            // Load floor data from localStorage
+            const savedData = localStorage.getItem('floor3DData');
+            if (!savedData) return false;
+
+            try {
+                const floorData = JSON.parse(savedData);
+
+                if (floorData.floorPoints && floorData.floorPoints.length >= 4) {
+                    floorPoints = floorData.floorPoints;
+                    floorPlaneY = floorData.floorPlaneY || 0;
+
+                    // Reconstruct THREE.Vector3 objects for world points
+                    if (floorData.floorWorldPoints) {
+                        floorWorldPoints = floorData.floorWorldPoints.map(p =>
+                            new THREE.Vector3(p.x, p.y, p.z)
+                        );
+                    }
+
+                    if (floorData.floorCenter) {
+                        floorCenter = new THREE.Vector3(
+                            floorData.floorCenter.x,
+                            floorData.floorCenter.y,
+                            floorData.floorCenter.z
+                        );
+                    }
+
+                    console.log('Floor data loaded from localStorage:', floorPoints, 'Floor Y:', floorPlaneY);
+
+                    // Draw floor markers and outline
+                    floorPoints.forEach((p, i) => {
+                        addFloorMarker(container, p.x, p.y, i + 1);
+                    });
+                    drawFloorOutline(container);
+
+                    // Update UI to show floor is defined
+                    const floorBtn = container.querySelector('.floor-btn');
+                    const moveHint = container.querySelector('.move-hint');
+                    if (floorBtn) {
+                        floorBtn.innerHTML = '⬚ Floor ✓';
+                    }
+                    if (moveHint) {
+                        moveHint.innerHTML = '✥ Drag object to move (floor locked)';
+                    }
+
+                    return true;
+                }
+            } catch (e) {
+                console.error('Error loading floor data:', e);
+            }
+
+            return false;
         }
 
         function getFloorYAtScreenPos(screenX, screenY) {
@@ -1572,7 +1688,7 @@ def test_inpainting_page():
 
         function autoDetectContactPoints(model) {
             // Auto-detect the lowest points on the model (e.g., chair legs)
-            // Find vertices near the bottom of the model
+            // Uses spatial clustering to find 4 distinct leg positions
             objectContactPoints = [];
             clearContactMarkers();
 
@@ -1606,9 +1722,10 @@ def test_inpainting_page():
             const minY = Math.min(...allVertices.map(v => v.y));
 
             // Find vertices within a small threshold of the minimum Y
-            const threshold = 0.05;  // 5% of model size tolerance
+            const threshold = 0.08;  // 8% of model size tolerance
             const box = new THREE.Box3().setFromObject(model);
             const modelHeight = box.max.y - box.min.y;
+            const modelWidth = Math.max(box.max.x - box.min.x, box.max.z - box.min.z);
             const yThreshold = minY + modelHeight * threshold;
 
             const bottomVertices = allVertices.filter(v => v.y <= yThreshold);
@@ -1618,50 +1735,106 @@ def test_inpainting_page():
                 allVertices.sort((a, b) => a.y - b.y);
                 objectContactPoints = allVertices.slice(0, 4).map(v => v.clone());
             } else {
-                // Cluster bottom vertices into 4 groups (for 4 legs)
-                // Use simple k-means-like approach: divide into quadrants
-                const centerX = (box.min.x + box.max.x) / 2;
-                const centerZ = (box.min.z + box.max.z) / 2;
+                // Use farthest-point sampling to find 4 well-spread contact points
+                // This guarantees we get 4 distinct, maximally-spread positions
 
-                const quadrants = [
-                    bottomVertices.filter(v => v.x <= centerX && v.z <= centerZ),  // Front-left
-                    bottomVertices.filter(v => v.x > centerX && v.z <= centerZ),   // Front-right
-                    bottomVertices.filter(v => v.x <= centerX && v.z > centerZ),   // Back-left
-                    bottomVertices.filter(v => v.x > centerX && v.z > centerZ)     // Back-right
-                ];
+                // Start with the lowest vertex
+                bottomVertices.sort((a, b) => a.y - b.y);
+                objectContactPoints.push(bottomVertices[0].clone());
 
-                // Get lowest point from each quadrant
-                quadrants.forEach(quad => {
-                    if (quad.length > 0) {
-                        quad.sort((a, b) => a.y - b.y);
-                        objectContactPoints.push(quad[0].clone());
+                // Helper function to get min distance from a point to all selected points
+                const minDistToSelected = (v) => {
+                    let minDist = Infinity;
+                    for (const selected of objectContactPoints) {
+                        const dist = Math.sqrt(
+                            Math.pow(v.x - selected.x, 2) +
+                            Math.pow(v.z - selected.z, 2)
+                        );  // Only X/Z distance (horizontal)
+                        if (dist < minDist) {
+                            minDist = dist;
+                        }
                     }
-                });
+                    return minDist;
+                };
 
-                // If some quadrants were empty, fill with lowest remaining
-                while (objectContactPoints.length < 4 && bottomVertices.length > objectContactPoints.length) {
-                    const remaining = bottomVertices.filter(v =>
-                        !objectContactPoints.some(p => p.distanceTo(v) < 0.01)
-                    );
-                    if (remaining.length > 0) {
-                        remaining.sort((a, b) => a.y - b.y);
-                        objectContactPoints.push(remaining[0].clone());
+                // Find 3 more points, each time selecting the point farthest from all selected points
+                while (objectContactPoints.length < 4) {
+                    let farthestPoint = null;
+                    let farthestMinDist = 0;
+
+                    for (const v of bottomVertices) {
+                        // Skip if already selected (or very close to selected)
+                        const distToSelected = minDistToSelected(v);
+                        if (distToSelected < 0.01) continue;  // Already selected
+
+                        if (distToSelected > farthestMinDist) {
+                            farthestMinDist = distToSelected;
+                            farthestPoint = v;
+                        }
+                    }
+
+                    if (farthestPoint) {
+                        objectContactPoints.push(farthestPoint.clone());
                     } else {
-                        break;
+                        break;  // No more distinct points found
                     }
                 }
             }
 
-            console.log('Auto-detected contact points:', objectContactPoints);
+            console.log('Auto-detected contact points:', objectContactPoints.length, objectContactPoints);
 
-            // Update the Legs button to show auto-detected
-            const contactBtn = document.querySelector('.contact-btn');
-            if (contactBtn && objectContactPoints.length >= 4) {
-                contactBtn.innerHTML = '⊙ Legs ✓';
-                contactBtn.title = 'Auto-detected 4 contact points (click to redefine)';
-            }
+            // Show visual markers for the detected contact points
+            showContactPointMarkers();
 
             return objectContactPoints.length;
+        }
+
+        function showContactPointMarkers() {
+            // Clear existing markers
+            clearContactMarkers();
+
+            if (!currentLoadedModel || !viewerContainer || objectContactPoints.length === 0) return;
+
+            const rect = viewerContainer.getBoundingClientRect();
+
+            // Project each contact point to screen coordinates
+            objectContactPoints.forEach((localPoint, index) => {
+                // Convert local point to world coordinates
+                const worldPoint = currentLoadedModel.localToWorld(localPoint.clone());
+
+                // Project to screen coordinates
+                const screenPoint = worldPoint.clone().project(threeCamera);
+                const screenX = (screenPoint.x + 1) / 2 * rect.width;
+                const screenY = (-screenPoint.y + 1) / 2 * rect.height;
+
+                // Add marker
+                addContactMarker(viewerContainer, screenX, screenY, index + 1);
+            });
+        }
+
+        function updateContactMarkerPositions() {
+            // Update contact marker positions when model moves
+            if (!currentLoadedModel || !viewerContainer || objectContactPoints.length === 0) return;
+            if (contactMarkers.length === 0) return;
+
+            const rect = viewerContainer.getBoundingClientRect();
+
+            objectContactPoints.forEach((localPoint, index) => {
+                if (index >= contactMarkers.length) return;
+
+                // Convert local point to world coordinates
+                const worldPoint = currentLoadedModel.localToWorld(localPoint.clone());
+
+                // Project to screen coordinates
+                const screenPoint = worldPoint.clone().project(threeCamera);
+                const screenX = (screenPoint.x + 1) / 2 * rect.width;
+                const screenY = (-screenPoint.y + 1) / 2 * rect.height;
+
+                // Update marker position
+                const marker = contactMarkers[index];
+                marker.style.left = screenX + 'px';
+                marker.style.top = screenY + 'px';
+            });
         }
 
         function applyBrightnessToModel(brightness) {
@@ -1825,8 +1998,16 @@ def test_inpainting_page():
                 currentLoadedModel = model;
                 threeScene.add(model);
 
-                // Auto-detect contact points (chair legs) after model is loaded
+                // Apply floor and detect contact points after model is loaded
                 setTimeout(() => {
+                    // If floor is already defined (from background), apply it FIRST
+                    // This modifies the geometry, so contact detection must come AFTER
+                    if (floorPoints.length >= 4) {
+                        applyFloorToModel(model);
+                    }
+
+                    // THEN auto-detect contact points (chair legs)
+                    // This must happen after geometry modifications are done
                     const numPoints = autoDetectContactPoints(model);
                     if (numPoints >= 4) {
                         console.log('Auto-detected ' + numPoints + ' contact points');
@@ -1837,6 +2018,45 @@ def test_inpainting_page():
                 document.getElementById('threejsViewer').innerHTML =
                     '<p style="color: #f5576c; padding: 2rem; text-align: center;">Error loading 3D model</p>';
             });
+        }
+
+        function applyFloorToModel(model) {
+            // Apply existing floor settings to a newly loaded model
+            if (!model || floorPoints.length < 4) return;
+
+            // Get the lowest point of the model (either contact points or bounding box)
+            let modelBottomY;
+            if (objectContactPoints.length >= 4) {
+                modelBottomY = getLowestContactPointY();
+            } else {
+                const box = new THREE.Box3().setFromObject(model);
+                modelBottomY = box.min.y;
+            }
+
+            // Move model so its bottom is at floor level
+            const offset = modelBottomY - floorPlaneY;
+            model.position.y -= offset;
+            console.log('Model placed on existing floor, offset:', offset);
+
+            // Center geometry on Y axis so rotation keeps all legs on floor
+            const boxForCenter = new THREE.Box3().setFromObject(model);
+            const center = boxForCenter.getCenter(new THREE.Vector3());
+
+            // Translate geometry so center X/Z is at origin
+            const offsetX = center.x - model.position.x;
+            const offsetZ = center.z - model.position.z;
+
+            model.traverse((child) => {
+                if (child.isMesh && child.geometry) {
+                    child.geometry.translate(-offsetX, 0, -offsetZ);
+                }
+            });
+
+            // Adjust position to compensate (keep visual position same)
+            model.position.x += offsetX;
+            model.position.z += offsetZ;
+
+            console.log('Geometry centered for Y rotation, offset X:', offsetX, 'Z:', offsetZ);
         }
 
         function base64ToBlob(base64, mimeType) {
@@ -1875,7 +2095,8 @@ def test_inpainting_page():
                     historyGrid.innerHTML = '';
 
                     // Display in reverse order (newest first)
-                    data.history.reverse().forEach((item, index) => {
+                    const reversedHistory = [...data.history].reverse();
+                    reversedHistory.forEach((item, index) => {
                         const historyItem = document.createElement('div');
                         historyItem.className = 'history-item';
                         historyItem.style.cursor = 'pointer';
@@ -1896,6 +2117,11 @@ def test_inpainting_page():
                     });
 
                     document.getElementById('model3dHistorySection').classList.remove('hidden');
+
+                    // Auto-load the most recent 3D model
+                    if (reversedHistory.length > 0) {
+                        load3DModelFromHistory(reversedHistory[0]);
+                    }
                 } else {
                     document.getElementById('model3dHistorySection').classList.add('hidden');
                 }
