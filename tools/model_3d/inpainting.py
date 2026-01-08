@@ -1739,6 +1739,30 @@ def test_inpainting_page():
                         break;  // No more distinct points found
                     }
                 }
+
+                // Refinement: snap each point to the lowest vertex within a small radius
+                // This ensures points are at actual leg tips, not just spread-out bottom vertices
+                const snapRadius = modelWidth * 0.12;  // Search within 12% of model width
+                for (let i = 0; i < objectContactPoints.length; i++) {
+                    const point = objectContactPoints[i];
+                    let lowestInRadius = point;
+                    let lowestY = point.y;
+
+                    for (const v of allVertices) {
+                        // Check if within snap radius (horizontal distance only)
+                        const horizDist = Math.sqrt(
+                            Math.pow(v.x - point.x, 2) +
+                            Math.pow(v.z - point.z, 2)
+                        );
+
+                        if (horizDist < snapRadius && v.y < lowestY) {
+                            lowestY = v.y;
+                            lowestInRadius = v;
+                        }
+                    }
+
+                    objectContactPoints[i] = lowestInRadius.clone();
+                }
             }
 
             console.log('Auto-detected contact points:', objectContactPoints.length, objectContactPoints);
