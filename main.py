@@ -21,9 +21,9 @@ from page.contact import contact_page
 from page.staging_inquiry import staging_inquiry_page
 from page.reserve import reserve_page
 from page.design import design_page
-# Test routes moved to tools/test/test_api_routes.py
-from tools.test.test_api_routes import register_test_routes
-from tools.test.test_inpainting import test_inpainting_page
+# 3D model routes
+from tools.model_3d.api_routes import register_test_routes
+from tools.model_3d.inpainting import test_inpainting_page
 from page.areas import AREAS, AREA_PAGE_FUNCTIONS
 from page.blog_listing import blog_listing_page, load_blog_metadata
 from page.signin import signin_page

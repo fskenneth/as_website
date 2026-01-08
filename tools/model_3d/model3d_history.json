@@ -1,0 +1,11 @@
+[
+  {
+    "timestamp": "2026-01-08T14:11:16.815884",
+    "input_thumbnail": "/static/models/thumbnails/04f1de8f_input.png",
+    "model_url": "/static/models/8d384282.glb",
+    "format": "glb",
+    "method": "triposr",
+    "processing_time": 53.202229022979736,
+    "info": "TripoSR (Replicate API) - Real 3D mesh"
+  }
+]

@@ -1,0 +1,23 @@
+[
+  {
+    "timestamp": "2026-01-03T16:18:28",
+    "input_url": "/static/images/areas/66886_2026-01-03_before.png",
+    "output_url": "/static/images/areas/66886_2026-01-03_after.png",
+    "processing_time": 0,
+    "source": "decor8_api_log"
+  },
+  {
+    "timestamp": "2026-01-03T16:18:25",
+    "input_url": "/static/images/areas/66885_2026-01-03_before.png",
+    "output_url": "/static/images/areas/66885_2026-01-03_after.png",
+    "processing_time": 0,
+    "source": "decor8_api_log"
+  },
+  {
+    "timestamp": "2026-01-03T16:10:11",
+    "input_url": "/static/images/areas/66880_2026-01-03_before.png",
+    "output_url": "/static/images/areas/66880_2026-01-03_after.png",
+    "processing_time": 0,
+    "source": "decor8_api_log"
+  }
+]
