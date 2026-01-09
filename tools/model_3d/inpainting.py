@@ -1968,6 +1968,138 @@ def test_inpainting_page():
             });
         }
 
+        let dragStartHitPoint = null;
+        let dragStartModelPosition = null;
+        let dragPlaneY = 0;
+        let lastCursorHitPoint = null;  // Track cursor position for incremental movement
+
+        // Check if a point (x, z) is inside the floor polygon (using X-Z coordinates)
+        function isPointInFloorPolygon(x, z) {
+            if (floorWorldPoints.length < 4) return true; // No floor defined, allow all movement
+
+            // Ray casting algorithm for point-in-polygon test
+            let inside = false;
+            const points = floorWorldPoints;
+            for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+                const xi = points[i].x, zi = points[i].z;
+                const xj = points[j].x, zj = points[j].z;
+
+                if (((zi > z) !== (zj > z)) && (x < (xj - xi) * (z - zi) / (zj - zi) + xi)) {
+                    inside = !inside;
+                }
+            }
+            return inside;
+        }
+
+        // Check if all contact points would be inside floor after moving model
+        function wouldContactPointsBeInFloor(newPosX, newPosZ) {
+            if (floorWorldPoints.length < 4) return true; // No floor defined
+            if (objectContactPoints.length === 0) return true; // No contact points
+
+            // Temporarily move model to new position
+            const oldX = currentLoadedModel.position.x;
+            const oldZ = currentLoadedModel.position.z;
+            currentLoadedModel.position.x = newPosX;
+            currentLoadedModel.position.z = newPosZ;
+
+            // Check all contact points
+            let allInside = true;
+            for (const localPoint of objectContactPoints) {
+                const worldPoint = currentLoadedModel.localToWorld(localPoint.clone());
+                if (!isPointInFloorPolygon(worldPoint.x, worldPoint.z)) {
+                    allInside = false;
+                    break;
+                }
+            }
+
+            // Restore original position
+            currentLoadedModel.position.x = oldX;
+            currentLoadedModel.position.z = oldZ;
+
+            return allInside;
+        }
+
+        // Count how many contact points would be inside floor at given position
+        function countContactPointsInFloor(posX, posZ) {
+            if (floorWorldPoints.length < 4 || objectContactPoints.length === 0) return objectContactPoints.length;
+
+            const oldX = currentLoadedModel.position.x;
+            const oldZ = currentLoadedModel.position.z;
+            currentLoadedModel.position.x = posX;
+            currentLoadedModel.position.z = posZ;
+            currentLoadedModel.updateMatrixWorld(true);
+
+            let count = 0;
+            for (const localPoint of objectContactPoints) {
+                const worldPoint = currentLoadedModel.localToWorld(localPoint.clone());
+                if (isPointInFloorPolygon(worldPoint.x, worldPoint.z)) {
+                    count++;
+                }
+            }
+
+            currentLoadedModel.position.x = oldX;
+            currentLoadedModel.position.z = oldZ;
+            currentLoadedModel.updateMatrixWorld(true);
+            return count;
+        }
+
+        // Check if movement is allowed - allow if it doesn't make things worse
+        function getValidPosition(startX, startZ, deltaX, deltaZ) {
+            if (floorWorldPoints.length < 4 || objectContactPoints.length === 0) {
+                return { x: startX + deltaX, z: startZ + deltaZ };
+            }
+
+            const targetX = startX + deltaX;
+            const targetZ = startZ + deltaZ;
+
+            // Count current points inside
+            const currentInside = countContactPointsInFloor(startX, startZ);
+
+            // Try full movement - allow if at least as many points inside
+            const fullMoveInside = countContactPointsInFloor(targetX, targetZ);
+            if (fullMoveInside >= currentInside) {
+                return { x: targetX, z: targetZ };
+            }
+
+            // Full movement blocked - try X only (slide along Z edge)
+            if (Math.abs(deltaX) > 0.001) {
+                const xOnlyInside = countContactPointsInFloor(targetX, startZ);
+                if (xOnlyInside >= currentInside) {
+                    return { x: targetX, z: startZ };
+                }
+            }
+
+            // Try Z only (slide along X edge)
+            if (Math.abs(deltaZ) > 0.001) {
+                const zOnlyInside = countContactPointsInFloor(startX, targetZ);
+                if (zOnlyInside >= currentInside) {
+                    return { x: startX, z: targetZ };
+                }
+            }
+
+            // No valid movement - stay in place
+            return { x: startX, z: startZ };
+        }
+
+        function getPlaneIntersection(clientX, clientY, canvas, planeY) {
+            const rect = canvas.getBoundingClientRect();
+            const mouse = new THREE.Vector2();
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, threeCamera);
+
+            // Create horizontal plane at the specified Y height
+            const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY);
+            const intersection = new THREE.Vector3();
+
+            if (raycaster.ray.intersectPlane(plane, intersection)) {
+                return intersection;
+            }
+            return null;
+        }
+
         function setupModelDragEvents(container) {
             const canvas = container.querySelector('canvas');
             if (!canvas) return;
@@ -1988,45 +2120,121 @@ def test_inpainting_page():
                     const intersects = raycaster.intersectObject(currentLoadedModel, true);
                     if (intersects.length > 0) {
                         isDraggingModel = true;
-                        lastMouseX = e.clientX;
-                        lastMouseY = e.clientY;
                         canvas.style.cursor = 'move';
+
+                        // Store the exact 3D point where user clicked on the model
+                        dragStartHitPoint = intersects[0].point.clone();
+                        dragPlaneY = dragStartHitPoint.y;
+                        dragStartModelPosition = currentLoadedModel.position.clone();
+                        lastCursorHitPoint = dragStartHitPoint.clone();  // Initialize for incremental tracking
                     }
                 }
             });
 
             canvas.addEventListener('mousemove', (e) => {
-                if (isDraggingModel && currentLoadedModel) {
-                    const deltaX = e.clientX - lastMouseX;
-                    const deltaY = e.clientY - lastMouseY;
+                if (isDraggingModel && currentLoadedModel && lastCursorHitPoint) {
+                    // Get intersection with plane at the same Y height as the original click
+                    const currentPoint = getPlaneIntersection(e.clientX, e.clientY, canvas, dragPlaneY);
 
-                    // Convert screen movement to world movement on floor plane
-                    // Only apply movement in dominant direction to prevent accidental rotation look
-                    const moveFactor = 0.01;
-                    if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                        // Horizontal drag - only move left/right
-                        currentLoadedModel.position.x += deltaX * moveFactor;
-                    } else {
-                        // Vertical drag - only move forward/backward
-                        currentLoadedModel.position.z += deltaY * moveFactor;
+                    if (currentPoint) {
+                        // Calculate incremental movement from last cursor position
+                        const deltaX = currentPoint.x - lastCursorHitPoint.x;
+                        const deltaZ = currentPoint.z - lastCursorHitPoint.z;
+
+                        // Get valid position from current model position (incremental movement)
+                        const validPos = getValidPosition(
+                            currentLoadedModel.position.x,
+                            currentLoadedModel.position.z,
+                            deltaX,
+                            deltaZ
+                        );
+
+                        // Move the model
+                        currentLoadedModel.position.x = validPos.x;
+                        currentLoadedModel.position.z = validPos.z;
+                        updateContactMarkerPositions();
+
+                        // Always update cursor tracking for next frame
+                        lastCursorHitPoint = currentPoint.clone();
                     }
-
-                    // Update contact marker positions
-                    updateContactMarkerPositions();
-
-                    lastMouseX = e.clientX;
-                    lastMouseY = e.clientY;
                 }
             });
 
             canvas.addEventListener('mouseup', () => {
                 isDraggingModel = false;
+                dragStartHitPoint = null;
+                dragStartModelPosition = null;
+                lastCursorHitPoint = null;
                 canvas.style.cursor = 'default';
             });
 
             canvas.addEventListener('mouseleave', () => {
                 isDraggingModel = false;
+                dragStartHitPoint = null;
+                dragStartModelPosition = null;
+                lastCursorHitPoint = null;
                 canvas.style.cursor = 'default';
+            });
+
+            // Touch events for mobile
+            canvas.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    const touch = e.touches[0];
+                    const rect = canvas.getBoundingClientRect();
+                    mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+                    mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+
+                    raycaster.setFromCamera(mouse, threeCamera);
+
+                    if (currentLoadedModel) {
+                        const intersects = raycaster.intersectObject(currentLoadedModel, true);
+                        if (intersects.length > 0) {
+                            isDraggingModel = true;
+                            dragStartHitPoint = intersects[0].point.clone();
+                            dragPlaneY = dragStartHitPoint.y;
+                            dragStartModelPosition = currentLoadedModel.position.clone();
+                            lastCursorHitPoint = dragStartHitPoint.clone();
+                            e.preventDefault();
+                        }
+                    }
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('touchmove', (e) => {
+                if (isDraggingModel && currentLoadedModel && lastCursorHitPoint && e.touches.length === 1) {
+                    const touch = e.touches[0];
+                    const currentPoint = getPlaneIntersection(touch.clientX, touch.clientY, canvas, dragPlaneY);
+
+                    if (currentPoint) {
+                        // Calculate incremental movement from last cursor position
+                        const deltaX = currentPoint.x - lastCursorHitPoint.x;
+                        const deltaZ = currentPoint.z - lastCursorHitPoint.z;
+
+                        // Get valid position from current model position (incremental movement)
+                        const validPos = getValidPosition(
+                            currentLoadedModel.position.x,
+                            currentLoadedModel.position.z,
+                            deltaX,
+                            deltaZ
+                        );
+
+                        // Move the model
+                        currentLoadedModel.position.x = validPos.x;
+                        currentLoadedModel.position.z = validPos.z;
+                        updateContactMarkerPositions();
+
+                        // Always update cursor tracking for next frame
+                        lastCursorHitPoint = currentPoint.clone();
+                    }
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('touchend', () => {
+                isDraggingModel = false;
+                dragStartHitPoint = null;
+                dragStartModelPosition = null;
+                lastCursorHitPoint = null;
             });
         }
 
