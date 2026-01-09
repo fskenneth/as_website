@@ -1604,8 +1604,7 @@ def test_inpainting_page():
                     console.log('Floor data loaded from localStorage:', floorPoints, 'Normalized:', floorPointsNormalized, 'Floor Y:', floorPlaneY);
 
                     // Draw floor markers and outline using projected world coordinates
-                    // This ensures alignment with leg marker projections
-                    const rect = container.getBoundingClientRect();
+                    // This ensures alignment with leg marker projections (reuse rect from above)
                     floorWorldPoints.forEach((wp, i) => {
                         const screenPt = wp.clone().project(threeCamera);
                         const screenX = (screenPt.x + 1) / 2 * rect.width;
