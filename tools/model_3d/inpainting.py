@@ -1481,11 +1481,23 @@ def test_inpainting_page():
         }
 
         function drawFloorOutline(container) {
-            if (floorPoints.length < 4) return;
+            if (floorWorldPoints.length < 4) return;
 
             // Remove existing outline first
             const existingOutline = container.querySelector('.floor-outline');
             if (existingOutline) existingOutline.remove();
+
+            const rect = container.getBoundingClientRect();
+
+            // Project floor world points to screen coordinates using current camera
+            // This ensures the outline aligns with leg marker projections
+            const screenPoints = floorWorldPoints.map(wp => {
+                const screenPt = wp.clone().project(threeCamera);
+                return {
+                    x: (screenPt.x + 1) / 2 * rect.width,
+                    y: (-screenPt.y + 1) / 2 * rect.height
+                };
+            });
 
             // Create SVG overlay for floor outline
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -1496,7 +1508,7 @@ def test_inpainting_page():
             `;
 
             const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            const points = floorPoints.map(p => `${p.x},${p.y}`).join(' ');
+            const points = screenPoints.map(p => `${p.x},${p.y}`).join(' ');
             polygon.setAttribute('points', points);
             polygon.setAttribute('fill', 'rgba(76,175,80,0.1)');
             polygon.setAttribute('stroke', 'rgba(76,175,80,0.8)');
@@ -1508,20 +1520,23 @@ def test_inpainting_page():
         }
 
         function updateFloorMarkersOnResize(container) {
-            // Update floor markers and outline based on normalized coordinates and new canvas size
-            if (floorPointsNormalized.length < 4 || !viewerContainer) return;
+            // Update floor markers and outline based on projected world coordinates
+            if (floorWorldPoints.length < 4 || !viewerContainer || !threeCamera) return;
 
             const rect = viewerContainer.getBoundingClientRect();
 
-            // Update absolute floor points from normalized coordinates
-            floorPoints = floorPointsNormalized.map(p => ({
-                x: p.x * rect.width,
-                y: p.y * rect.height
-            }));
+            // Project floor world points to screen using current camera
+            const screenPoints = floorWorldPoints.map(wp => {
+                const screenPt = wp.clone().project(threeCamera);
+                return {
+                    x: (screenPt.x + 1) / 2 * rect.width,
+                    y: (-screenPt.y + 1) / 2 * rect.height
+                };
+            });
 
-            // Clear and redraw markers
+            // Clear and redraw markers at projected positions
             clearFloorMarkers();
-            floorPoints.forEach((p, i) => {
+            screenPoints.forEach((p, i) => {
                 addFloorMarker(container, p.x, p.y, i + 1);
             });
             drawFloorOutline(container);
@@ -1588,9 +1603,14 @@ def test_inpainting_page():
 
                     console.log('Floor data loaded from localStorage:', floorPoints, 'Normalized:', floorPointsNormalized, 'Floor Y:', floorPlaneY);
 
-                    // Draw floor markers and outline
-                    floorPoints.forEach((p, i) => {
-                        addFloorMarker(container, p.x, p.y, i + 1);
+                    // Draw floor markers and outline using projected world coordinates
+                    // This ensures alignment with leg marker projections
+                    const rect = container.getBoundingClientRect();
+                    floorWorldPoints.forEach((wp, i) => {
+                        const screenPt = wp.clone().project(threeCamera);
+                        const screenX = (screenPt.x + 1) / 2 * rect.width;
+                        const screenY = (-screenPt.y + 1) / 2 * rect.height;
+                        addFloorMarker(container, screenX, screenY, i + 1);
                     });
                     drawFloorOutline(container);
 
