@@ -1937,10 +1937,15 @@ def test_inpainting_page():
                     const deltaY = e.clientY - lastMouseY;
 
                     // Convert screen movement to world movement on floor plane
-                    // X movement = left/right, Z movement = forward/backward
+                    // Only apply movement in dominant direction to prevent accidental rotation look
                     const moveFactor = 0.01;
-                    currentLoadedModel.position.x += deltaX * moveFactor;
-                    currentLoadedModel.position.z += deltaY * moveFactor;  // Forward/back on floor
+                    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                        // Horizontal drag - only move left/right
+                        currentLoadedModel.position.x += deltaX * moveFactor;
+                    } else {
+                        // Vertical drag - only move forward/backward
+                        currentLoadedModel.position.z += deltaY * moveFactor;
+                    }
 
                     // Update contact marker positions
                     updateContactMarkerPositions();
