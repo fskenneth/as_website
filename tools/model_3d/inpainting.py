@@ -1195,9 +1195,16 @@ def test_inpainting_page():
         }
 
         function rotateAroundFloor(model, angle) {
-            // Simple Y rotation - keeps all legs on floor since Y rotation
-            // only affects horizontal orientation, not vertical position
+            // Apply Y rotation
             model.rotation.y += angle;
+            model.updateMatrixWorld(true);
+
+            // Re-level the model to keep all legs on the floor
+            // This compensates for any tilt caused by the combined rotation
+            if (objectContactPoints.length >= 3) {
+                levelModelToFloor(model, objectContactPoints);
+                updateContactMarkerPositions();
+            }
         }
 
         function bakeRotation(model) {
