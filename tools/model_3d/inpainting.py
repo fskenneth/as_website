@@ -1000,9 +1000,9 @@ def test_inpainting_page():
                 threeScene.background = new THREE.Color(0x1a1a2e);
             }
 
-            // Camera - orthographic-like perspective for better 2D placement feel
-            threeCamera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
-            threeCamera.position.set(0, 0, 5);
+            // Camera - low FOV for minimal perspective distortion (objects stay similar size at different depths)
+            threeCamera = new THREE.PerspectiveCamera(25, width / height, 0.1, 1000);
+            threeCamera.position.set(0, 0, 10);
             threeCamera.lookAt(0, 0, 0);
 
             // Renderer
