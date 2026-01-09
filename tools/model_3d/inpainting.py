@@ -1767,10 +1767,62 @@ def test_inpainting_page():
 
             console.log('Auto-detected contact points:', objectContactPoints.length, objectContactPoints);
 
+            // Level the model so all 4 contact points are at the same Y (floor level)
+            if (objectContactPoints.length >= 3) {
+                levelModelToFloor(model, objectContactPoints);
+            }
+
             // Show visual markers for the detected contact points
             showContactPointMarkers();
 
             return objectContactPoints.length;
+        }
+
+        function levelModelToFloor(model, contactPoints) {
+            // Transform the model so all contact points lie on the floor plane (Y = floorPlaneY)
+            if (contactPoints.length < 3) return;
+
+            // Convert contact points to world coordinates
+            const worldPoints = contactPoints.map(p => model.localToWorld(p.clone()));
+
+            // Calculate the plane normal from 3 points
+            const p0 = worldPoints[0];
+            const p1 = worldPoints[1];
+            const p2 = worldPoints[2];
+
+            const v1 = new THREE.Vector3().subVectors(p1, p0);
+            const v2 = new THREE.Vector3().subVectors(p2, p0);
+            const planeNormal = new THREE.Vector3().crossVectors(v1, v2).normalize();
+
+            // Ensure normal points upward
+            if (planeNormal.y < 0) planeNormal.negate();
+
+            // Calculate rotation to make plane horizontal (normal = up vector)
+            const upVector = new THREE.Vector3(0, 1, 0);
+            const quaternion = new THREE.Quaternion().setFromUnitVectors(planeNormal, upVector);
+
+            // Apply rotation to model
+            model.quaternion.premultiply(quaternion);
+            model.updateMatrixWorld(true);
+
+            // Recalculate world positions after rotation
+            const newWorldPoints = contactPoints.map(p => model.localToWorld(p.clone()));
+
+            // Find the lowest Y after rotation
+            const minY = Math.min(...newWorldPoints.map(p => p.y));
+
+            // Determine target floor Y
+            const targetY = (floorPoints.length >= 4) ? floorPlaneY : 0;
+
+            // Move model so contact points are at floor level
+            model.position.y -= (minY - targetY);
+            model.updateMatrixWorld(true);  // Update after position change
+
+            console.log('Model leveled to floor. Min contact Y:', minY, '-> Target Y:', targetY);
+
+            // Note: We don't modify objectContactPoints - they stay in local coordinates.
+            // The model transformation (rotation + position) handles the world positioning.
+            // When markers are rendered, localToWorld() will give correct screen positions.
         }
 
         function showContactPointMarkers() {
