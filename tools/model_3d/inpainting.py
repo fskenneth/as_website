@@ -913,6 +913,7 @@ def test_inpainting_page():
         let objectContactPoints = [];  // 4 world coordinates on the object that touch floor
         let isDefiningContactPoints = false;
         let contactMarkers = [];  // DOM elements showing contact points
+        let userYRotation = 0;  // Track user's Y rotation separately from leveling
 
         function setupThreeScene(container, modelData, format) {
             viewerContainer = container;
@@ -1195,12 +1196,15 @@ def test_inpainting_page():
         }
 
         function rotateAroundFloor(model, angle) {
-            // Apply Y rotation
-            model.rotation.y += angle;
+            // Update tracked Y rotation
+            userYRotation += angle;
+
+            // Reset model rotation to just the user's Y rotation (no leveling tilt yet)
+            model.quaternion.identity();
+            model.rotation.set(0, userYRotation, 0);
             model.updateMatrixWorld(true);
 
-            // Re-level the model to keep all legs on the floor
-            // This compensates for any tilt caused by the combined rotation
+            // Apply leveling on top of the Y rotation
             if (objectContactPoints.length >= 3) {
                 levelModelToFloor(model, objectContactPoints);
                 updateContactMarkerPositions();
@@ -2034,8 +2038,9 @@ def test_inpainting_page():
                 model.scale.setScalar(scale);
                 model.position.set(0, 0, 0);
 
-                // Reset brightness for new model
+                // Reset brightness and rotation for new model
                 modelBrightness = 1.0;
+                userYRotation = 0;
 
                 // Store reference for drag controls
                 currentLoadedModel = model;
