@@ -1000,9 +1000,9 @@ def test_inpainting_page():
                 threeScene.background = new THREE.Color(0x1a1a2e);
             }
 
-            // Camera - low FOV for minimal perspective distortion (objects stay similar size at different depths)
-            threeCamera = new THREE.PerspectiveCamera(25, width / height, 0.1, 1000);
-            threeCamera.position.set(0, 0, 10);
+            // Camera - calculated to match floor perspective ratio (~0.59)
+            threeCamera = new THREE.PerspectiveCamera(9, width / height, 0.1, 1000);
+            threeCamera.position.set(0, 0, 33);
             threeCamera.lookAt(0, 0, 0);
 
             // Renderer
@@ -1586,30 +1586,37 @@ def test_inpainting_page():
                         y: p.y * rect.height
                     }));
 
-                    // Reconstruct THREE.Vector3 objects for world points
-                    if (floorData.floorWorldPoints) {
-                        floorWorldPoints = floorData.floorWorldPoints.map(p =>
-                            new THREE.Vector3(p.x, p.y, p.z)
-                        );
+                    // RECALCULATE world points from screen positions using CURRENT camera
+                    // This ensures floor boundary matches both photo AND model perspective
+                    const raycaster = new THREE.Raycaster();
+                    const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -floorPlaneY);
+
+                    floorWorldPoints = [];
+                    for (const screenPt of floorPoints) {
+                        const ndcX = (screenPt.x / rect.width) * 2 - 1;
+                        const ndcY = -(screenPt.y / rect.height) * 2 + 1;
+                        raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), threeCamera);
+
+                        const intersection = new THREE.Vector3();
+                        if (raycaster.ray.intersectPlane(floorPlane, intersection)) {
+                            floorWorldPoints.push(intersection);
+                        }
                     }
 
-                    if (floorData.floorCenter) {
+                    // Calculate floor center
+                    if (floorWorldPoints.length >= 4) {
                         floorCenter = new THREE.Vector3(
-                            floorData.floorCenter.x,
-                            floorData.floorCenter.y,
-                            floorData.floorCenter.z
+                            (floorWorldPoints[0].x + floorWorldPoints[1].x + floorWorldPoints[2].x + floorWorldPoints[3].x) / 4,
+                            floorPlaneY,
+                            (floorWorldPoints[0].z + floorWorldPoints[1].z + floorWorldPoints[2].z + floorWorldPoints[3].z) / 4
                         );
                     }
 
-                    console.log('Floor data loaded from localStorage:', floorPoints, 'Normalized:', floorPointsNormalized, 'Floor Y:', floorPlaneY);
+                    console.log('Floor data loaded from localStorage:', floorPoints, 'World points recalculated for current camera');
 
-                    // Draw floor markers and outline using projected world coordinates
-                    // This ensures alignment with leg marker projections (reuse rect from above)
-                    floorWorldPoints.forEach((wp, i) => {
-                        const screenPt = wp.clone().project(threeCamera);
-                        const screenX = (screenPt.x + 1) / 2 * rect.width;
-                        const screenY = (-screenPt.y + 1) / 2 * rect.height;
-                        addFloorMarker(container, screenX, screenY, i + 1);
+                    // Draw floor markers at original screen positions (they match the photo)
+                    floorPoints.forEach((p, i) => {
+                        addFloorMarker(container, p.x, p.y, i + 1);
                     });
                     drawFloorOutline(container);
 
