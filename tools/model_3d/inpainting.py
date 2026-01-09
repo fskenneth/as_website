@@ -964,7 +964,8 @@ def test_inpainting_page():
         let controlOverlay = null;
 
         // Floor plane definition
-        let floorPoints = [];  // 4 screen coordinates defining the floor
+        let floorPoints = [];  // 4 screen coordinates defining the floor (absolute pixels)
+        let floorPointsNormalized = [];  // 4 normalized coordinates (0-1 range relative to canvas)
         let floorWorldPoints = [];  // 4 world coordinates of the floor corners
         let floorCenter = null;  // Center of the floor rectangle in world coords
         let isDefiningFloor = false;
@@ -1051,6 +1052,9 @@ def test_inpainting_page():
                 threeCamera.aspect = newWidth / newHeight;
                 threeCamera.updateProjectionMatrix();
                 threeRenderer.setSize(newWidth, newHeight);
+
+                // Update floor markers to follow the resized background
+                updateFloorMarkersOnResize(container);
             });
 
             // Setup mouse/touch events for model dragging
@@ -1315,6 +1319,7 @@ def test_inpainting_page():
             // Start floor definition mode
             isDefiningFloor = true;
             floorPoints = [];
+            floorPointsNormalized = [];
             floorWorldPoints = [];
             floorCenter = null;
             clearFloorMarkers();
@@ -1335,8 +1340,9 @@ def test_inpainting_page():
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
 
-                // Add floor point
+                // Add floor point (both absolute and normalized)
                 floorPoints.push({ x, y });
+                floorPointsNormalized.push({ x: x / rect.width, y: y / rect.height });
                 addFloorMarker(container, x, y, floorPoints.length);
 
                 moveHint.innerHTML = `Click 4 corners of the floor (${floorPoints.length}/4)`;
@@ -1501,10 +1507,31 @@ def test_inpainting_page():
             container.appendChild(svg);
         }
 
+        function updateFloorMarkersOnResize(container) {
+            // Update floor markers and outline based on normalized coordinates and new canvas size
+            if (floorPointsNormalized.length < 4 || !viewerContainer) return;
+
+            const rect = viewerContainer.getBoundingClientRect();
+
+            // Update absolute floor points from normalized coordinates
+            floorPoints = floorPointsNormalized.map(p => ({
+                x: p.x * rect.width,
+                y: p.y * rect.height
+            }));
+
+            // Clear and redraw markers
+            clearFloorMarkers();
+            floorPoints.forEach((p, i) => {
+                addFloorMarker(container, p.x, p.y, i + 1);
+            });
+            drawFloorOutline(container);
+        }
+
         function saveFloorToStorage() {
-            // Save floor data to localStorage
+            // Save floor data to localStorage (use normalized coordinates for portability)
             const floorData = {
                 floorPoints: floorPoints,
+                floorPointsNormalized: floorPointsNormalized,
                 floorPlaneY: floorPlaneY,
                 floorWorldPoints: floorWorldPoints.map(p => ({ x: p.x, y: p.y, z: p.z })),
                 floorCenter: floorCenter ? { x: floorCenter.x, y: floorCenter.y, z: floorCenter.z } : null
@@ -1522,8 +1549,27 @@ def test_inpainting_page():
                 const floorData = JSON.parse(savedData);
 
                 if (floorData.floorPoints && floorData.floorPoints.length >= 4) {
-                    floorPoints = floorData.floorPoints;
                     floorPlaneY = floorData.floorPlaneY || 0;
+
+                    // Load normalized coordinates (or calculate from absolute if not available)
+                    if (floorData.floorPointsNormalized && floorData.floorPointsNormalized.length >= 4) {
+                        floorPointsNormalized = floorData.floorPointsNormalized;
+                    } else {
+                        // Backward compatibility: calculate normalized from absolute
+                        // Assume original canvas was same aspect ratio
+                        const rect = container.getBoundingClientRect();
+                        floorPointsNormalized = floorData.floorPoints.map(p => ({
+                            x: p.x / rect.width,
+                            y: p.y / rect.height
+                        }));
+                    }
+
+                    // Calculate absolute positions from normalized for current canvas size
+                    const rect = container.getBoundingClientRect();
+                    floorPoints = floorPointsNormalized.map(p => ({
+                        x: p.x * rect.width,
+                        y: p.y * rect.height
+                    }));
 
                     // Reconstruct THREE.Vector3 objects for world points
                     if (floorData.floorWorldPoints) {
@@ -1540,7 +1586,7 @@ def test_inpainting_page():
                         );
                     }
 
-                    console.log('Floor data loaded from localStorage:', floorPoints, 'Floor Y:', floorPlaneY);
+                    console.log('Floor data loaded from localStorage:', floorPoints, 'Normalized:', floorPointsNormalized, 'Floor Y:', floorPlaneY);
 
                     // Draw floor markers and outline
                     floorPoints.forEach((p, i) => {
