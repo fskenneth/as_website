@@ -1936,29 +1936,14 @@ def test_inpainting_page():
                     const deltaX = e.clientX - lastMouseX;
                     const deltaY = e.clientY - lastMouseY;
 
-                    // Convert screen movement to world movement
+                    // Convert screen movement to world movement on floor plane
+                    // X movement = left/right, Z movement = forward/backward
                     const moveFactor = 0.01;
                     currentLoadedModel.position.x += deltaX * moveFactor;
+                    currentLoadedModel.position.z += deltaY * moveFactor;  // Forward/back on floor
 
-                    if (floorPoints.length >= 4) {
-                        // Floor is defined - keep model on floor plane
-                        // Moving up/down on screen scales model (perspective effect)
-                        const scaleFactor = 1 - deltaY * 0.003;
-                        currentLoadedModel.scale.multiplyScalar(scaleFactor);
-
-                        if (objectContactPoints.length >= 4) {
-                            // Use contact points to keep legs on floor
-                            adjustModelToFloor();
-                        } else {
-                            // Use bounding box bottom
-                            const box = new THREE.Box3().setFromObject(currentLoadedModel);
-                            const bottomOffset = box.min.y - currentLoadedModel.position.y;
-                            currentLoadedModel.position.y = floorPlaneY - bottomOffset;
-                        }
-                    } else {
-                        // No floor defined - free movement
-                        currentLoadedModel.position.y -= deltaY * moveFactor;
-                    }
+                    // Update contact marker positions
+                    updateContactMarkerPositions();
 
                     lastMouseX = e.clientX;
                     lastMouseY = e.clientY;
