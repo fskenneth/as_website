@@ -37,6 +37,68 @@ def test_inpainting_page():
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
         }
 
+        /* Full-width 3D viewer */
+        #convert3DResults {
+            padding: 0 !important;
+            margin: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+
+        #convert3DResults h4 {
+            padding: 1rem 2rem;
+            margin: 0;
+        }
+
+        #convert3DResults #3dModelInfo,
+        #convert3DResults > div:last-child {
+            padding: 0.5rem 2rem;
+        }
+
+        #threejsViewer,
+        #roomCompositeViewer {
+            position: relative;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100vw !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+            border-radius: 0 !important;
+            aspect-ratio: 4/3 !important;
+        }
+
+        /* Mobile styles */
+        @media (max-width: 768px) {
+            body {
+                padding: 0 !important;
+            }
+
+            .container {
+                max-width: 100%;
+                border-radius: 0;
+                padding: 0;
+                box-shadow: none;
+            }
+
+            .container > h1,
+            .container > .subtitle,
+            .container > .upload-section,
+            .container > .preview-section,
+            .container > .btn-group,
+            .container > .results-grid,
+            .container > .history-section > *:not(#threejsViewer):not(#roomCompositeViewer):not(#convert3DResults) {
+                margin-left: 1rem;
+                margin-right: 1rem;
+            }
+
+            .upload-section,
+            .result-card,
+            .history-section {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+        }
+
         h1 {
             text-align: center;
             color: #333;
@@ -897,7 +959,7 @@ def test_inpainting_page():
         let isDraggingBrightness = false;
         let lastMouseX = 0;
         let lastMouseY = 0;
-        let modelBrightness = 1.0;
+        let modelBrightness = 2.5; // Max brightness by default
         let viewerContainer = null;
         let controlOverlay = null;
 
@@ -917,8 +979,9 @@ def test_inpainting_page():
 
         function setupThreeScene(container, modelData, format) {
             viewerContainer = container;
-            const width = container.clientWidth;
-            const height = container.clientHeight;
+            const width = window.innerWidth;
+            const height = width * (3 / 4); // 4:3 aspect ratio
+            container.style.height = height + 'px';
 
             // Scene
             threeScene = new THREE.Scene();
@@ -982,8 +1045,9 @@ def test_inpainting_page():
 
             // Handle resize
             window.addEventListener('resize', () => {
-                const newWidth = container.clientWidth;
-                const newHeight = container.clientHeight;
+                const newWidth = window.innerWidth;
+                const newHeight = newWidth * (3 / 4); // 4:3 aspect ratio
+                container.style.height = newHeight + 'px';
                 threeCamera.aspect = newWidth / newHeight;
                 threeCamera.updateProjectionMatrix();
                 threeRenderer.setSize(newWidth, newHeight);
@@ -2029,12 +2093,15 @@ def test_inpainting_page():
                 model.position.set(0, 0, 0);
 
                 // Reset brightness and rotation for new model
-                modelBrightness = 1.0;
+                modelBrightness = 2.5; // Max brightness by default
                 userYRotation = 0;
 
                 // Store reference for drag controls
                 currentLoadedModel = model;
                 threeScene.add(model);
+
+                // Apply max brightness by default
+                applyBrightnessToModel(modelBrightness);
 
                 // Apply floor and detect contact points after model is loaded
                 setTimeout(() => {
@@ -2415,7 +2482,7 @@ def test_inpainting_page():
                 # 3D Model Results
                 Div(
                     H4("3D Model Generated"),
-                    Div(id="threejsViewer", style="width: 100%; aspect-ratio: 4/3; background: #1a1a2e; border-radius: 8px;"),
+                    Div(id="threejsViewer", style="background: #1a1a2e;"),
                     P("", id="3dModelInfo", style="color: #666; font-size: 0.9rem; margin-top: 0.5rem;"),
                     Div(
                         Button("Download .glb", onclick="download3DModel('glb')", cls="vacate-btn method-1",
@@ -2445,7 +2512,7 @@ def test_inpainting_page():
                         style="margin-bottom: 1rem;"
                     ),
                     Div(id="roomCompositeViewer",
-                        style="width: 100%; height: 500px; background: #1a1a2e; border-radius: 8px; display: none;"),
+                        style="height: 500px; background: #1a1a2e; display: none;"),
                     Div(
                         Button("📷 Export as Image", onclick="exportComposite()", cls="vacate-btn method-5",
                                id="exportBtn", style="display: none;"),
