@@ -1200,29 +1200,50 @@ def test_inpainting_page():
             container.style.position = 'relative';
             container.appendChild(overlay);
 
-            // Rotate control events (Y axis - bottom)
+            // Rotate control events (Y axis - bottom) - mouse
             rotateBtn.addEventListener('mousedown', (e) => {
                 e.preventDefault();
                 isDraggingRotate = true;
                 lastMouseX = e.clientX;
                 rotateBtn.style.background = 'rgba(100,200,255,0.9)';
             });
+            // Rotate control events - touch
+            rotateBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                isDraggingRotate = true;
+                lastMouseX = e.touches[0].clientX;
+                rotateBtn.style.background = 'rgba(100,200,255,0.9)';
+            }, { passive: false });
 
-            // Scale control events
+            // Scale control events - mouse
             scaleControl.addEventListener('mousedown', (e) => {
                 e.preventDefault();
                 isDraggingScale = true;
                 lastMouseY = e.clientY;
                 scaleControl.style.background = 'rgba(100,255,100,0.9)';
             });
+            // Scale control events - touch
+            scaleControl.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                isDraggingScale = true;
+                lastMouseY = e.touches[0].clientY;
+                scaleControl.style.background = 'rgba(100,255,100,0.9)';
+            }, { passive: false });
 
-            // Brightness control events
+            // Brightness control events - mouse
             brightnessControl.addEventListener('mousedown', (e) => {
                 e.preventDefault();
                 isDraggingBrightness = true;
                 lastMouseY = e.clientY;
                 brightnessControl.style.background = 'rgba(255,200,100,0.9)';
             });
+            // Brightness control events - touch
+            brightnessControl.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                isDraggingBrightness = true;
+                lastMouseY = e.touches[0].clientY;
+                brightnessControl.style.background = 'rgba(255,200,100,0.9)';
+            }, { passive: false });
 
             // Global mouse events
             document.addEventListener('mousemove', (e) => {
@@ -1256,6 +1277,49 @@ def test_inpainting_page():
                     rotateBtn.style.background = 'rgba(255,255,255,0.9)';
                     // Don't bake Y rotation - just let it accumulate
                     // Y rotation doesn't affect vertical alignment so no need to reset
+                }
+                if (isDraggingScale) {
+                    isDraggingScale = false;
+                    scaleControl.style.background = 'rgba(255,255,255,0.9)';
+                }
+                if (isDraggingBrightness) {
+                    isDraggingBrightness = false;
+                    brightnessControl.style.background = 'rgba(255,255,255,0.9)';
+                }
+            });
+
+            // Global touch events for mobile
+            document.addEventListener('touchmove', (e) => {
+                if (isDraggingRotate && currentLoadedModel) {
+                    const deltaX = e.touches[0].clientX - lastMouseX;
+                    const angle = deltaX * 0.02;
+                    rotateAroundFloor(currentLoadedModel, angle);
+                    lastMouseX = e.touches[0].clientX;
+                    e.preventDefault();
+                }
+                if (isDraggingScale && currentLoadedModel) {
+                    const deltaY = e.touches[0].clientY - lastMouseY;
+                    const scaleFactor = 1 - deltaY * 0.005;
+                    const newScale = currentLoadedModel.scale.x * scaleFactor;
+                    if (newScale > 0.1 && newScale < 10) {
+                        currentLoadedModel.scale.setScalar(newScale);
+                    }
+                    lastMouseY = e.touches[0].clientY;
+                    e.preventDefault();
+                }
+                if (isDraggingBrightness && currentLoadedModel) {
+                    const deltaY = e.touches[0].clientY - lastMouseY;
+                    modelBrightness = Math.max(0.2, Math.min(2.5, modelBrightness - deltaY * 0.01));
+                    applyBrightnessToModel(modelBrightness);
+                    lastMouseY = e.touches[0].clientY;
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
+            document.addEventListener('touchend', () => {
+                if (isDraggingRotate) {
+                    isDraggingRotate = false;
+                    rotateBtn.style.background = 'rgba(255,255,255,0.9)';
                 }
                 if (isDraggingScale) {
                     isDraggingScale = false;
