@@ -1333,16 +1333,11 @@ def test_inpainting_page():
         }
 
         function rotateAroundFloor(model, angle) {
-            // Calculate the world-space center of contact points BEFORE rotation
-            // This is the visual center we want to preserve
-            let savedCenterX = model.position.x;
-            let savedCenterZ = model.position.z;
-            if (objectContactPoints.length >= 3) {
-                model.updateMatrixWorld(true);
-                const worldPoints = objectContactPoints.map(p => model.localToWorld(p.clone()));
-                savedCenterX = worldPoints.reduce((sum, p) => sum + p.x, 0) / worldPoints.length;
-                savedCenterZ = worldPoints.reduce((sum, p) => sum + p.z, 0) / worldPoints.length;
-            }
+            // Save exact position before rotation - we'll restore it after
+            // This prevents position drift from accumulated floating point errors
+            const savedX = model.position.x;
+            const savedY = model.position.y;
+            const savedZ = model.position.z;
 
             // Update tracked Y rotation
             userYRotation += angle;
@@ -1359,20 +1354,15 @@ def test_inpainting_page():
 
                 // Re-apply perspective tilt (but keep user's Y rotation)
                 applyPerspectiveTilt(model, objectContactPoints);
-
-                // Calculate new center of contact points after rotation
-                model.updateMatrixWorld(true);
-                const newWorldPoints = objectContactPoints.map(p => model.localToWorld(p.clone()));
-                const newCenterX = newWorldPoints.reduce((sum, p) => sum + p.x, 0) / newWorldPoints.length;
-                const newCenterZ = newWorldPoints.reduce((sum, p) => sum + p.z, 0) / newWorldPoints.length;
-
-                // Adjust position to keep visual center at same location
-                model.position.x += (savedCenterX - newCenterX);
-                model.position.z += (savedCenterZ - newCenterZ);
-                model.updateMatrixWorld(true);
-
-                updateContactMarkerPositions();
             }
+
+            // Restore exact position - rotation should only change orientation, not location
+            model.position.x = savedX;
+            model.position.y = savedY;
+            model.position.z = savedZ;
+            model.updateMatrixWorld(true);
+
+            updateContactMarkerPositions();
         }
 
         function levelModelToFloorWithoutAlign(model, contactPoints) {
