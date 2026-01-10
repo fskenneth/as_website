@@ -978,6 +978,11 @@ def test_inpainting_page():
         let contactMarkers = [];  // DOM elements showing contact points
         let userYRotation = 0;  // Track user's Y rotation separately from leveling
 
+        // For maintaining constant apparent size when moving in Z
+        let modelReferenceZ = 0;  // Z position where baseScale applies
+        let modelBaseScale = 1;   // Scale at reference Z position
+        const cameraZ = 10;       // Camera Z position (must match camera setup)
+
         function setupThreeScene(container, modelData, format) {
             viewerContainer = container;
             const width = window.innerWidth;
@@ -2108,6 +2113,22 @@ def test_inpainting_page():
             return count;
         }
 
+        // Update model scale to maintain constant apparent size when Z changes
+        function updateScaleForConstantSize() {
+            if (!currentLoadedModel || modelBaseScale === 0) return;
+
+            // Calculate distance from camera at reference and current Z
+            const referenceDistance = cameraZ - modelReferenceZ;
+            const currentDistance = cameraZ - currentLoadedModel.position.z;
+
+            // Scale proportionally with distance to maintain constant apparent size
+            // When further away (larger distance), scale up to compensate for perspective shrinking
+            if (currentDistance > 0 && referenceDistance > 0) {
+                const newScale = modelBaseScale * (currentDistance / referenceDistance);
+                currentLoadedModel.scale.setScalar(newScale);
+            }
+        }
+
         // Check if movement is allowed - allow if it doesn't make things worse
         function getValidPosition(startX, startZ, deltaX, deltaZ) {
             if (floorWorldPoints.length < 4 || objectContactPoints.length === 0) {
@@ -2217,6 +2238,7 @@ def test_inpainting_page():
                         // Move the model
                         currentLoadedModel.position.x = validPos.x;
                         currentLoadedModel.position.z = validPos.z;
+                        updateScaleForConstantSize();
                         updateContactMarkerPositions();
 
                         // Always update cursor tracking for next frame
@@ -2286,6 +2308,7 @@ def test_inpainting_page():
                         // Move the model
                         currentLoadedModel.position.x = validPos.x;
                         currentLoadedModel.position.z = validPos.z;
+                        updateScaleForConstantSize();
                         updateContactMarkerPositions();
 
                         // Always update cursor tracking for next frame
@@ -2365,6 +2388,10 @@ def test_inpainting_page():
                 model.scale.setScalar(scale);
                 model.position.set(0, 0, 0);
 
+                // Store initial reference for constant size during movement
+                modelReferenceZ = 0;
+                modelBaseScale = scale;
+
                 // Reset brightness and rotation for new model
                 modelBrightness = 2.5; // Max brightness by default
                 userYRotation = 0;
@@ -2435,6 +2462,10 @@ def test_inpainting_page():
             model.position.z += offsetZ;
 
             console.log('Geometry centered for Y rotation, offset X:', offsetX, 'Z:', offsetZ);
+
+            // Store reference Z and scale for constant apparent size during movement
+            modelReferenceZ = model.position.z;
+            modelBaseScale = model.scale.x;
         }
 
         function base64ToBlob(base64, mimeType) {
