@@ -1279,8 +1279,108 @@ def test_inpainting_page():
 
             // Apply leveling on top of the Y rotation
             if (objectContactPoints.length >= 3) {
-                levelModelToFloor(model, objectContactPoints);
+                // Level model to floor (makes contact plane horizontal)
+                levelModelToFloorWithoutAlign(model, objectContactPoints);
+
+                // Re-apply perspective tilt (but keep user's Y rotation)
+                applyPerspectiveTilt(model, objectContactPoints);
+
                 updateContactMarkerPositions();
+            }
+        }
+
+        function levelModelToFloorWithoutAlign(model, contactPoints) {
+            // Transform the model so all contact points lie on the floor plane (Y = floorPlaneY)
+            // This version does NOT call alignModelToFloorOrientation
+            if (contactPoints.length < 3) return;
+
+            // Convert contact points to world coordinates
+            const worldPoints = contactPoints.map(p => model.localToWorld(p.clone()));
+
+            // Calculate the plane normal from 3 points
+            const p0 = worldPoints[0];
+            const p1 = worldPoints[1];
+            const p2 = worldPoints[2];
+
+            const v1 = new THREE.Vector3().subVectors(p1, p0);
+            const v2 = new THREE.Vector3().subVectors(p2, p0);
+            const planeNormal = new THREE.Vector3().crossVectors(v1, v2).normalize();
+
+            // Ensure normal points upward
+            if (planeNormal.y < 0) planeNormal.negate();
+
+            // Calculate rotation to make plane horizontal (normal = up vector)
+            const upVector = new THREE.Vector3(0, 1, 0);
+            const quaternion = new THREE.Quaternion().setFromUnitVectors(planeNormal, upVector);
+
+            // Apply rotation to model
+            model.quaternion.premultiply(quaternion);
+            model.updateMatrixWorld(true);
+
+            // Recalculate world positions after rotation
+            const newWorldPoints = contactPoints.map(p => model.localToWorld(p.clone()));
+
+            // Find the lowest Y after rotation
+            const minY = Math.min(...newWorldPoints.map(p => p.y));
+
+            // Determine target floor Y
+            const targetY = (floorPoints.length >= 4) ? floorPlaneY : 0;
+
+            // Move model so contact points are at floor level
+            model.position.y -= (minY - targetY);
+            model.updateMatrixWorld(true);
+        }
+
+        function applyPerspectiveTilt(model, contactPoints) {
+            // Apply perspective tilt without changing Y rotation
+            if (floorWorldPoints.length < 4) return;
+
+            const floorBackLeft = floorWorldPoints[0];
+            const floorBackRight = floorWorldPoints[3];
+            const floorFrontLeft = floorWorldPoints[1];
+            const floorFrontRight = floorWorldPoints[2];
+
+            // Calculate perspective tilt from floor trapezoid ratio
+            const rect = viewerContainer.getBoundingClientRect();
+            const projectToScreen = (p) => {
+                const sp = p.clone().project(threeCamera);
+                return { x: (sp.x + 1) / 2 * rect.width, y: (-sp.y + 1) / 2 * rect.height };
+            };
+
+            const screenBackLeft = projectToScreen(floorBackLeft);
+            const screenBackRight = projectToScreen(floorBackRight);
+            const screenFrontLeft = projectToScreen(floorFrontLeft);
+            const screenFrontRight = projectToScreen(floorFrontRight);
+
+            const backLength = Math.sqrt(
+                Math.pow(screenBackRight.x - screenBackLeft.x, 2) +
+                Math.pow(screenBackRight.y - screenBackLeft.y, 2)
+            );
+            const frontLength = Math.sqrt(
+                Math.pow(screenFrontRight.x - screenFrontLeft.x, 2) +
+                Math.pow(screenFrontRight.y - screenFrontLeft.y, 2)
+            );
+
+            const perspectiveRatio = backLength / frontLength;
+
+            let perspectiveTilt = 0;
+            if (perspectiveRatio < 1) {
+                perspectiveTilt = Math.asin(Math.min(1 - perspectiveRatio, 1));
+            }
+
+            if (perspectiveTilt > 0.001) {
+                // Apply X rotation for perspective tilt
+                const euler = new THREE.Euler().setFromQuaternion(model.quaternion, 'XYZ');
+                euler.x = euler.x + perspectiveTilt;
+                model.setRotationFromEuler(euler);
+                model.updateMatrixWorld(true);
+
+                // Re-level model after tilt
+                const worldPoints = contactPoints.map(p => model.localToWorld(p.clone()));
+                const minY = Math.min(...worldPoints.map(p => p.y));
+                const targetY = (floorPoints.length >= 4) ? floorPlaneY : 0;
+                model.position.y -= (minY - targetY);
+                model.updateMatrixWorld(true);
             }
         }
 
