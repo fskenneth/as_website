@@ -1269,6 +1269,10 @@ def test_inpainting_page():
         }
 
         function rotateAroundFloor(model, angle) {
+            // Save current X/Z position - rotation should not change location
+            const savedX = model.position.x;
+            const savedZ = model.position.z;
+
             // Update tracked Y rotation
             userYRotation += angle;
 
@@ -1284,6 +1288,11 @@ def test_inpainting_page():
 
                 // Re-apply perspective tilt (but keep user's Y rotation)
                 applyPerspectiveTilt(model, objectContactPoints);
+
+                // Restore X/Z position - rotation should only change orientation, not location
+                model.position.x = savedX;
+                model.position.z = savedZ;
+                model.updateMatrixWorld(true);
 
                 updateContactMarkerPositions();
             }
@@ -2015,6 +2024,9 @@ def test_inpainting_page():
             // Level the model so all 4 contact points are at the same Y (floor level)
             if (objectContactPoints.length >= 3) {
                 levelModelToFloor(model, objectContactPoints);
+
+                // Apply perspective tilt to match the floor perspective
+                applyPerspectiveTilt(model, objectContactPoints);
             }
 
             // Show visual markers for the detected contact points
