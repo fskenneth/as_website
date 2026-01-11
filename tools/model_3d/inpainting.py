@@ -1119,8 +1119,8 @@ def test_inpainting_page():
                 scaleCtrl.style.top = pos.centerY + 'px';
             }
             if (brightnessCtrl) {
-                brightnessCtrl.style.left = Math.max(pos.leftX - 55, 10) + 'px';
-                brightnessCtrl.style.top = pos.centerY + 'px';
+                brightnessCtrl.style.left = pos.centerX + 'px';
+                brightnessCtrl.style.top = Math.max(pos.topY - 55, 10) + 'px';
             }
         }
 
@@ -1161,18 +1161,18 @@ def test_inpainting_page():
             `;
             scaleControl.title = 'Drag up/down to resize';
 
-            // Brightness control (sun icon) - positioned to left of object
+            // Brightness control (sun icon) - positioned above object
             const brightnessControl = document.createElement('div');
             brightnessControl.className = 'brightness-control';
             brightnessControl.innerHTML = '☀';
             brightnessControl.style.cssText = `
-                position: absolute; left: 20px; top: 50%; transform: translate(0, -50%);
-                width: 36px; height: 50px; background: rgba(255,255,255,0.9); border-radius: 18px;
+                position: absolute; top: 20px; left: 50%; transform: translate(-50%, 0);
+                width: 50px; height: 36px; background: rgba(255,255,255,0.9); border-radius: 18px;
                 display: flex; align-items: center; justify-content: center; font-size: 20px;
-                cursor: ns-resize; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                cursor: ew-resize; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
                 user-select: none; color: #f5a623; font-weight: bold;
             `;
-            brightnessControl.title = 'Drag up/down to adjust brightness';
+            brightnessControl.title = 'Drag left/right to adjust brightness';
 
             // Move hint in center
             const moveHint = document.createElement('div');
@@ -1267,14 +1267,14 @@ def test_inpainting_page():
             brightnessControl.addEventListener('mousedown', (e) => {
                 e.preventDefault();
                 isDraggingBrightness = true;
-                lastMouseY = e.clientY;
+                lastMouseX = e.clientX;
                 brightnessControl.style.background = 'rgba(255,200,100,0.9)';
             });
             // Brightness control events - touch
             brightnessControl.addEventListener('touchstart', (e) => {
                 e.preventDefault();
                 isDraggingBrightness = true;
-                lastMouseY = e.touches[0].clientY;
+                lastMouseX = e.touches[0].clientX;
                 brightnessControl.style.background = 'rgba(255,200,100,0.9)';
             }, { passive: false });
 
@@ -1297,10 +1297,10 @@ def test_inpainting_page():
                     lastMouseY = e.clientY;
                 }
                 if (isDraggingBrightness && currentLoadedModel) {
-                    const deltaY = e.clientY - lastMouseY;
-                    modelBrightness = Math.max(0.2, Math.min(2.5, modelBrightness - deltaY * 0.01));
+                    const deltaX = e.clientX - lastMouseX;
+                    modelBrightness = Math.max(0.2, Math.min(2.5, modelBrightness + deltaX * 0.01));
                     applyBrightnessToModel(modelBrightness);
-                    lastMouseY = e.clientY;
+                    lastMouseX = e.clientX;
                 }
             });
 
@@ -1346,10 +1346,10 @@ def test_inpainting_page():
                     e.preventDefault();
                 }
                 if (isDraggingBrightness && currentLoadedModel) {
-                    const deltaY = e.touches[0].clientY - lastMouseY;
-                    modelBrightness = Math.max(0.2, Math.min(2.5, modelBrightness - deltaY * 0.01));
+                    const deltaX = e.touches[0].clientX - lastMouseX;
+                    modelBrightness = Math.max(0.2, Math.min(2.5, modelBrightness + deltaX * 0.01));
                     applyBrightnessToModel(modelBrightness);
-                    lastMouseY = e.touches[0].clientY;
+                    lastMouseX = e.touches[0].clientX;
                     e.preventDefault();
                 }
             }, { passive: false });
