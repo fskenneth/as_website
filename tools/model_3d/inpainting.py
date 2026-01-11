@@ -1314,6 +1314,11 @@ def test_inpainting_page():
                 if (isDraggingScale) {
                     isDraggingScale = false;
                     scaleControl.style.background = 'rgba(255,255,255,0.9)';
+                    // Update base scale and reference Z so moving doesn't reset the size
+                    if (currentLoadedModel) {
+                        modelBaseScale = currentLoadedModel.scale.x;
+                        modelReferenceZ = currentLoadedModel.position.z;
+                    }
                 }
                 if (isDraggingBrightness) {
                     isDraggingBrightness = false;
@@ -1357,6 +1362,11 @@ def test_inpainting_page():
                 if (isDraggingScale) {
                     isDraggingScale = false;
                     scaleControl.style.background = 'rgba(255,255,255,0.9)';
+                    // Update base scale and reference Z so moving doesn't reset the size
+                    if (currentLoadedModel) {
+                        modelBaseScale = currentLoadedModel.scale.x;
+                        modelReferenceZ = currentLoadedModel.position.z;
+                    }
                 }
                 if (isDraggingBrightness) {
                     isDraggingBrightness = false;
