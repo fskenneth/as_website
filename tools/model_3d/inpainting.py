@@ -978,6 +978,11 @@ def test_inpainting_page():
         let contactMarkers = [];  // DOM elements showing contact points
         let userYRotation = 0;  // Track user's Y rotation separately from leveling
 
+        // Visibility toggles
+        let showFloorMarkers = true;
+        let showContactMarkers = true;
+        let showControlButtons = true;
+
         // For maintaining constant apparent size when moving in Z
         let modelReferenceZ = 0;  // Z position where baseScale applies
         let modelBaseScale = 1;   // Scale at reference Z position
@@ -1179,24 +1184,52 @@ def test_inpainting_page():
                 color: white; font-size: 12px; pointer-events: none;
             `;
 
-            // Define Floor button (top right)
+            // Define Floor button (top right) - toggles floor visibility
             const floorBtn = document.createElement('div');
             floorBtn.className = 'floor-btn';
-            floorBtn.innerHTML = '⬚ Floor';
+            floorBtn.innerHTML = '⬚ Floor ✓';
             floorBtn.style.cssText = `
                 position: absolute; top: 10px; right: 10px;
                 padding: 8px 16px; background: rgba(76,175,80,0.9); border-radius: 20px;
                 color: white; font-size: 12px; cursor: pointer; pointer-events: auto;
                 box-shadow: 0 2px 10px rgba(0,0,0,0.3); user-select: none;
             `;
-            floorBtn.title = 'Click to define 4 floor corner points';
-            floorBtn.onclick = () => startDefiningFloor(container, floorBtn, moveHint);
+            floorBtn.title = 'Click to toggle floor visibility, long press to redefine';
+
+            // Toggle floor visibility on click
+            floorBtn.onclick = () => {
+                showFloorMarkers = !showFloorMarkers;
+                floorMarkers.forEach(m => m.style.display = showFloorMarkers ? 'flex' : 'none');
+                // Update floor lines visibility
+                const floorLines = container.querySelector('.floor-outline');
+                if (floorLines) floorLines.style.display = showFloorMarkers ? 'block' : 'none';
+                floorBtn.innerHTML = showFloorMarkers ? '⬚ Floor ✓' : '⬚ Floor';
+                floorBtn.style.background = showFloorMarkers ? 'rgba(76,175,80,0.9)' : 'rgba(100,100,100,0.7)';
+            };
+
+            // Reset Floor button - clears floor and waits for manual clicks
+            const resetFloorBtn = document.createElement('div');
+            resetFloorBtn.className = 'reset-floor-btn';
+            resetFloorBtn.innerHTML = '↻ Reset';
+            resetFloorBtn.style.cssText = `
+                position: absolute; top: 50px; right: 10px;
+                padding: 8px 16px; background: rgba(156,39,176,0.9); border-radius: 20px;
+                color: white; font-size: 12px; cursor: pointer; pointer-events: auto;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.3); user-select: none;
+            `;
+            resetFloorBtn.title = 'Click to redefine floor points';
+
+            // Reset floor on click
+            resetFloorBtn.onclick = () => {
+                startDefiningFloor(container, floorBtn, moveHint);
+            };
 
             overlay.appendChild(rotateBtn);
             overlay.appendChild(scaleControl);
             overlay.appendChild(brightnessControl);
             overlay.appendChild(moveHint);
             overlay.appendChild(floorBtn);
+            overlay.appendChild(resetFloorBtn);
             container.style.position = 'relative';
             container.appendChild(overlay);
 
@@ -2371,9 +2404,29 @@ def test_inpainting_page():
 
             const raycaster = new THREE.Raycaster();
             const mouse = new THREE.Vector2();
+            let clickStartPos = null;  // Track click start position to detect tap vs drag
+            let modelWasClicked = false;  // Track if mousedown was on model
+
+            // Function to toggle control buttons visibility (and leg points)
+            function toggleControlButtons() {
+                showControlButtons = !showControlButtons;
+                const rotateCtrl = controlOverlay?.querySelector('.rotate-control');
+                const scaleCtrl = controlOverlay?.querySelector('.scale-control');
+                const brightnessCtrl = controlOverlay?.querySelector('.brightness-control');
+                // Use opacity so buttons are still clickable when "hidden"
+                const opacity = showControlButtons ? '1' : '0.15';
+                if (rotateCtrl) rotateCtrl.style.opacity = opacity;
+                if (scaleCtrl) scaleCtrl.style.opacity = opacity;
+                if (brightnessCtrl) brightnessCtrl.style.opacity = opacity;
+                // Also toggle leg points visibility with controls
+                contactMarkers.forEach(m => m.style.display = showControlButtons ? 'flex' : 'none');
+            }
 
             canvas.addEventListener('mousedown', (e) => {
                 if (isDraggingRotate || isDraggingScale || isDraggingBrightness) return;
+
+                clickStartPos = { x: e.clientX, y: e.clientY };
+                modelWasClicked = false;
 
                 const rect = canvas.getBoundingClientRect();
                 mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -2385,6 +2438,7 @@ def test_inpainting_page():
                     const intersects = raycaster.intersectObject(currentLoadedModel, true);
                     if (intersects.length > 0) {
                         isDraggingModel = true;
+                        modelWasClicked = true;
                         canvas.style.cursor = 'move';
 
                         // Store the exact 3D point where user clicked on the model
@@ -2426,11 +2480,23 @@ def test_inpainting_page():
                 }
             });
 
-            canvas.addEventListener('mouseup', () => {
+            canvas.addEventListener('mouseup', (e) => {
+                // Check if this was a click (not a drag) on the model
+                if (modelWasClicked && clickStartPos) {
+                    const dx = e.clientX - clickStartPos.x;
+                    const dy = e.clientY - clickStartPos.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    // If movement is less than 5 pixels, treat as click to toggle controls
+                    if (distance < 5) {
+                        toggleControlButtons();
+                    }
+                }
                 isDraggingModel = false;
                 dragStartHitPoint = null;
                 dragStartModelPosition = null;
                 lastCursorHitPoint = null;
+                clickStartPos = null;
+                modelWasClicked = false;
                 canvas.style.cursor = 'default';
             });
 
@@ -2443,9 +2509,15 @@ def test_inpainting_page():
             });
 
             // Touch events for mobile
+            let touchStartPos = null;  // Track touch start position
+            let touchModelWasClicked = false;  // Track if touch was on model
+
             canvas.addEventListener('touchstart', (e) => {
                 if (e.touches.length === 1) {
                     const touch = e.touches[0];
+                    touchStartPos = { x: touch.clientX, y: touch.clientY };
+                    touchModelWasClicked = false;
+
                     const rect = canvas.getBoundingClientRect();
                     mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
                     mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
@@ -2456,6 +2528,7 @@ def test_inpainting_page():
                         const intersects = raycaster.intersectObject(currentLoadedModel, true);
                         if (intersects.length > 0) {
                             isDraggingModel = true;
+                            touchModelWasClicked = true;
                             dragStartHitPoint = intersects[0].point.clone();
                             dragPlaneY = dragStartHitPoint.y;
                             dragStartModelPosition = currentLoadedModel.position.clone();
@@ -2497,11 +2570,24 @@ def test_inpainting_page():
                 }
             }, { passive: false });
 
-            canvas.addEventListener('touchend', () => {
+            canvas.addEventListener('touchend', (e) => {
+                // Check if this was a tap (not a drag) on the model
+                if (touchModelWasClicked && touchStartPos && e.changedTouches.length > 0) {
+                    const touch = e.changedTouches[0];
+                    const dx = touch.clientX - touchStartPos.x;
+                    const dy = touch.clientY - touchStartPos.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    // If movement is less than 10 pixels, treat as tap to toggle controls
+                    if (distance < 10) {
+                        toggleControlButtons();
+                    }
+                }
                 isDraggingModel = false;
                 dragStartHitPoint = null;
                 dragStartModelPosition = null;
                 lastCursorHitPoint = null;
+                touchStartPos = null;
+                touchModelWasClicked = false;
             });
         }
 
