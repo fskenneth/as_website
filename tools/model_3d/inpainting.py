@@ -1887,8 +1887,40 @@ def test_inpainting_page():
             isDefiningFloorBoundary = false;
             drawFloorBoundary();
 
-            // Move object inside the boundary area
+            // Save floor boundary to localStorage
+            saveFloorBoundary();
+
+            // Move object inside the boundary area with smooth animation
             moveObjectInsideBoundary();
+        }
+
+        function saveFloorBoundary() {
+            if (floorBoundaryPoints.length >= 3) {
+                localStorage.setItem('floorBoundaryPoints', JSON.stringify(floorBoundaryPoints));
+            }
+        }
+
+        function loadFloorBoundary() {
+            const saved = localStorage.getItem('floorBoundaryPoints');
+            if (saved) {
+                try {
+                    floorBoundaryPoints = JSON.parse(saved);
+                    if (floorBoundaryPoints.length >= 3) {
+                        createFloorBoundaryCanvas();
+                        // Recreate markers
+                        floorBoundaryPoints.forEach((point, index) => {
+                            const screenPos = worldToScreen(point.x, point.y);
+                            if (screenPos) {
+                                addFloorBoundaryMarker(screenPos.x, screenPos.y, index + 1);
+                            }
+                        });
+                        drawFloorBoundary();
+                    }
+                } catch (e) {
+                    console.error('Failed to load floor boundary:', e);
+                    floorBoundaryPoints = [];
+                }
+            }
         }
 
         function moveObjectInsideBoundary() {
@@ -1906,10 +1938,8 @@ def test_inpainting_page():
             // Get current contact points positions
             const contactPositions = getContactPointsWorldPositions();
             if (contactPositions.length === 0) {
-                // No contact points, just move model center to boundary center
-                currentLoadedModel.position.x = boundaryCenterX;
-                currentLoadedModel.position.y = boundaryCenterY;
-                updateScaleForConstantSize();
+                // No contact points, animate model center to boundary center
+                animateModelTo(boundaryCenterX, boundaryCenterY);
                 return;
             }
 
@@ -1922,16 +1952,43 @@ def test_inpainting_page():
             contactCenterX /= contactPositions.length;
             contactCenterY /= contactPositions.length;
 
-            // Calculate delta to move contact points centroid to boundary centroid
+            // Calculate target position for the model
             const deltaX = boundaryCenterX - contactCenterX;
             const deltaY = boundaryCenterY - contactCenterY;
+            const targetX = currentLoadedModel.position.x + deltaX;
+            const targetY = currentLoadedModel.position.y + deltaY;
 
-            // Move the model
-            currentLoadedModel.position.x += deltaX;
-            currentLoadedModel.position.y += deltaY;
+            // Animate the model to target position
+            animateModelTo(targetX, targetY);
+        }
 
-            updateScaleForConstantSize();
-            updateContactMarkerPositions();
+        function animateModelTo(targetX, targetY) {
+            if (!currentLoadedModel) return;
+
+            const startX = currentLoadedModel.position.x;
+            const startY = currentLoadedModel.position.y;
+            const duration = 500; // milliseconds
+            const startTime = performance.now();
+
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Ease out cubic for smooth deceleration
+                const eased = 1 - Math.pow(1 - progress, 3);
+
+                currentLoadedModel.position.x = startX + (targetX - startX) * eased;
+                currentLoadedModel.position.y = startY + (targetY - startY) * eased;
+
+                updateScaleForConstantSize();
+                updateContactMarkerPositions();
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                }
+            }
+
+            requestAnimationFrame(animate);
         }
 
         function clearFloorBoundary() {
@@ -1941,6 +1998,8 @@ def test_inpainting_page():
                 const ctx = floorBoundaryCanvas.getContext('2d');
                 ctx.clearRect(0, 0, floorBoundaryCanvas.width, floorBoundaryCanvas.height);
             }
+            // Remove from localStorage
+            localStorage.removeItem('floorBoundaryPoints');
         }
 
         function getLowestContactPointY() {
@@ -2499,6 +2558,57 @@ def test_inpainting_page():
                 touchStartPos = null;
                 touchModelWasClicked = false;
             });
+
+            // Handle clicks on the viewerContainer for floor boundary definition
+            // This captures clicks that might not reach the canvas (e.g., through overlay)
+            viewerContainer.addEventListener('click', (e) => {
+                if (!isDefiningFloorBoundary) return;
+
+                // Don't handle clicks on control buttons
+                if (e.target.closest('.floor-boundary-btn') ||
+                    e.target.closest('[class*="Ctrl"]') ||
+                    e.target.closest('[title*="Drag"]')) {
+                    return;
+                }
+
+                const worldPos = screenToWorld(e.clientX, e.clientY);
+                if (worldPos) {
+                    // Check if clicking near the first point to close the polygon
+                    if (floorBoundaryPoints.length >= 3) {
+                        const firstPoint = floorBoundaryPoints[0];
+                        const firstScreenPos = worldToScreen(firstPoint.x, firstPoint.y);
+                        if (firstScreenPos) {
+                            const rect = viewerContainer.getBoundingClientRect();
+                            const clickX = e.clientX - rect.left;
+                            const clickY = e.clientY - rect.top;
+                            const distToFirst = Math.sqrt(
+                                Math.pow(clickX - firstScreenPos.x, 2) +
+                                Math.pow(clickY - firstScreenPos.y, 2)
+                            );
+                            if (distToFirst < 30) {  // Close to first point - finish polygon
+                                finishDefiningFloorBoundary();
+                                // Reset button state
+                                const btn = viewerContainer.querySelector('.floor-boundary-btn');
+                                if (btn) {
+                                    btn.style.background = 'rgba(0,200,100,0.9)';
+                                    btn.innerHTML = '⬡';
+                                }
+                                return;
+                            }
+                        }
+                    }
+
+                    // Add new boundary point
+                    floorBoundaryPoints.push(worldPos);
+                    const rect = viewerContainer.getBoundingClientRect();
+                    addFloorBoundaryMarker(
+                        e.clientX - rect.left,
+                        e.clientY - rect.top,
+                        floorBoundaryPoints.length
+                    );
+                    drawFloorBoundary();
+                }
+            });
         }
 
         function loadTextureAsPlane(textureUrl) {
@@ -2598,6 +2708,9 @@ def test_inpainting_page():
                     threeCamera.updateProjectionMatrix();
                     updateContactMarkerPositions();
                     updateControlPositions();
+
+                    // Load saved floor boundary from localStorage
+                    loadFloorBoundary();
                 }, 100);
             }, undefined, (error) => {
                 console.error('Error loading 3D model:', error);
