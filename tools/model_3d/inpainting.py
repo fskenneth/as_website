@@ -1152,7 +1152,7 @@ def test_inpainting_page():
                 width: 50px; height: 36px; background: rgba(255,255,255,0.9); border-radius: 18px;
                 display: flex; align-items: center; justify-content: center; font-size: 24px;
                 cursor: ew-resize; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                user-select: none; color: #000; font-weight: bold;
+                user-select: none; color: #000; font-weight: bold; padding-bottom: 4px;
             `;
             rotateBtn.title = 'Drag left/right to rotate (Y axis)';
 
@@ -1166,7 +1166,7 @@ def test_inpainting_page():
                 width: 36px; height: 50px; background: rgba(255,255,255,0.9); border-radius: 18px;
                 display: flex; align-items: center; justify-content: center; font-size: 24px;
                 cursor: ns-resize; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                user-select: none; color: #000; font-weight: bold; padding-bottom: 4px;
+                user-select: none; color: #000; font-weight: bold; padding-bottom: 6px;
             `;
             scaleControl.title = 'Drag up/down to resize';
 
@@ -1192,7 +1192,7 @@ def test_inpainting_page():
                 width: 36px; height: 50px; background: rgba(255,255,255,0.9); border-radius: 18px;
                 display: flex; align-items: center; justify-content: center; font-size: 24px;
                 cursor: ns-resize; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                user-select: none; color: #000; font-weight: bold; padding-bottom: 4px;
+                user-select: none; color: #000; font-weight: bold; padding-bottom: 6px;
             `;
             tiltControl.title = 'Drag up/down to tilt object (X rotation)';
 
