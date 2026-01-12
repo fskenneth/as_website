@@ -97,6 +97,27 @@ def init_db():
     except:
         pass  # Column already exists
 
+    # Design models table - stores 3D model placement state for staging designs
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS design_models (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            staging_id INTEGER,
+            background_image TEXT NOT NULL,
+            model_url TEXT NOT NULL,
+            position_x REAL DEFAULT 0,
+            position_y REAL DEFAULT 0,
+            position_z REAL DEFAULT 0,
+            scale REAL DEFAULT 1,
+            rotation_y REAL DEFAULT 0,
+            tilt REAL DEFAULT 0.1745,
+            brightness REAL DEFAULT 2.5,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (staging_id) REFERENCES stagings (id),
+            UNIQUE(background_image, model_url)
+        )
+    ''')
+
     # Create indexes for faster lookups
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id)')
@@ -104,6 +125,8 @@ def init_db():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_stagings_user_id ON stagings(user_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_stagings_status ON stagings(status)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_design_models_background ON design_models(background_image)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_design_models_staging ON design_models(staging_id)')
 
     conn.commit()
     conn.close()
@@ -639,6 +662,128 @@ def update_staging_status(staging_id: int, status: str,
 
         conn.commit()
         return {'success': True}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        conn.close()
+
+
+# ============== Design Model State Functions ==============
+
+def save_model_state(background_image: str, model_url: str, state: dict, staging_id: int = None) -> dict:
+    """
+    Save or update a 3D model's placement state.
+    Uses INSERT OR REPLACE to upsert based on background_image + model_url unique constraint.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('''
+            INSERT INTO design_models (
+                staging_id, background_image, model_url,
+                position_x, position_y, position_z,
+                scale, rotation_y, tilt, brightness,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(background_image, model_url) DO UPDATE SET
+                staging_id = excluded.staging_id,
+                position_x = excluded.position_x,
+                position_y = excluded.position_y,
+                position_z = excluded.position_z,
+                scale = excluded.scale,
+                rotation_y = excluded.rotation_y,
+                tilt = excluded.tilt,
+                brightness = excluded.brightness,
+                updated_at = excluded.updated_at
+        ''', (
+            staging_id,
+            background_image,
+            model_url,
+            state.get('position_x', 0),
+            state.get('position_y', 0),
+            state.get('position_z', 0),
+            state.get('scale', 1),
+            state.get('rotation_y', 0),
+            state.get('tilt', 0.1745),
+            state.get('brightness', 2.5),
+            datetime.now()
+        ))
+
+        conn.commit()
+        return {'success': True, 'id': cursor.lastrowid}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        conn.close()
+
+
+def get_model_state(background_image: str, model_url: str) -> dict:
+    """Get the saved state for a specific model on a background image."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT position_x, position_y, position_z, scale, rotation_y, tilt, brightness
+        FROM design_models
+        WHERE background_image = ? AND model_url = ?
+    ''', (background_image, model_url))
+
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        return dict(row)
+    return None
+
+
+def get_all_models_for_background(background_image: str) -> list:
+    """Get all saved models for a specific background image."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT model_url, position_x, position_y, position_z, scale, rotation_y, tilt, brightness
+        FROM design_models
+        WHERE background_image = ?
+    ''', (background_image,))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [dict(row) for row in rows]
+
+
+def delete_model_state(background_image: str, model_url: str) -> dict:
+    """Delete a saved model state."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('''
+            DELETE FROM design_models
+            WHERE background_image = ? AND model_url = ?
+        ''', (background_image, model_url))
+
+        deleted = cursor.rowcount > 0
+        conn.commit()
+        return {'success': deleted, 'error': None if deleted else 'Model state not found'}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        conn.close()
+
+
+def delete_all_models_for_background(background_image: str) -> dict:
+    """Delete all saved model states for a background image."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('DELETE FROM design_models WHERE background_image = ?', (background_image,))
+        deleted_count = cursor.rowcount
+        conn.commit()
+        return {'success': True, 'deleted_count': deleted_count}
     except Exception as e:
         return {'success': False, 'error': str(e)}
     finally:

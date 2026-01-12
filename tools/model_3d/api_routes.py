@@ -368,7 +368,160 @@ def register_test_routes(rt):
             print(f"Error loading 3D history: {e}")
             return JSONResponse({'error': str(e)}, status_code=500)
 
-    print("Test API routes registered: /api/temp-image, /api/test-inpainting, /api/inpainting-history, /api/remove-background, /api/convert-to-3d, /api/model3d-history")
+    # =========================================================================
+    # MODEL STATE PERSISTENCE ENDPOINTS
+    # =========================================================================
+
+    @rt('/api/model-state', methods=['POST'])
+    async def save_model_state_endpoint(request: Request):
+        """
+        Save or update a 3D model's placement state.
+
+        Request body:
+            {
+                "background_image": "/static/images/areas/xxx.jpg",
+                "model_url": "/static/models/xxx.glb",
+                "position_x": 0.5,
+                "position_y": -0.3,
+                "position_z": 0,
+                "scale": 1.2,
+                "rotation_y": 0.5,
+                "tilt": 0.1745,
+                "brightness": 2.5,
+                "staging_id": 123  // optional
+            }
+
+        Returns:
+            {"success": true, "id": 1}
+        """
+        from tools.user_db import save_model_state
+
+        try:
+            data = await request.json()
+            background_image = data.get('background_image')
+            model_url = data.get('model_url')
+
+            if not background_image or not model_url:
+                return JSONResponse({'success': False, 'error': 'background_image and model_url are required'}, status_code=400)
+
+            state = {
+                'position_x': data.get('position_x', 0),
+                'position_y': data.get('position_y', 0),
+                'position_z': data.get('position_z', 0),
+                'scale': data.get('scale', 1),
+                'rotation_y': data.get('rotation_y', 0),
+                'tilt': data.get('tilt', 0.1745),
+                'brightness': data.get('brightness', 2.5)
+            }
+
+            staging_id = data.get('staging_id')
+
+            result = save_model_state(background_image, model_url, state, staging_id)
+            return JSONResponse(result)
+
+        except Exception as e:
+            print(f"Save model state error: {e}")
+            import traceback
+            traceback.print_exc()
+            return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+
+    @rt('/api/model-state')
+    async def get_model_state_endpoint(request: Request):
+        """
+        Get the saved state for a specific model on a background image.
+
+        Query params:
+            ?background_image=/static/images/areas/xxx.jpg&model_url=/static/models/xxx.glb
+
+        Returns:
+            {
+                "position_x": 0.5,
+                "position_y": -0.3,
+                "position_z": 0,
+                "scale": 1.2,
+                "rotation_y": 0.5,
+                "tilt": 0.1745,
+                "brightness": 2.5
+            }
+            or null if not found
+        """
+        from tools.user_db import get_model_state
+
+        try:
+            background_image = request.query_params.get('background_image')
+            model_url = request.query_params.get('model_url')
+
+            if not background_image or not model_url:
+                return JSONResponse({'error': 'background_image and model_url query params are required'}, status_code=400)
+
+            state = get_model_state(background_image, model_url)
+            return JSONResponse(state)
+
+        except Exception as e:
+            print(f"Get model state error: {e}")
+            return JSONResponse({'error': str(e)}, status_code=500)
+
+    @rt('/api/model-state', methods=['DELETE'])
+    async def delete_model_state_endpoint(request: Request):
+        """
+        Delete a saved model state.
+
+        Query params:
+            ?background_image=/static/images/areas/xxx.jpg&model_url=/static/models/xxx.glb
+
+        Returns:
+            {"success": true}
+        """
+        from tools.user_db import delete_model_state
+
+        try:
+            background_image = request.query_params.get('background_image')
+            model_url = request.query_params.get('model_url')
+
+            if not background_image or not model_url:
+                return JSONResponse({'success': False, 'error': 'background_image and model_url query params are required'}, status_code=400)
+
+            result = delete_model_state(background_image, model_url)
+            return JSONResponse(result)
+
+        except Exception as e:
+            print(f"Delete model state error: {e}")
+            return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+
+    @rt('/api/models-for-background')
+    async def get_all_models_endpoint(request: Request):
+        """
+        Get all saved models for a specific background image.
+
+        Query params:
+            ?background_image=/static/images/areas/xxx.jpg
+
+        Returns:
+            [
+                {
+                    "model_url": "/static/models/xxx.glb",
+                    "position_x": 0.5,
+                    ...
+                },
+                ...
+            ]
+        """
+        from tools.user_db import get_all_models_for_background
+
+        try:
+            background_image = request.query_params.get('background_image')
+
+            if not background_image:
+                return JSONResponse({'error': 'background_image query param is required'}, status_code=400)
+
+            models = get_all_models_for_background(background_image)
+            return JSONResponse(models)
+
+        except Exception as e:
+            print(f"Get all models error: {e}")
+            return JSONResponse({'error': str(e)}, status_code=500)
+
+    print("Test API routes registered: /api/temp-image, /api/test-inpainting, /api/inpainting-history, /api/remove-background, /api/convert-to-3d, /api/model3d-history, /api/model-state, /api/models-for-background")
 
 
 # =========================================================================

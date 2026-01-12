@@ -982,6 +982,81 @@ def test_inpainting_page():
         const DEFAULT_TILT = 10 * Math.PI / 180;  // Default tilt angle (10 degrees)
         let modelTilt = DEFAULT_TILT;  // Model X rotation for tilting view angle
 
+        // State persistence
+        let currentBackgroundImage = null;  // Track current background image URL
+        let saveStateTimeout = null;  // Debounce timer for auto-save
+
+        // Debounced save function (500ms delay)
+        function saveModelState() {
+            console.log('saveModelState called:', {
+                hasModel: !!currentLoadedModel,
+                bgImage: currentBackgroundImage,
+                modelUrl: current3DModel?.model_url
+            });
+
+            if (!currentLoadedModel) {
+                console.log('saveModelState: No loaded model');
+                return;
+            }
+            if (!currentBackgroundImage) {
+                console.log('saveModelState: No background image');
+                return;
+            }
+            if (!current3DModel?.model_url) {
+                console.log('saveModelState: No model URL');
+                return;
+            }
+
+            if (saveStateTimeout) clearTimeout(saveStateTimeout);
+            saveStateTimeout = setTimeout(() => {
+                const state = {
+                    background_image: currentBackgroundImage,
+                    model_url: current3DModel.model_url,
+                    position_x: currentLoadedModel.position.x,
+                    position_y: currentLoadedModel.position.y,
+                    position_z: currentLoadedModel.position.z,
+                    scale: currentLoadedModel.scale.x,
+                    rotation_y: userYRotation,
+                    tilt: modelTilt,
+                    brightness: modelBrightness
+                };
+
+                console.log('Saving model state:', state);
+
+                fetch('/api/model-state', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(state)
+                }).then(r => r.json()).then(result => {
+                    if (result.success) {
+                        console.log('Model state saved successfully');
+                    } else {
+                        console.error('Failed to save model state:', result.error);
+                    }
+                }).catch(err => console.error('Save state error:', err));
+            }, 500);
+        }
+
+        // Load saved state for a model
+        async function loadSavedModelState(backgroundImage, modelUrl) {
+            try {
+                const params = new URLSearchParams({
+                    background_image: backgroundImage,
+                    model_url: modelUrl
+                });
+                const response = await fetch(`/api/model-state?${params}`);
+                if (response.ok) {
+                    const state = await response.json();
+                    if (state && state.position_x !== undefined) {
+                        return state;
+                    }
+                }
+            } catch (err) {
+                console.error('Load state error:', err);
+            }
+            return null;
+        }
+
         function setupThreeScene(container, modelData, format) {
             viewerContainer = container;
             const width = window.innerWidth;
@@ -992,17 +1067,29 @@ def test_inpainting_page():
             threeScene = new THREE.Scene();
 
             // Use 2nd after photo as background if available (index 3 = 2nd after)
+            // Fallback to 1st after (index 1), then any after image
+            let bgImageSrc = null;
             if (currentImages.length > 3 && currentImages[3].src) {
+                bgImageSrc = currentImages[3].src;
+            } else if (currentImages.length > 1 && currentImages[1].src) {
+                bgImageSrc = currentImages[1].src;
+            }
+
+            if (bgImageSrc) {
+                currentBackgroundImage = bgImageSrc;  // Track for state persistence
                 const textureLoader = new THREE.TextureLoader();
-                textureLoader.load(currentImages[3].src, (bgTexture) => {
+                textureLoader.load(bgImageSrc, (bgTexture) => {
                     threeScene.background = bgTexture;
                 }, undefined, (error) => {
                     console.error('Error loading background:', error);
                     threeScene.background = new THREE.Color(0x1a1a2e);
                 });
             } else {
+                // No background image available - use a default identifier for state persistence
+                currentBackgroundImage = 'default_session';
                 threeScene.background = new THREE.Color(0x1a1a2e);
             }
+            console.log('Background image for state persistence:', currentBackgroundImage);
 
             // Camera - orthographic to keep leg bottoms on horizontal line when rotating
             const aspect = width / height;
@@ -1310,6 +1397,7 @@ def test_inpainting_page():
                     setTimeout(() => {
                         tiltResetBtn.style.background = 'rgba(255,255,255,0.9)';
                     }, 150);
+                    saveModelState();  // Save after tilt reset
                 }
             });
 
@@ -1353,11 +1441,13 @@ def test_inpainting_page():
             });
 
             document.addEventListener('mouseup', () => {
+                let stateChanged = false;
                 if (isDraggingRotate) {
                     isDraggingRotate = false;
                     rotateBtn.style.background = 'rgba(255,255,255,0.9)';
                     // Don't bake Y rotation - just let it accumulate
                     // Y rotation doesn't affect vertical alignment so no need to reset
+                    stateChanged = true;
                 }
                 if (isDraggingScale) {
                     isDraggingScale = false;
@@ -1367,15 +1457,19 @@ def test_inpainting_page():
                         modelBaseScale = currentLoadedModel.scale.x;
                         modelReferenceZ = currentLoadedModel.position.z;
                     }
+                    stateChanged = true;
                 }
                 if (isDraggingBrightness) {
                     isDraggingBrightness = false;
                     brightnessControl.style.background = 'rgba(255,255,255,0.9)';
+                    stateChanged = true;
                 }
                 if (isDraggingTilt) {
                     isDraggingTilt = false;
                     tiltControl.style.background = 'rgba(255,255,255,0.9)';
+                    stateChanged = true;
                 }
+                if (stateChanged) saveModelState();
             });
 
             // Global touch events for mobile
@@ -1422,9 +1516,11 @@ def test_inpainting_page():
             }, { passive: false });
 
             document.addEventListener('touchend', () => {
+                let stateChanged = false;
                 if (isDraggingRotate) {
                     isDraggingRotate = false;
                     rotateBtn.style.background = 'rgba(255,255,255,0.9)';
+                    stateChanged = true;
                 }
                 if (isDraggingScale) {
                     isDraggingScale = false;
@@ -1434,15 +1530,19 @@ def test_inpainting_page():
                         modelBaseScale = currentLoadedModel.scale.x;
                         modelReferenceZ = currentLoadedModel.position.z;
                     }
+                    stateChanged = true;
                 }
                 if (isDraggingBrightness) {
                     isDraggingBrightness = false;
                     brightnessControl.style.background = 'rgba(255,255,255,0.9)';
+                    stateChanged = true;
                 }
                 if (isDraggingTilt) {
                     isDraggingTilt = false;
                     tiltControl.style.background = 'rgba(255,255,255,0.9)';
+                    stateChanged = true;
                 }
+                if (stateChanged) saveModelState();
             });
         }
 
@@ -2089,6 +2189,10 @@ def test_inpainting_page():
                         }
                     }
                 }
+                // Save state if model was dragged
+                if (isDraggingModel) {
+                    saveModelState();
+                }
                 isDraggingModel = false;
                 dragStartHitPoint = null;
                 dragStartModelPosition = null;
@@ -2177,6 +2281,10 @@ def test_inpainting_page():
                             toggleControlButtons();
                         }
                     }
+                }
+                // Save state if model was dragged
+                if (isDraggingModel) {
+                    saveModelState();
                 }
                 isDraggingModel = false;
                 dragStartHitPoint = null;
@@ -2270,15 +2378,51 @@ def test_inpainting_page():
                 applyBrightnessToModel(modelBrightness);
 
                 // Auto-detect contact points and set up camera after model is loaded
-                setTimeout(() => {
+                setTimeout(async () => {
                     // Auto-detect contact points (chair legs)
                     const numPoints = autoDetectContactPoints(model);
                     if (numPoints >= 4) {
                         console.log('Auto-detected ' + numPoints + ' contact points');
                     }
 
-                    // Apply default tilt (slight angle from above)
-                    applyModelRotation(model);
+                    // Try to load saved state for this model
+                    const modelUrl = current3DModel?.url || current3DModel?.model_url;
+                    if (currentBackgroundImage && modelUrl) {
+                        const savedState = await loadSavedModelState(currentBackgroundImage, modelUrl);
+                        if (savedState) {
+                            console.log('Restoring saved model state:', savedState);
+                            // Apply saved position
+                            model.position.set(
+                                savedState.position_x || 0,
+                                savedState.position_y || 0,
+                                savedState.position_z || 0
+                            );
+                            // Apply saved scale
+                            if (savedState.scale) {
+                                model.scale.setScalar(savedState.scale);
+                                modelBaseScale = savedState.scale;
+                            }
+                            // Apply saved rotation and tilt
+                            userYRotation = savedState.rotation_y || 0;
+                            modelTilt = savedState.tilt !== undefined ? savedState.tilt : DEFAULT_TILT;
+                            modelBrightness = savedState.brightness !== undefined ? savedState.brightness : 2.5;
+
+                            // Apply the rotation
+                            applyModelRotation(model);
+                            // Apply brightness
+                            applyBrightnessToModel(modelBrightness);
+                        } else {
+                            // No saved state, apply default tilt
+                            applyModelRotation(model);
+                            // Set default position
+                            setDefaultPosition();
+                        }
+                    } else {
+                        // No background image, apply default tilt
+                        applyModelRotation(model);
+                        // Set default position
+                        setDefaultPosition();
+                    }
 
                     // Set camera at Y=0 looking straight ahead
                     threeCamera.position.y = 0;
@@ -2286,9 +2430,6 @@ def test_inpainting_page():
                     threeCamera.updateProjectionMatrix();
                     updateContactMarkerPositions();
                     updateControlPositions();
-
-                    // Set default position
-                    setDefaultPosition();
                 }, 100);
             }, undefined, (error) => {
                 console.error('Error loading 3D model:', error);
