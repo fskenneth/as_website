@@ -1886,6 +1886,52 @@ def test_inpainting_page():
         function finishDefiningFloorBoundary() {
             isDefiningFloorBoundary = false;
             drawFloorBoundary();
+
+            // Move object inside the boundary area
+            moveObjectInsideBoundary();
+        }
+
+        function moveObjectInsideBoundary() {
+            if (floorBoundaryPoints.length < 3 || !currentLoadedModel) return;
+
+            // Calculate centroid of the floor boundary polygon
+            let boundaryCenterX = 0, boundaryCenterY = 0;
+            floorBoundaryPoints.forEach(point => {
+                boundaryCenterX += point.x;
+                boundaryCenterY += point.y;
+            });
+            boundaryCenterX /= floorBoundaryPoints.length;
+            boundaryCenterY /= floorBoundaryPoints.length;
+
+            // Get current contact points positions
+            const contactPositions = getContactPointsWorldPositions();
+            if (contactPositions.length === 0) {
+                // No contact points, just move model center to boundary center
+                currentLoadedModel.position.x = boundaryCenterX;
+                currentLoadedModel.position.y = boundaryCenterY;
+                updateScaleForConstantSize();
+                return;
+            }
+
+            // Calculate centroid of contact points
+            let contactCenterX = 0, contactCenterY = 0;
+            contactPositions.forEach(pos => {
+                contactCenterX += pos.x;
+                contactCenterY += pos.y;
+            });
+            contactCenterX /= contactPositions.length;
+            contactCenterY /= contactPositions.length;
+
+            // Calculate delta to move contact points centroid to boundary centroid
+            const deltaX = boundaryCenterX - contactCenterX;
+            const deltaY = boundaryCenterY - contactCenterY;
+
+            // Move the model
+            currentLoadedModel.position.x += deltaX;
+            currentLoadedModel.position.y += deltaY;
+
+            updateScaleForConstantSize();
+            updateContactMarkerPositions();
         }
 
         function clearFloorBoundary() {
