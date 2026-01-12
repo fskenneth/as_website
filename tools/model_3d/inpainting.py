@@ -957,6 +957,7 @@ def test_inpainting_page():
         let isDraggingRotate = false;
         let isDraggingScale = false;
         let isDraggingBrightness = false;
+        let isDraggingTilt = false;
         let lastMouseX = 0;
         let lastMouseY = 0;
         let modelBrightness = 2.5; // Max brightness by default
@@ -977,6 +978,7 @@ def test_inpainting_page():
         let isDefiningContactPoints = false;
         let contactMarkers = [];  // DOM elements showing contact points
         let userYRotation = 0;  // Track user's Y rotation separately from leveling
+        let levelingQuaternion = null;  // Store the initial leveling rotation
 
         // Visibility toggles
         let showFloorMarkers = true;
@@ -987,6 +989,7 @@ def test_inpainting_page():
         let modelReferenceZ = 0;  // Z position where baseScale applies
         let modelBaseScale = 1;   // Scale at reference Z position
         const cameraZ = 10;       // Camera Z position (must match camera setup)
+        let cameraTilt = 0;    // Camera Y position offset for tilting viewpoint
 
         function setupThreeScene(container, modelData, format) {
             viewerContainer = container;
@@ -1010,8 +1013,17 @@ def test_inpainting_page():
                 threeScene.background = new THREE.Color(0x1a1a2e);
             }
 
-            // Camera - low FOV for minimal perspective distortion (objects stay similar size at different depths)
-            threeCamera = new THREE.PerspectiveCamera(25, width / height, 0.1, 1000);
+            // Camera - orthographic to keep leg bottoms on horizontal line when rotating
+            const aspect = width / height;
+            const frustumSize = 5;
+            threeCamera = new THREE.OrthographicCamera(
+                frustumSize * aspect / -2,
+                frustumSize * aspect / 2,
+                frustumSize / 2,
+                frustumSize / -2,
+                0.1,
+                1000
+            );
             threeCamera.position.set(0, 0, 10);
             threeCamera.lookAt(0, 0, 0);
 
@@ -1059,7 +1071,12 @@ def test_inpainting_page():
                 const newWidth = window.innerWidth;
                 const newHeight = newWidth * (3 / 4); // 4:3 aspect ratio
                 container.style.height = newHeight + 'px';
-                threeCamera.aspect = newWidth / newHeight;
+                const newAspect = newWidth / newHeight;
+                const frustumSize = 5;
+                threeCamera.left = frustumSize * newAspect / -2;
+                threeCamera.right = frustumSize * newAspect / 2;
+                threeCamera.top = frustumSize / 2;
+                threeCamera.bottom = frustumSize / -2;
                 threeCamera.updateProjectionMatrix();
                 threeRenderer.setSize(newWidth, newHeight);
 
@@ -1109,6 +1126,7 @@ def test_inpainting_page():
             const rotateCtrl = controlOverlay.querySelector('.rotate-control');
             const scaleCtrl = controlOverlay.querySelector('.scale-control');
             const brightnessCtrl = controlOverlay.querySelector('.brightness-control');
+            const tiltCtrl = controlOverlay.querySelector('.tilt-control');
 
             if (rotateCtrl) {
                 rotateCtrl.style.left = pos.centerX + 'px';
@@ -1121,6 +1139,10 @@ def test_inpainting_page():
             if (brightnessCtrl) {
                 brightnessCtrl.style.left = pos.centerX + 'px';
                 brightnessCtrl.style.top = Math.max(pos.topY - 55, 10) + 'px';
+            }
+            if (tiltCtrl) {
+                tiltCtrl.style.left = Math.max(pos.leftX - 55, 10) + 'px';
+                tiltCtrl.style.top = pos.centerY + 'px';
             }
         }
 
@@ -1143,7 +1165,7 @@ def test_inpainting_page():
                 width: 50px; height: 36px; background: rgba(255,255,255,0.9); border-radius: 18px;
                 display: flex; align-items: center; justify-content: center; font-size: 24px;
                 cursor: ew-resize; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                user-select: none; color: #333; font-weight: bold;
+                user-select: none; color: #000; font-weight: bold;
             `;
             rotateBtn.title = 'Drag left/right to rotate (Y axis)';
 
@@ -1157,7 +1179,7 @@ def test_inpainting_page():
                 width: 36px; height: 50px; background: rgba(255,255,255,0.9); border-radius: 18px;
                 display: flex; align-items: center; justify-content: center; font-size: 24px;
                 cursor: ns-resize; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                user-select: none; color: #333; font-weight: bold;
+                user-select: none; color: #000; font-weight: bold; padding-bottom: 4px;
             `;
             scaleControl.title = 'Drag up/down to resize';
 
@@ -1170,9 +1192,22 @@ def test_inpainting_page():
                 width: 50px; height: 36px; background: rgba(255,255,255,0.9); border-radius: 18px;
                 display: flex; align-items: center; justify-content: center; font-size: 20px;
                 cursor: ew-resize; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                user-select: none; color: #f5a623; font-weight: bold;
+                user-select: none; color: #000; font-weight: bold;
             `;
             brightnessControl.title = 'Drag left/right to adjust brightness';
+
+            // Tilt control (up-down arrows) - positioned to left of object
+            const tiltControl = document.createElement('div');
+            tiltControl.className = 'tilt-control';
+            tiltControl.innerHTML = '↕';
+            tiltControl.style.cssText = `
+                position: absolute; left: 20px; top: 50%; transform: translate(0, -50%);
+                width: 36px; height: 50px; background: rgba(255,255,255,0.9); border-radius: 18px;
+                display: flex; align-items: center; justify-content: center; font-size: 24px;
+                cursor: ns-resize; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                user-select: none; color: #000; font-weight: bold; padding-bottom: 4px;
+            `;
+            tiltControl.title = 'Drag up/down to tilt object (X rotation)';
 
             // Move hint in center
             const moveHint = document.createElement('div');
@@ -1227,6 +1262,7 @@ def test_inpainting_page():
             overlay.appendChild(rotateBtn);
             overlay.appendChild(scaleControl);
             overlay.appendChild(brightnessControl);
+            overlay.appendChild(tiltControl);
             overlay.appendChild(moveHint);
             overlay.appendChild(floorBtn);
             overlay.appendChild(resetFloorBtn);
@@ -1278,13 +1314,27 @@ def test_inpainting_page():
                 brightnessControl.style.background = 'rgba(255,200,100,0.9)';
             }, { passive: false });
 
+            // Tilt control events - mouse
+            tiltControl.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                isDraggingTilt = true;
+                lastMouseY = e.clientY;
+                tiltControl.style.background = 'rgba(200,100,255,0.9)';
+            });
+            // Tilt control events - touch
+            tiltControl.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                isDraggingTilt = true;
+                lastMouseY = e.touches[0].clientY;
+                tiltControl.style.background = 'rgba(200,100,255,0.9)';
+            }, { passive: false });
+
             // Global mouse events
             document.addEventListener('mousemove', (e) => {
                 if (isDraggingRotate && currentLoadedModel) {
                     const deltaX = e.clientX - lastMouseX;
-                    const angle = deltaX * 0.02;
-                    // Use floor pivot rotation to keep legs on floor
-                    rotateAroundFloor(currentLoadedModel, angle);
+                    rotateAroundFloor(currentLoadedModel, deltaX * 0.02);
+                    updateControlPositions();
                     lastMouseX = e.clientX;
                 }
                 if (isDraggingScale && currentLoadedModel) {
@@ -1301,6 +1351,21 @@ def test_inpainting_page():
                     modelBrightness = Math.max(0.2, Math.min(2.5, modelBrightness + deltaX * 0.01));
                     applyBrightnessToModel(modelBrightness);
                     lastMouseX = e.clientX;
+                }
+                if (isDraggingTilt && currentLoadedModel) {
+                    const deltaY = e.clientY - lastMouseY;
+
+                    // Update camera tilt offset (drag down = look from higher = positive offset)
+                    cameraTilt = Math.max(-3, Math.min(3, cameraTilt + deltaY * 0.02));
+
+                    // Move camera Y position relative to Y=0 (flat floor)
+                    threeCamera.position.y = cameraTilt;
+                    threeCamera.lookAt(currentLoadedModel.position.x, 0, currentLoadedModel.position.z);
+                    threeCamera.updateProjectionMatrix();
+
+                    updateContactMarkerPositions();
+                    updateControlPositions();
+                    lastMouseY = e.clientY;
                 }
             });
 
@@ -1324,14 +1389,18 @@ def test_inpainting_page():
                     isDraggingBrightness = false;
                     brightnessControl.style.background = 'rgba(255,255,255,0.9)';
                 }
+                if (isDraggingTilt) {
+                    isDraggingTilt = false;
+                    tiltControl.style.background = 'rgba(255,255,255,0.9)';
+                }
             });
 
             // Global touch events for mobile
             document.addEventListener('touchmove', (e) => {
                 if (isDraggingRotate && currentLoadedModel) {
                     const deltaX = e.touches[0].clientX - lastMouseX;
-                    const angle = deltaX * 0.02;
-                    rotateAroundFloor(currentLoadedModel, angle);
+                    rotateAroundFloor(currentLoadedModel, deltaX * 0.02);
+                    updateControlPositions();
                     lastMouseX = e.touches[0].clientX;
                     e.preventDefault();
                 }
@@ -1350,6 +1419,22 @@ def test_inpainting_page():
                     modelBrightness = Math.max(0.2, Math.min(2.5, modelBrightness + deltaX * 0.01));
                     applyBrightnessToModel(modelBrightness);
                     lastMouseX = e.touches[0].clientX;
+                    e.preventDefault();
+                }
+                if (isDraggingTilt && currentLoadedModel) {
+                    const deltaY = e.touches[0].clientY - lastMouseY;
+
+                    // Update camera tilt offset (drag down = look from higher = positive offset)
+                    cameraTilt = Math.max(-3, Math.min(3, cameraTilt + deltaY * 0.02));
+
+                    // Move camera Y position relative to Y=0 (flat floor)
+                    threeCamera.position.y = cameraTilt;
+                    threeCamera.lookAt(currentLoadedModel.position.x, 0, currentLoadedModel.position.z);
+                    threeCamera.updateProjectionMatrix();
+
+                    updateContactMarkerPositions();
+                    updateControlPositions();
+                    lastMouseY = e.touches[0].clientY;
                     e.preventDefault();
                 }
             }, { passive: false });
@@ -1372,12 +1457,15 @@ def test_inpainting_page():
                     isDraggingBrightness = false;
                     brightnessControl.style.background = 'rgba(255,255,255,0.9)';
                 }
+                if (isDraggingTilt) {
+                    isDraggingTilt = false;
+                    tiltControl.style.background = 'rgba(255,255,255,0.9)';
+                }
             });
         }
 
         function rotateAroundFloor(model, angle) {
-            // Save exact position before rotation - we'll restore it after
-            // This prevents position drift from accumulated floating point errors
+            // Save exact position before rotation
             const savedX = model.position.x;
             const savedY = model.position.y;
             const savedZ = model.position.z;
@@ -1385,21 +1473,22 @@ def test_inpainting_page():
             // Update tracked Y rotation
             userYRotation += angle;
 
-            // Reset model rotation to just the user's Y rotation (no leveling tilt yet)
-            model.quaternion.identity();
-            model.rotation.set(0, userYRotation, 0);
+            // Create Y rotation quaternion
+            const yRotQuat = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(0, 1, 0), userYRotation
+            );
+
+            // Combine: Y rotation applied to leveled model
+            // Order: first level (levelingQuaternion), then Y rotate (yRotQuat)
+            // In quaternion math: final = yRotQuat * levelingQuaternion
+            if (levelingQuaternion) {
+                model.quaternion.copy(yRotQuat).multiply(levelingQuaternion);
+            } else {
+                model.quaternion.copy(yRotQuat);
+            }
             model.updateMatrixWorld(true);
 
-            // Apply leveling on top of the Y rotation
-            if (objectContactPoints.length >= 3) {
-                // Level model to floor (makes contact plane horizontal)
-                levelModelToFloorWithoutAlign(model, objectContactPoints);
-
-                // Re-apply perspective tilt (but keep user's Y rotation)
-                applyPerspectiveTilt(model, objectContactPoints);
-            }
-
-            // Restore exact position - rotation should only change orientation, not location
+            // Restore exact position
             model.position.x = savedX;
             model.position.y = savedY;
             model.position.z = savedZ;
@@ -2127,6 +2216,7 @@ def test_inpainting_page():
 
                     objectContactPoints[i] = lowestInRadius.clone();
                 }
+
             }
 
             console.log('Auto-detected contact points:', objectContactPoints.length, objectContactPoints);
@@ -2134,9 +2224,7 @@ def test_inpainting_page():
             // Level the model so all 4 contact points are at the same Y (floor level)
             if (objectContactPoints.length >= 3) {
                 levelModelToFloor(model, objectContactPoints);
-
-                // Apply perspective tilt to match the floor perspective
-                applyPerspectiveTilt(model, objectContactPoints);
+                // Note: No perspective tilt with orthographic camera
             }
 
             // Show visual markers for the detected contact points
@@ -2146,13 +2234,13 @@ def test_inpainting_page():
         }
 
         function levelModelToFloor(model, contactPoints) {
-            // Transform the model so all contact points lie on the floor plane (Y = floorPlaneY)
+            // Rotate model so contact plane is horizontal, then position at floor level
             if (contactPoints.length < 3) return;
 
             // Convert contact points to world coordinates
             const worldPoints = contactPoints.map(p => model.localToWorld(p.clone()));
 
-            // Calculate the plane normal from 3 points
+            // Calculate the plane normal from 3 points (best-fit plane)
             const p0 = worldPoints[0];
             const p1 = worldPoints[1];
             const p2 = worldPoints[2];
@@ -2168,28 +2256,27 @@ def test_inpainting_page():
             const upVector = new THREE.Vector3(0, 1, 0);
             const quaternion = new THREE.Quaternion().setFromUnitVectors(planeNormal, upVector);
 
+            // Store leveling quaternion for combining with Y rotation later
+            levelingQuaternion = quaternion.clone();
+
             // Apply rotation to model
-            model.quaternion.premultiply(quaternion);
+            model.quaternion.copy(quaternion);
             model.updateMatrixWorld(true);
 
             // Recalculate world positions after rotation
             const newWorldPoints = contactPoints.map(p => model.localToWorld(p.clone()));
 
-            // Find the lowest Y after rotation
-            const minY = Math.min(...newWorldPoints.map(p => p.y));
+            // Find the average Y after rotation (should all be nearly the same now)
+            const avgY = newWorldPoints.reduce((sum, p) => sum + p.y, 0) / newWorldPoints.length;
 
             // Determine target floor Y
             const targetY = (floorPoints.length >= 4) ? floorPlaneY : 0;
 
             // Move model so contact points are at floor level
-            model.position.y -= (minY - targetY);
-            model.updateMatrixWorld(true);  // Update after position change
+            model.position.y -= (avgY - targetY);
+            model.updateMatrixWorld(true);
 
-            console.log('Model leveled to floor. Min contact Y:', minY, '-> Target Y:', targetY);
-
-            // Note: We don't modify objectContactPoints - they stay in local coordinates.
-            // The model transformation (rotation + position) handles the world positioning.
-            // When markers are rendered, localToWorld() will give correct screen positions.
+            console.log('Model leveled to floor. Avg contact Y:', avgY, '-> Target Y:', targetY);
         }
 
         function showContactPointMarkers() {
@@ -2423,17 +2510,19 @@ def test_inpainting_page():
                 const rotateCtrl = controlOverlay?.querySelector('.rotate-control');
                 const scaleCtrl = controlOverlay?.querySelector('.scale-control');
                 const brightnessCtrl = controlOverlay?.querySelector('.brightness-control');
+                const tiltCtrl = controlOverlay?.querySelector('.tilt-control');
                 // Use opacity so buttons are still clickable when "hidden"
                 const opacity = showControlButtons ? '1' : '0.15';
                 if (rotateCtrl) rotateCtrl.style.opacity = opacity;
                 if (scaleCtrl) scaleCtrl.style.opacity = opacity;
                 if (brightnessCtrl) brightnessCtrl.style.opacity = opacity;
+                if (tiltCtrl) tiltCtrl.style.opacity = opacity;
                 // Also toggle leg points visibility with controls
                 contactMarkers.forEach(m => m.style.display = showControlButtons ? 'flex' : 'none');
             }
 
             canvas.addEventListener('mousedown', (e) => {
-                if (isDraggingRotate || isDraggingScale || isDraggingBrightness) return;
+                if (isDraggingRotate || isDraggingScale || isDraggingBrightness || isDraggingTilt) return;
 
                 clickStartPos = { x: e.clientX, y: e.clientY };
                 modelWasClicked = false;
@@ -2483,6 +2572,9 @@ def test_inpainting_page():
                         currentLoadedModel.position.z = validPos.z;
                         updateScaleForConstantSize();
                         updateContactMarkerPositions();
+
+                        // Update camera to look at new model position at Y=0
+                        threeCamera.lookAt(currentLoadedModel.position.x, 0, currentLoadedModel.position.z);
 
                         // Always update cursor tracking for next frame
                         lastCursorHitPoint = currentPoint.clone();
@@ -2572,6 +2664,9 @@ def test_inpainting_page():
                         currentLoadedModel.position.z = validPos.z;
                         updateScaleForConstantSize();
                         updateContactMarkerPositions();
+
+                        // Update camera to look at new model position at Y=0
+                        threeCamera.lookAt(currentLoadedModel.position.x, 0, currentLoadedModel.position.z);
 
                         // Always update cursor tracking for next frame
                         lastCursorHitPoint = currentPoint.clone();
@@ -2667,9 +2762,12 @@ def test_inpainting_page():
                 modelReferenceZ = 0;
                 modelBaseScale = scale;
 
-                // Reset brightness and rotation for new model
+                // Reset brightness, rotation and camera tilt for new model
                 modelBrightness = 2.5; // Max brightness by default
                 userYRotation = 0;
+                cameraTilt = 0;
+                threeCamera.position.y = 0;
+                threeCamera.lookAt(0, 0, 0);
 
                 // Store reference for drag controls
                 currentLoadedModel = model;
@@ -2692,6 +2790,14 @@ def test_inpainting_page():
                     if (numPoints >= 4) {
                         console.log('Auto-detected ' + numPoints + ' contact points');
                     }
+
+                    // Set camera at Y=0 (flat floor level) looking straight ahead
+                    cameraTilt = 0;
+                    threeCamera.position.y = 0;
+                    threeCamera.lookAt(0, 0, 0);
+                    threeCamera.updateProjectionMatrix();
+                    updateContactMarkerPositions();
+                    updateControlPositions();
                 }, 100);
             }, undefined, (error) => {
                 console.error('Error loading 3D model:', error);
