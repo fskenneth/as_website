@@ -979,7 +979,7 @@ def test_inpainting_page():
         let modelReferenceZ = 0;  // Z position where baseScale applies
         let modelBaseScale = 1;   // Scale at reference Z position
         const cameraZ = 10;       // Camera Z position (must match camera setup)
-        let modelTilt = 5 * Math.PI / 180;  // Model X rotation for tilting view angle (5 degrees)
+        let modelTilt = 10 * Math.PI / 180;  // Model X rotation for tilting view angle (10 degrees)
 
         function setupThreeScene(container, modelData, format) {
             viewerContainer = container;
@@ -2032,14 +2032,20 @@ def test_inpainting_page():
             });
 
             canvas.addEventListener('mouseup', (e) => {
-                // Check if this was a click (not a drag) on the model
-                if (modelWasClicked && clickStartPos) {
+                // Check if this was a click (not a drag)
+                if (clickStartPos) {
                     const dx = e.clientX - clickStartPos.x;
                     const dy = e.clientY - clickStartPos.y;
                     const distance = Math.sqrt(dx * dx + dy * dy);
-                    // If movement is less than 5 pixels, treat as click to toggle controls
+                    // If movement is less than 5 pixels, treat as click
                     if (distance < 5) {
-                        toggleControlButtons();
+                        if (showControlButtons) {
+                            // Buttons are showing - hide them on any click (object or background)
+                            toggleControlButtons();
+                        } else if (modelWasClicked) {
+                            // Buttons are hidden - show them only when clicking on model
+                            toggleControlButtons();
+                        }
                     }
                 }
                 isDraggingModel = false;
@@ -2114,15 +2120,21 @@ def test_inpainting_page():
             }, { passive: false });
 
             canvas.addEventListener('touchend', (e) => {
-                // Check if this was a tap (not a drag) on the model
-                if (touchModelWasClicked && touchStartPos && e.changedTouches.length > 0) {
+                // Check if this was a tap (not a drag)
+                if (touchStartPos && e.changedTouches.length > 0) {
                     const touch = e.changedTouches[0];
                     const dx = touch.clientX - touchStartPos.x;
                     const dy = touch.clientY - touchStartPos.y;
                     const distance = Math.sqrt(dx * dx + dy * dy);
-                    // If movement is less than 10 pixels, treat as tap to toggle controls
+                    // If movement is less than 10 pixels, treat as tap
                     if (distance < 10) {
-                        toggleControlButtons();
+                        if (showControlButtons) {
+                            // Buttons are showing - hide them on any tap (object or background)
+                            toggleControlButtons();
+                        } else if (touchModelWasClicked) {
+                            // Buttons are hidden - show them only when tapping on model
+                            toggleControlButtons();
+                        }
                     }
                 }
                 isDraggingModel = false;
@@ -2204,7 +2216,7 @@ def test_inpainting_page():
                 // Reset brightness, rotation and tilt for new model
                 modelBrightness = 2.5; // Max brightness by default
                 userYRotation = 0;
-                modelTilt = 5 * Math.PI / 180;  // Reset to 5 degrees
+                modelTilt = 10 * Math.PI / 180;  // Reset to 10 degrees
                 cameraTilt = 0;
                 threeCamera.position.y = 0;
                 threeCamera.lookAt(0, 0, 0);
