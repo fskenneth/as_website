@@ -973,7 +973,7 @@ def test_inpainting_page():
 
         // Visibility toggles
         let showContactMarkers = true;
-        let showControlButtons = true;
+        let showControlButtons = false;  // Start hidden, show on model click
 
         // For maintaining constant apparent size when moving in Z
         let modelReferenceZ = 0;  // Z position where baseScale applies
@@ -1247,7 +1247,7 @@ def test_inpainting_page():
             rotateBtn.style.cssText = `
                 position: absolute; bottom: 20px; left: 50%; transform: translate(-50%, 0);
                 width: 50px; height: 36px; background: rgba(255,255,255,0.9); border-radius: 18px;
-                display: flex; align-items: center; justify-content: center;
+                display: none; align-items: center; justify-content: center;
                 cursor: ew-resize; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
                 user-select: none; color: #000;
             `;
@@ -1261,7 +1261,7 @@ def test_inpainting_page():
             scaleControl.style.cssText = `
                 position: absolute; right: 20px; top: 50%; transform: translate(0, -50%);
                 width: 36px; height: 50px; background: rgba(255,255,255,0.9); border-radius: 18px;
-                display: flex; align-items: center; justify-content: center; font-size: 24px;
+                display: none; align-items: center; justify-content: center; font-size: 24px;
                 cursor: ns-resize; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
                 user-select: none; color: #000; font-weight: bold; padding-bottom: 6px;
             `;
@@ -1274,7 +1274,7 @@ def test_inpainting_page():
             brightnessControl.style.cssText = `
                 position: absolute; top: 20px; left: 50%; transform: translate(-50%, 0);
                 width: 50px; height: 36px; background: rgba(255,255,255,0.9); border-radius: 18px;
-                display: flex; align-items: center; justify-content: center; font-size: 20px;
+                display: none; align-items: center; justify-content: center; font-size: 20px;
                 cursor: ew-resize; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
                 user-select: none; color: #000; font-weight: bold;
             `;
@@ -1287,7 +1287,7 @@ def test_inpainting_page():
             tiltControl.style.cssText = `
                 position: absolute; left: 20px; top: 50%; transform: translate(0, -50%);
                 width: 36px; height: 50px; background: rgba(255,255,255,0.9); border-radius: 18px;
-                display: flex; align-items: center; justify-content: center; font-size: 24px;
+                display: none; align-items: center; justify-content: center; font-size: 24px;
                 cursor: ns-resize; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
                 user-select: none; color: #000; font-weight: bold; padding-bottom: 6px;
             `;
@@ -1300,7 +1300,7 @@ def test_inpainting_page():
             tiltResetBtn.style.cssText = `
                 position: absolute; left: 20px; top: calc(50% + 35px); transform: translate(0, -50%);
                 width: 36px; height: 36px; background: rgba(255,255,255,0.9); border-radius: 50%;
-                display: flex; align-items: center; justify-content: center; font-size: 24px;
+                display: none; align-items: center; justify-content: center; font-size: 24px;
                 cursor: pointer; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
                 user-select: none; color: #000; font-weight: bold;
             `;
