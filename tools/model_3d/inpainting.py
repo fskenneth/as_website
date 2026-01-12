@@ -979,7 +979,8 @@ def test_inpainting_page():
         let modelReferenceZ = 0;  // Z position where baseScale applies
         let modelBaseScale = 1;   // Scale at reference Z position
         const cameraZ = 10;       // Camera Z position (must match camera setup)
-        let modelTilt = 10 * Math.PI / 180;  // Model X rotation for tilting view angle (10 degrees)
+        const DEFAULT_TILT = 10 * Math.PI / 180;  // Default tilt angle (10 degrees)
+        let modelTilt = DEFAULT_TILT;  // Model X rotation for tilting view angle
 
         function setupThreeScene(container, modelData, format) {
             viewerContainer = container;
@@ -1114,6 +1115,7 @@ def test_inpainting_page():
             const scaleCtrl = controlOverlay.querySelector('.scale-control');
             const brightnessCtrl = controlOverlay.querySelector('.brightness-control');
             const tiltCtrl = controlOverlay.querySelector('.tilt-control');
+            const tiltResetCtrl = controlOverlay.querySelector('.tilt-reset-control');
 
             if (rotateCtrl) {
                 rotateCtrl.style.left = pos.centerX + 'px';
@@ -1131,6 +1133,10 @@ def test_inpainting_page():
                 tiltCtrl.style.left = Math.max(pos.leftX - 55, 10) + 'px';
                 tiltCtrl.style.top = pos.centerY + 'px';
             }
+            if (tiltResetCtrl) {
+                tiltResetCtrl.style.left = Math.max(pos.leftX - 55, 10) + 'px';
+                tiltResetCtrl.style.top = (pos.centerY + 45) + 'px';
+            }
         }
 
         function addControlOverlay(container) {
@@ -1146,13 +1152,17 @@ def test_inpainting_page():
             // Rotate control (left-right arrows) - positioned under object (Y rotation)
             const rotateBtn = document.createElement('div');
             rotateBtn.className = 'rotate-control';
-            rotateBtn.innerHTML = '↔';
+            rotateBtn.innerHTML = `<svg width="28" height="20" viewBox="0 0 28 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="4" y1="10" x2="24" y2="10"/>
+                <polyline points="8,5 3,10 8,15"/>
+                <polyline points="20,5 25,10 20,15"/>
+            </svg>`;
             rotateBtn.style.cssText = `
                 position: absolute; bottom: 20px; left: 50%; transform: translate(-50%, 0);
                 width: 50px; height: 36px; background: rgba(255,255,255,0.9); border-radius: 18px;
-                display: flex; align-items: center; justify-content: center; font-size: 24px;
+                display: flex; align-items: center; justify-content: center;
                 cursor: ew-resize; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                user-select: none; color: #000; font-weight: bold; padding-bottom: 4px;
+                user-select: none; color: #000;
             `;
             rotateBtn.title = 'Drag left/right to rotate (Y axis)';
 
@@ -1196,6 +1206,19 @@ def test_inpainting_page():
             `;
             tiltControl.title = 'Drag up/down to tilt object (X rotation)';
 
+            // Tilt reset button (circular arrow) - positioned below tilt control
+            const tiltResetBtn = document.createElement('div');
+            tiltResetBtn.className = 'tilt-reset-control';
+            tiltResetBtn.innerHTML = '↺';
+            tiltResetBtn.style.cssText = `
+                position: absolute; left: 20px; top: calc(50% + 35px); transform: translate(0, -50%);
+                width: 36px; height: 36px; background: rgba(255,255,255,0.9); border-radius: 50%;
+                display: flex; align-items: center; justify-content: center; font-size: 24px;
+                cursor: pointer; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                user-select: none; color: #000; font-weight: bold;
+            `;
+            tiltResetBtn.title = 'Reset tilt to default angle';
+
             // Move hint in center
             const moveHint = document.createElement('div');
             moveHint.className = 'move-hint';
@@ -1210,6 +1233,7 @@ def test_inpainting_page():
             overlay.appendChild(scaleControl);
             overlay.appendChild(brightnessControl);
             overlay.appendChild(tiltControl);
+            overlay.appendChild(tiltResetBtn);
             overlay.appendChild(moveHint);
             container.style.position = 'relative';
             container.appendChild(overlay);
@@ -1273,6 +1297,21 @@ def test_inpainting_page():
                 lastMouseY = e.touches[0].clientY;
                 tiltControl.style.background = 'rgba(200,100,255,0.9)';
             }, { passive: false });
+
+            // Tilt reset button click event
+            tiltResetBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (currentLoadedModel) {
+                    modelTilt = DEFAULT_TILT;
+                    applyModelRotation(currentLoadedModel);
+                    updateContactMarkerPositions();
+                    tiltResetBtn.style.background = 'rgba(200,100,255,0.9)';
+                    setTimeout(() => {
+                        tiltResetBtn.style.background = 'rgba(255,255,255,0.9)';
+                    }, 150);
+                }
+            });
 
             // Global mouse events
             document.addEventListener('mousemove', (e) => {
@@ -1975,12 +2014,14 @@ def test_inpainting_page():
                 const scaleCtrl = controlOverlay?.querySelector('.scale-control');
                 const brightnessCtrl = controlOverlay?.querySelector('.brightness-control');
                 const tiltCtrl = controlOverlay?.querySelector('.tilt-control');
+                const tiltResetCtrl = controlOverlay?.querySelector('.tilt-reset-control');
                 // Completely hide all buttons when toggled off
                 const display = showControlButtons ? 'flex' : 'none';
                 if (rotateCtrl) rotateCtrl.style.display = display;
                 if (scaleCtrl) scaleCtrl.style.display = display;
                 if (brightnessCtrl) brightnessCtrl.style.display = display;
                 if (tiltCtrl) tiltCtrl.style.display = display;
+                if (tiltResetCtrl) tiltResetCtrl.style.display = display;
                 // Also toggle leg points visibility with controls
                 contactMarkers.forEach(m => m.style.display = showControlButtons ? 'flex' : 'none');
             }
@@ -2216,7 +2257,7 @@ def test_inpainting_page():
                 // Reset brightness, rotation and tilt for new model
                 modelBrightness = 2.5; // Max brightness by default
                 userYRotation = 0;
-                modelTilt = 10 * Math.PI / 180;  // Reset to 10 degrees
+                modelTilt = DEFAULT_TILT;  // Reset to default tilt
                 cameraTilt = 0;
                 threeCamera.position.y = 0;
                 threeCamera.lookAt(0, 0, 0);
