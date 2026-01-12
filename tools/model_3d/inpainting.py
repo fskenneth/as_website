@@ -1951,12 +1951,12 @@ def test_inpainting_page():
                 const scaleCtrl = controlOverlay?.querySelector('.scale-control');
                 const brightnessCtrl = controlOverlay?.querySelector('.brightness-control');
                 const tiltCtrl = controlOverlay?.querySelector('.tilt-control');
-                // Use opacity so buttons are still clickable when "hidden"
-                const opacity = showControlButtons ? '1' : '0.15';
-                if (rotateCtrl) rotateCtrl.style.opacity = opacity;
-                if (scaleCtrl) scaleCtrl.style.opacity = opacity;
-                if (brightnessCtrl) brightnessCtrl.style.opacity = opacity;
-                if (tiltCtrl) tiltCtrl.style.opacity = opacity;
+                // Completely hide all 4 buttons when toggled off
+                const display = showControlButtons ? 'flex' : 'none';
+                if (rotateCtrl) rotateCtrl.style.display = display;
+                if (scaleCtrl) scaleCtrl.style.display = display;
+                if (brightnessCtrl) brightnessCtrl.style.display = display;
+                if (tiltCtrl) tiltCtrl.style.display = display;
                 // Also toggle leg points visibility with controls
                 contactMarkers.forEach(m => m.style.display = showControlButtons ? 'flex' : 'none');
             }
