@@ -2357,8 +2357,9 @@ def test_inpainting_page():
                         modelWasClicked = true;
                         canvas.style.cursor = 'move';
 
-                        // Store starting screen position for drag tracking
-                        dragStartHitPoint = { clientX: e.clientX, clientY: e.clientY };
+                        // Store the world position where user clicked (for click-point tracking)
+                        const clickWorldPos = screenToWorld(e.clientX, e.clientY);
+                        dragStartHitPoint = clickWorldPos;  // World position of click
                         dragStartModelPosition = currentLoadedModel.position.clone();
                     }
                 }
@@ -2366,27 +2367,19 @@ def test_inpainting_page():
 
             canvas.addEventListener('mousemove', (e) => {
                 if (isDraggingModel && currentLoadedModel && dragStartHitPoint && dragStartModelPosition) {
-                    // Calculate screen delta from drag start
-                    const screenDeltaX = e.clientX - dragStartHitPoint.clientX;
-                    const screenDeltaY = e.clientY - dragStartHitPoint.clientY;
+                    // Get current cursor world position
+                    const currentWorldPos = screenToWorld(e.clientX, e.clientY);
+                    if (!currentWorldPos) return;
 
-                    // Convert screen delta to world delta
-                    // For orthographic camera: screen movement maps directly to world X and Y
-                    const rect = canvas.getBoundingClientRect();
-                    const frustumSize = 5;
-                    const aspect = rect.width / rect.height;
+                    // Calculate how much the cursor moved in world space
+                    const worldDeltaX = currentWorldPos.x - dragStartHitPoint.x;
+                    const worldDeltaY = currentWorldPos.y - dragStartHitPoint.y;
 
-                    // Scale factors: how much world units per pixel
-                    const worldPerPixelX = (frustumSize * aspect) / rect.width;
-                    const worldPerPixelY = frustumSize / rect.height;
-
-                    // Screen X -> World X, Screen Y -> World Y (up/down)
-                    const worldDeltaX = screenDeltaX * worldPerPixelX;
-                    const worldDeltaY = -screenDeltaY * worldPerPixelY;  // Negative because screen Y is inverted
-
-                    // Apply delta to original model position with boundary constraint
+                    // Move the model so the clicked point follows the cursor
                     const targetX = dragStartModelPosition.x + worldDeltaX;
                     const targetY = dragStartModelPosition.y + worldDeltaY;
+
+                    // Apply boundary constraint
                     const constrained = constrainMovementToBoundary(
                         dragStartModelPosition.x, dragStartModelPosition.y,
                         targetX, targetY
@@ -2400,47 +2393,11 @@ def test_inpainting_page():
             });
 
             canvas.addEventListener('mouseup', (e) => {
-                // Handle floor boundary definition clicks
-                if (isDefiningFloorBoundary && clickStartPos) {
-                    const dx = e.clientX - clickStartPos.x;
-                    const dy = e.clientY - clickStartPos.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-
-                    if (distance < 5) {  // It's a click, not a drag
-                        const worldPos = screenToWorld(e.clientX, e.clientY);
-                        if (worldPos) {
-                            // Check if clicking near the first point to close the polygon
-                            if (floorBoundaryPoints.length >= 3) {
-                                const firstPoint = floorBoundaryPoints[0];
-                                const firstScreenPos = worldToScreen(firstPoint.x, firstPoint.y);
-                                if (firstScreenPos) {
-                                    const rect = viewerContainer.getBoundingClientRect();
-                                    const clickX = e.clientX - rect.left;
-                                    const clickY = e.clientY - rect.top;
-                                    const distToFirst = Math.sqrt(
-                                        Math.pow(clickX - firstScreenPos.x, 2) +
-                                        Math.pow(clickY - firstScreenPos.y, 2)
-                                    );
-                                    if (distToFirst < 30) {  // Close to first point - finish polygon
-                                        finishDefiningFloorBoundary();
-                                        clickStartPos = null;
-                                        return;
-                                    }
-                                }
-                            }
-
-                            // Add new boundary point
-                            floorBoundaryPoints.push(worldPos);
-                            const rect = viewerContainer.getBoundingClientRect();
-                            addFloorBoundaryMarker(
-                                e.clientX - rect.left,
-                                e.clientY - rect.top,
-                                floorBoundaryPoints.length
-                            );
-                            drawFloorBoundary();
-                        }
-                    }
+                // Floor boundary clicks are handled by viewerContainer click handler
+                // Skip boundary handling here to avoid duplicate points
+                if (isDefiningFloorBoundary) {
                     clickStartPos = null;
+                    isDraggingModel = false;
                     return;
                 }
 
@@ -2492,8 +2449,9 @@ def test_inpainting_page():
                         if (intersects.length > 0) {
                             isDraggingModel = true;
                             touchModelWasClicked = true;
-                            // Store starting screen position for drag tracking
-                            dragStartHitPoint = { clientX: touch.clientX, clientY: touch.clientY };
+                            // Store the world position where user touched (for touch-point tracking)
+                            const touchWorldPos = screenToWorld(touch.clientX, touch.clientY);
+                            dragStartHitPoint = touchWorldPos;  // World position of touch
                             dragStartModelPosition = currentLoadedModel.position.clone();
                             e.preventDefault();
                         }
@@ -2505,26 +2463,19 @@ def test_inpainting_page():
                 if (isDraggingModel && currentLoadedModel && dragStartHitPoint && dragStartModelPosition && e.touches.length === 1) {
                     const touch = e.touches[0];
 
-                    // Calculate screen delta from drag start
-                    const screenDeltaX = touch.clientX - dragStartHitPoint.clientX;
-                    const screenDeltaY = touch.clientY - dragStartHitPoint.clientY;
+                    // Get current touch world position
+                    const currentWorldPos = screenToWorld(touch.clientX, touch.clientY);
+                    if (!currentWorldPos) return;
 
-                    // Convert screen delta to world delta
-                    const rect = canvas.getBoundingClientRect();
-                    const frustumSize = 5;
-                    const aspect = rect.width / rect.height;
+                    // Calculate how much the touch moved in world space
+                    const worldDeltaX = currentWorldPos.x - dragStartHitPoint.x;
+                    const worldDeltaY = currentWorldPos.y - dragStartHitPoint.y;
 
-                    // Scale factors: how much world units per pixel
-                    const worldPerPixelX = (frustumSize * aspect) / rect.width;
-                    const worldPerPixelY = frustumSize / rect.height;
-
-                    // Screen X -> World X, Screen Y -> World Y (up/down)
-                    const worldDeltaX = screenDeltaX * worldPerPixelX;
-                    const worldDeltaY = -screenDeltaY * worldPerPixelY;
-
-                    // Apply delta to original model position with boundary constraint
+                    // Move the model so the touched point follows the finger
                     const targetX = dragStartModelPosition.x + worldDeltaX;
                     const targetY = dragStartModelPosition.y + worldDeltaY;
+
+                    // Apply boundary constraint
                     const constrained = constrainMovementToBoundary(
                         dragStartModelPosition.x, dragStartModelPosition.y,
                         targetX, targetY
@@ -2561,8 +2512,14 @@ def test_inpainting_page():
 
             // Handle clicks on the viewerContainer for floor boundary definition
             // This captures clicks that might not reach the canvas (e.g., through overlay)
+            let lastBoundaryClickTime = 0;
             viewerContainer.addEventListener('click', (e) => {
                 if (!isDefiningFloorBoundary) return;
+
+                // Prevent duplicate clicks (debounce 100ms)
+                const now = Date.now();
+                if (now - lastBoundaryClickTime < 100) return;
+                lastBoundaryClickTime = now;
 
                 // Don't handle clicks on control buttons
                 if (e.target.closest('.floor-boundary-btn') ||
