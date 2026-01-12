@@ -1915,11 +1915,23 @@ def test_inpainting_page():
                             }
                         });
                         drawFloorBoundary();
+                        // Move object inside the loaded boundary
+                        moveObjectInsideBoundary();
+                        return;
                     }
                 } catch (e) {
                     console.error('Failed to load floor boundary:', e);
                     floorBoundaryPoints = [];
                 }
+            }
+            // No floor boundary - set default position to bottom 1/5 of screen
+            // Frustum size is 5, so Y ranges from -2.5 to 2.5
+            // Bottom 1/5 center is at: -2.5 + (5 * 0.1) = -2.0
+            if (currentLoadedModel) {
+                currentLoadedModel.position.y = -2.0;
+                updateScaleForConstantSize();
+                updateContactMarkerPositions();
+                updateControlPositions();
             }
         }
 
