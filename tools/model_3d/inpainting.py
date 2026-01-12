@@ -1606,20 +1606,8 @@ def test_inpainting_page():
         }
 
         function addContactMarker(container, x, y, index) {
-            const marker = document.createElement('div');
-            marker.className = 'contact-marker';
-            marker.innerHTML = index;
-            marker.style.cssText = `
-                position: absolute; left: ${x}px; top: ${y}px;
-                width: 24px; height: 24px; margin-left: -12px; margin-top: -12px;
-                background: rgba(255,152,0,0.9); border-radius: 50%;
-                display: flex; align-items: center; justify-content: center;
-                color: white; font-size: 12px; font-weight: bold;
-                pointer-events: none; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-                border: 2px solid white;
-            `;
-            container.appendChild(marker);
-            contactMarkers.push(marker);
+            // Contact markers disabled - function kept for compatibility
+            return;
         }
 
         function clearContactMarkers() {
