@@ -975,13 +975,6 @@ def test_inpainting_page():
         let showContactMarkers = true;
         let showControlButtons = true;
 
-        // Floor boundary polygon (2D constraint area for leg markers)
-        let floorBoundaryPoints = [];  // Array of {x, y} world coordinates (Z=0)
-        let isDefiningFloorBoundary = false;
-        let floorBoundaryMarkers = [];  // DOM elements showing boundary points
-        let floorBoundaryCanvas = null;  // Canvas for drawing boundary polygon
-        let showFloorBoundary = true;
-
         // For maintaining constant apparent size when moving in Z
         let modelReferenceZ = 0;  // Z position where baseScale applies
         let modelBaseScale = 1;   // Scale at reference Z position
@@ -1213,48 +1206,10 @@ def test_inpainting_page():
                 color: white; font-size: 12px; pointer-events: none;
             `;
 
-            // Floor boundary button (bottom right corner)
-            const floorBoundaryBtn = document.createElement('div');
-            floorBoundaryBtn.className = 'floor-boundary-btn';
-            floorBoundaryBtn.innerHTML = '⬡';
-            floorBoundaryBtn.style.cssText = `
-                position: absolute; bottom: 20px; right: 20px;
-                width: 40px; height: 40px; background: rgba(0,200,100,0.9); border-radius: 50%;
-                display: flex; align-items: center; justify-content: center; font-size: 20px;
-                cursor: pointer; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                user-select: none; color: white; font-weight: bold;
-            `;
-            floorBoundaryBtn.title = 'Click to define floor boundary area';
-
-            // Floor boundary button click handler
-            floorBoundaryBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (isDefiningFloorBoundary) {
-                    // Finish or cancel if not enough points
-                    if (floorBoundaryPoints.length >= 3) {
-                        finishDefiningFloorBoundary();
-                    } else {
-                        clearFloorBoundary();
-                        isDefiningFloorBoundary = false;
-                    }
-                    floorBoundaryBtn.style.background = 'rgba(0,200,100,0.9)';
-                    floorBoundaryBtn.innerHTML = '⬡';
-                    moveHint.innerHTML = '✥ Drag object to move';
-                    moveHint.style.pointerEvents = 'none';
-                } else {
-                    startDefiningFloorBoundary();
-                    floorBoundaryBtn.style.background = 'rgba(255,100,100,0.9)';
-                    floorBoundaryBtn.innerHTML = '✓';
-                    moveHint.innerHTML = 'Click to add boundary points. Click first point or ✓ to finish.';
-                    moveHint.style.pointerEvents = 'none';
-                }
-            });
-
             overlay.appendChild(rotateBtn);
             overlay.appendChild(scaleControl);
             overlay.appendChild(brightnessControl);
             overlay.appendChild(tiltControl);
-            overlay.appendChild(floorBoundaryBtn);
             overlay.appendChild(moveHint);
             container.style.position = 'relative';
             container.appendChild(overlay);
@@ -1672,7 +1627,7 @@ def test_inpainting_page():
             contactMarkers = [];
         }
 
-        // Floor boundary functions
+        // Coordinate conversion functions
         function screenToWorld(screenX, screenY) {
             // Convert screen coordinates to world coordinates (X, Y at Z=0)
             if (!viewerContainer || !threeCamera) return null;
@@ -1698,318 +1653,14 @@ def test_inpainting_page():
             };
         }
 
-        function addFloorBoundaryMarker(screenX, screenY, index) {
-            if (!viewerContainer) return;
-            const marker = document.createElement('div');
-            marker.className = 'floor-boundary-marker';
-            marker.innerHTML = index;
-            marker.style.cssText = `
-                position: absolute;
-                left: ${screenX}px;
-                top: ${screenY}px;
-                width: 24px;
-                height: 24px;
-                background: rgba(0, 200, 100, 0.9);
-                border: 2px solid white;
-                border-radius: 50%;
-                transform: translate(-50%, -50%);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 12px;
-                font-weight: bold;
-                color: white;
-                pointer-events: none;
-                z-index: 1000;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-            `;
-            viewerContainer.appendChild(marker);
-            floorBoundaryMarkers.push(marker);
-        }
-
-        function clearFloorBoundaryMarkers() {
-            floorBoundaryMarkers.forEach(m => m.remove());
-            floorBoundaryMarkers = [];
-        }
-
-        function createFloorBoundaryCanvas() {
-            if (!viewerContainer) return;
-            if (floorBoundaryCanvas) floorBoundaryCanvas.remove();
-
-            const rect = viewerContainer.getBoundingClientRect();
-            floorBoundaryCanvas = document.createElement('canvas');
-            floorBoundaryCanvas.width = rect.width;
-            floorBoundaryCanvas.height = rect.height;
-            floorBoundaryCanvas.style.cssText = `
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                height: 100%;
-                pointer-events: none;
-                z-index: 999;
-            `;
-            viewerContainer.appendChild(floorBoundaryCanvas);
-        }
-
-        function drawFloorBoundary() {
-            if (!floorBoundaryCanvas || floorBoundaryPoints.length < 2) return;
-
-            const ctx = floorBoundaryCanvas.getContext('2d');
-            const rect = viewerContainer.getBoundingClientRect();
-            ctx.clearRect(0, 0, rect.width, rect.height);
-
-            if (!showFloorBoundary) return;
-
-            ctx.beginPath();
-            ctx.strokeStyle = 'rgba(0, 200, 100, 0.8)';
-            ctx.fillStyle = 'rgba(0, 200, 100, 0.15)';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]);
-
-            for (let i = 0; i < floorBoundaryPoints.length; i++) {
-                const screenPos = worldToScreen(floorBoundaryPoints[i].x, floorBoundaryPoints[i].y);
-                if (screenPos) {
-                    if (i === 0) {
-                        ctx.moveTo(screenPos.x, screenPos.y);
-                    } else {
-                        ctx.lineTo(screenPos.x, screenPos.y);
-                    }
-                }
-            }
-
-            // Close the polygon if we have 3+ points
-            if (floorBoundaryPoints.length >= 3) {
-                ctx.closePath();
-                ctx.fill();
-            }
-            ctx.stroke();
-        }
-
-        function updateFloorBoundaryMarkerPositions() {
-            floorBoundaryPoints.forEach((point, index) => {
-                if (index < floorBoundaryMarkers.length) {
-                    const screenPos = worldToScreen(point.x, point.y);
-                    if (screenPos) {
-                        floorBoundaryMarkers[index].style.left = screenPos.x + 'px';
-                        floorBoundaryMarkers[index].style.top = screenPos.y + 'px';
-                    }
-                }
-            });
-            drawFloorBoundary();
-        }
-
-        function isPointInPolygon(x, y, polygon) {
-            // Ray casting algorithm to check if point is inside polygon
-            if (polygon.length < 3) return true; // No boundary defined
-
-            let inside = false;
-            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-                const xi = polygon[i].x, yi = polygon[i].y;
-                const xj = polygon[j].x, yj = polygon[j].y;
-
-                if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
-                    inside = !inside;
-                }
-            }
-            return inside;
-        }
-
-        function getContactPointsWorldPositions() {
-            // Get world positions of all contact points (leg markers)
-            if (!currentLoadedModel || objectContactPoints.length === 0) return [];
-
-            const worldPositions = [];
-            objectContactPoints.forEach(localPoint => {
-                const worldPoint = localPoint.clone();
-                currentLoadedModel.localToWorld(worldPoint);
-                worldPositions.push({ x: worldPoint.x, y: worldPoint.y });
-            });
-            return worldPositions;
-        }
-
-        function wouldContactPointsBeInBoundary(deltaX, deltaY) {
-            // Check if moving the model by delta would keep all contact points inside boundary
-            if (floorBoundaryPoints.length < 3) return true; // No boundary = always allowed
-
-            const contactPositions = getContactPointsWorldPositions();
-            if (contactPositions.length === 0) return true; // No contact points = always allowed
-
-            for (const pos of contactPositions) {
-                const newX = pos.x + deltaX;
-                const newY = pos.y + deltaY;
-                if (!isPointInPolygon(newX, newY, floorBoundaryPoints)) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        function constrainMovementToBoundary(originalX, originalY, targetX, targetY) {
-            // Constrain movement to keep all contact points within boundary
-            if (floorBoundaryPoints.length < 3) return { x: targetX, y: targetY };
-
-            const deltaX = targetX - originalX;
-            const deltaY = targetY - originalY;
-
-            // If target is valid, allow it
-            if (wouldContactPointsBeInBoundary(deltaX, deltaY)) {
-                return { x: targetX, y: targetY };
-            }
-
-            // Binary search to find maximum allowed movement
-            let validDeltaX = 0, validDeltaY = 0;
-            let step = 0.5;
-
-            for (let i = 0; i < 10; i++) {  // 10 iterations for precision
-                const testDeltaX = validDeltaX + deltaX * step;
-                const testDeltaY = validDeltaY + deltaY * step;
-
-                if (wouldContactPointsBeInBoundary(testDeltaX, testDeltaY)) {
-                    validDeltaX = testDeltaX;
-                    validDeltaY = testDeltaY;
-                }
-                step *= 0.5;
-            }
-
-            return { x: originalX + validDeltaX, y: originalY + validDeltaY };
-        }
-
-        function startDefiningFloorBoundary() {
-            isDefiningFloorBoundary = true;
-            floorBoundaryPoints = [];
-            clearFloorBoundaryMarkers();
-            createFloorBoundaryCanvas();
-            drawFloorBoundary();
-        }
-
-        function finishDefiningFloorBoundary() {
-            isDefiningFloorBoundary = false;
-            drawFloorBoundary();
-
-            // Save floor boundary to localStorage
-            saveFloorBoundary();
-
-            // Move object inside the boundary area with smooth animation
-            moveObjectInsideBoundary();
-        }
-
-        function saveFloorBoundary() {
-            if (floorBoundaryPoints.length >= 3) {
-                localStorage.setItem('floorBoundaryPoints', JSON.stringify(floorBoundaryPoints));
-            }
-        }
-
-        function loadFloorBoundary() {
-            const saved = localStorage.getItem('floorBoundaryPoints');
-            if (saved) {
-                try {
-                    floorBoundaryPoints = JSON.parse(saved);
-                    if (floorBoundaryPoints.length >= 3) {
-                        createFloorBoundaryCanvas();
-                        // Recreate markers
-                        floorBoundaryPoints.forEach((point, index) => {
-                            const screenPos = worldToScreen(point.x, point.y);
-                            if (screenPos) {
-                                addFloorBoundaryMarker(screenPos.x, screenPos.y, index + 1);
-                            }
-                        });
-                        drawFloorBoundary();
-                        // Move object inside the loaded boundary
-                        moveObjectInsideBoundary();
-                        return;
-                    }
-                } catch (e) {
-                    console.error('Failed to load floor boundary:', e);
-                    floorBoundaryPoints = [];
-                }
-            }
-            // No floor boundary - set default position to lower area of screen
+        function setDefaultPosition() {
+            // Set default position to lower area of screen
             if (currentLoadedModel) {
                 currentLoadedModel.position.y = -1.15;
                 updateScaleForConstantSize();
                 updateContactMarkerPositions();
                 updateControlPositions();
             }
-        }
-
-        function moveObjectInsideBoundary() {
-            if (floorBoundaryPoints.length < 3 || !currentLoadedModel) return;
-
-            // Calculate centroid of the floor boundary polygon
-            let boundaryCenterX = 0, boundaryCenterY = 0;
-            floorBoundaryPoints.forEach(point => {
-                boundaryCenterX += point.x;
-                boundaryCenterY += point.y;
-            });
-            boundaryCenterX /= floorBoundaryPoints.length;
-            boundaryCenterY /= floorBoundaryPoints.length;
-
-            // Get current contact points positions
-            const contactPositions = getContactPointsWorldPositions();
-            if (contactPositions.length === 0) {
-                // No contact points, animate model center to boundary center
-                animateModelTo(boundaryCenterX, boundaryCenterY);
-                return;
-            }
-
-            // Calculate centroid of contact points
-            let contactCenterX = 0, contactCenterY = 0;
-            contactPositions.forEach(pos => {
-                contactCenterX += pos.x;
-                contactCenterY += pos.y;
-            });
-            contactCenterX /= contactPositions.length;
-            contactCenterY /= contactPositions.length;
-
-            // Calculate target position for the model
-            const deltaX = boundaryCenterX - contactCenterX;
-            const deltaY = boundaryCenterY - contactCenterY;
-            const targetX = currentLoadedModel.position.x + deltaX;
-            const targetY = currentLoadedModel.position.y + deltaY;
-
-            // Animate the model to target position
-            animateModelTo(targetX, targetY);
-        }
-
-        function animateModelTo(targetX, targetY) {
-            if (!currentLoadedModel) return;
-
-            const startX = currentLoadedModel.position.x;
-            const startY = currentLoadedModel.position.y;
-            const duration = 500; // milliseconds
-            const startTime = performance.now();
-
-            function animate(currentTime) {
-                const elapsed = currentTime - startTime;
-                const progress = Math.min(elapsed / duration, 1);
-
-                // Ease out cubic for smooth deceleration
-                const eased = 1 - Math.pow(1 - progress, 3);
-
-                currentLoadedModel.position.x = startX + (targetX - startX) * eased;
-                currentLoadedModel.position.y = startY + (targetY - startY) * eased;
-
-                updateScaleForConstantSize();
-                updateContactMarkerPositions();
-
-                if (progress < 1) {
-                    requestAnimationFrame(animate);
-                }
-            }
-
-            requestAnimationFrame(animate);
-        }
-
-        function clearFloorBoundary() {
-            floorBoundaryPoints = [];
-            clearFloorBoundaryMarkers();
-            if (floorBoundaryCanvas) {
-                const ctx = floorBoundaryCanvas.getContext('2d');
-                ctx.clearRect(0, 0, floorBoundaryCanvas.width, floorBoundaryCanvas.height);
-            }
-            // Remove from localStorage
-            localStorage.removeItem('floorBoundaryPoints');
         }
 
         function getLowestContactPointY() {
@@ -2336,14 +1987,12 @@ def test_inpainting_page():
                 const scaleCtrl = controlOverlay?.querySelector('.scale-control');
                 const brightnessCtrl = controlOverlay?.querySelector('.brightness-control');
                 const tiltCtrl = controlOverlay?.querySelector('.tilt-control');
-                const floorBoundaryBtn = controlOverlay?.querySelector('.floor-boundary-btn');
                 // Completely hide all buttons when toggled off
                 const display = showControlButtons ? 'flex' : 'none';
                 if (rotateCtrl) rotateCtrl.style.display = display;
                 if (scaleCtrl) scaleCtrl.style.display = display;
                 if (brightnessCtrl) brightnessCtrl.style.display = display;
                 if (tiltCtrl) tiltCtrl.style.display = display;
-                if (floorBoundaryBtn) floorBoundaryBtn.style.display = display;
                 // Also toggle leg points visibility with controls
                 contactMarkers.forEach(m => m.style.display = showControlButtons ? 'flex' : 'none');
             }
@@ -2386,16 +2035,8 @@ def test_inpainting_page():
                     const worldDeltaY = currentWorldPos.y - dragStartHitPoint.y;
 
                     // Move the model so the clicked point follows the cursor
-                    const targetX = dragStartModelPosition.x + worldDeltaX;
-                    const targetY = dragStartModelPosition.y + worldDeltaY;
-
-                    // Apply boundary constraint
-                    const constrained = constrainMovementToBoundary(
-                        dragStartModelPosition.x, dragStartModelPosition.y,
-                        targetX, targetY
-                    );
-                    currentLoadedModel.position.x = constrained.x;
-                    currentLoadedModel.position.y = constrained.y;
+                    currentLoadedModel.position.x = dragStartModelPosition.x + worldDeltaX;
+                    currentLoadedModel.position.y = dragStartModelPosition.y + worldDeltaY;
 
                     updateScaleForConstantSize();
                     updateContactMarkerPositions();
@@ -2403,14 +2044,6 @@ def test_inpainting_page():
             });
 
             canvas.addEventListener('mouseup', (e) => {
-                // Floor boundary clicks are handled by viewerContainer click handler
-                // Skip boundary handling here to avoid duplicate points
-                if (isDefiningFloorBoundary) {
-                    clickStartPos = null;
-                    isDraggingModel = false;
-                    return;
-                }
-
                 // Check if this was a click (not a drag) on the model
                 if (modelWasClicked && clickStartPos) {
                     const dx = e.clientX - clickStartPos.x;
@@ -2482,16 +2115,8 @@ def test_inpainting_page():
                     const worldDeltaY = currentWorldPos.y - dragStartHitPoint.y;
 
                     // Move the model so the touched point follows the finger
-                    const targetX = dragStartModelPosition.x + worldDeltaX;
-                    const targetY = dragStartModelPosition.y + worldDeltaY;
-
-                    // Apply boundary constraint
-                    const constrained = constrainMovementToBoundary(
-                        dragStartModelPosition.x, dragStartModelPosition.y,
-                        targetX, targetY
-                    );
-                    currentLoadedModel.position.x = constrained.x;
-                    currentLoadedModel.position.y = constrained.y;
+                    currentLoadedModel.position.x = dragStartModelPosition.x + worldDeltaX;
+                    currentLoadedModel.position.y = dragStartModelPosition.y + worldDeltaY;
 
                     updateScaleForConstantSize();
                     updateContactMarkerPositions();
@@ -2520,62 +2145,6 @@ def test_inpainting_page():
                 touchModelWasClicked = false;
             });
 
-            // Handle clicks on the viewerContainer for floor boundary definition
-            // This captures clicks that might not reach the canvas (e.g., through overlay)
-            let lastBoundaryClickTime = 0;
-            viewerContainer.addEventListener('click', (e) => {
-                if (!isDefiningFloorBoundary) return;
-
-                // Prevent duplicate clicks (debounce 100ms)
-                const now = Date.now();
-                if (now - lastBoundaryClickTime < 100) return;
-                lastBoundaryClickTime = now;
-
-                // Don't handle clicks on control buttons
-                if (e.target.closest('.floor-boundary-btn') ||
-                    e.target.closest('[class*="Ctrl"]') ||
-                    e.target.closest('[title*="Drag"]')) {
-                    return;
-                }
-
-                const worldPos = screenToWorld(e.clientX, e.clientY);
-                if (worldPos) {
-                    // Check if clicking near the first point to close the polygon
-                    if (floorBoundaryPoints.length >= 3) {
-                        const firstPoint = floorBoundaryPoints[0];
-                        const firstScreenPos = worldToScreen(firstPoint.x, firstPoint.y);
-                        if (firstScreenPos) {
-                            const rect = viewerContainer.getBoundingClientRect();
-                            const clickX = e.clientX - rect.left;
-                            const clickY = e.clientY - rect.top;
-                            const distToFirst = Math.sqrt(
-                                Math.pow(clickX - firstScreenPos.x, 2) +
-                                Math.pow(clickY - firstScreenPos.y, 2)
-                            );
-                            if (distToFirst < 30) {  // Close to first point - finish polygon
-                                finishDefiningFloorBoundary();
-                                // Reset button state
-                                const btn = viewerContainer.querySelector('.floor-boundary-btn');
-                                if (btn) {
-                                    btn.style.background = 'rgba(0,200,100,0.9)';
-                                    btn.innerHTML = '⬡';
-                                }
-                                return;
-                            }
-                        }
-                    }
-
-                    // Add new boundary point
-                    floorBoundaryPoints.push(worldPos);
-                    const rect = viewerContainer.getBoundingClientRect();
-                    addFloorBoundaryMarker(
-                        e.clientX - rect.left,
-                        e.clientY - rect.top,
-                        floorBoundaryPoints.length
-                    );
-                    drawFloorBoundary();
-                }
-            });
         }
 
         function loadTextureAsPlane(textureUrl) {
@@ -2676,8 +2245,8 @@ def test_inpainting_page():
                     updateContactMarkerPositions();
                     updateControlPositions();
 
-                    // Load saved floor boundary from localStorage
-                    loadFloorBoundary();
+                    // Set default position
+                    setDefaultPosition();
                 }, 100);
             }, undefined, (error) => {
                 console.error('Error loading 3D model:', error);
