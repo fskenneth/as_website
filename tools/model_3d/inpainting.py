@@ -979,7 +979,7 @@ def test_inpainting_page():
         let modelReferenceZ = 0;  // Z position where baseScale applies
         let modelBaseScale = 1;   // Scale at reference Z position
         const cameraZ = 10;       // Camera Z position (must match camera setup)
-        let modelTilt = 0.087;  // Model X rotation for tilting view angle (default ~5 degrees)
+        let modelTilt = 5 * Math.PI / 180;  // Model X rotation for tilting view angle (5 degrees)
 
         function setupThreeScene(container, modelData, format) {
             viewerContainer = container;
@@ -2213,9 +2213,10 @@ def test_inpainting_page():
                 modelReferenceZ = 0;
                 modelBaseScale = scale;
 
-                // Reset brightness, rotation and camera tilt for new model
+                // Reset brightness, rotation and tilt for new model
                 modelBrightness = 2.5; // Max brightness by default
                 userYRotation = 0;
+                modelTilt = 5 * Math.PI / 180;  // Reset to 5 degrees
                 cameraTilt = 0;
                 threeCamera.position.y = 0;
                 threeCamera.lookAt(0, 0, 0);
