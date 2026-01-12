@@ -964,15 +964,6 @@ def test_inpainting_page():
         let viewerContainer = null;
         let controlOverlay = null;
 
-        // Floor plane definition
-        let floorPoints = [];  // 4 screen coordinates defining the floor (absolute pixels)
-        let floorPointsNormalized = [];  // 4 normalized coordinates (0-1 range relative to canvas)
-        let floorWorldPoints = [];  // 4 world coordinates of the floor corners
-        let floorCenter = null;  // Center of the floor rectangle in world coords
-        let isDefiningFloor = false;
-        let floorMarkers = [];  // DOM elements showing floor points
-        let floorPlaneY = 0;  // Y level of the floor in world coords
-
         // Object contact points (e.g., chair legs)
         let objectContactPoints = [];  // 4 world coordinates on the object that touch floor
         let isDefiningContactPoints = false;
@@ -981,7 +972,6 @@ def test_inpainting_page():
         let levelingQuaternion = null;  // Store the initial leveling rotation
 
         // Visibility toggles
-        let showFloorMarkers = true;
         let showContactMarkers = true;
         let showControlButtons = true;
 
@@ -989,7 +979,7 @@ def test_inpainting_page():
         let modelReferenceZ = 0;  // Z position where baseScale applies
         let modelBaseScale = 1;   // Scale at reference Z position
         const cameraZ = 10;       // Camera Z position (must match camera setup)
-        let cameraTilt = 0;    // Camera Y position offset for tilting viewpoint
+        let modelTilt = 0.087;  // Model X rotation for tilting view angle (default ~5 degrees)
 
         function setupThreeScene(container, modelData, format) {
             viewerContainer = container;
@@ -1043,9 +1033,6 @@ def test_inpainting_page():
             // Add control overlay UI
             addControlOverlay(container);
 
-            // Load saved floor data from localStorage (if any)
-            loadFloorFromStorage(container);
-
             // Load model based on format
             if (format === 'texture') {
                 loadTextureAsPlane(modelData);
@@ -1079,9 +1066,6 @@ def test_inpainting_page():
                 threeCamera.bottom = frustumSize / -2;
                 threeCamera.updateProjectionMatrix();
                 threeRenderer.setSize(newWidth, newHeight);
-
-                // Update floor markers to follow the resized background
-                updateFloorMarkersOnResize(container);
             });
 
             // Setup mouse/touch events for model dragging
@@ -1091,17 +1075,20 @@ def test_inpainting_page():
         function getModelScreenPosition() {
             if (!currentLoadedModel || !threeCamera || !viewerContainer) return null;
 
-            // Get model bounding box
-            const box = new THREE.Box3().setFromObject(currentLoadedModel);
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
+            // Use model's position as center (not bounding box center)
+            // This keeps buttons fixed relative to model center during rotation
+            const modelPos = currentLoadedModel.position.clone();
 
-            // Project center and corners to screen
-            const centerScreen = center.clone().project(threeCamera);
-            const bottomCenter = new THREE.Vector3(center.x, box.min.y, center.z).project(threeCamera);
-            const topCenter = new THREE.Vector3(center.x, box.max.y, center.z).project(threeCamera);
-            const rightCenter = new THREE.Vector3(box.max.x, center.y, center.z).project(threeCamera);
-            const leftCenter = new THREE.Vector3(box.min.x, center.y, center.z).project(threeCamera);
+            // Use a fixed offset in world units for button positioning
+            // This ensures buttons don't move when model rotates
+            const fixedOffset = 1.0;  // Fixed distance in world units
+
+            // Project center and fixed offset points to screen
+            const centerScreen = modelPos.clone().project(threeCamera);
+            const bottomCenter = new THREE.Vector3(modelPos.x, modelPos.y - fixedOffset, modelPos.z).project(threeCamera);
+            const topCenter = new THREE.Vector3(modelPos.x, modelPos.y + fixedOffset, modelPos.z).project(threeCamera);
+            const rightCenter = new THREE.Vector3(modelPos.x + fixedOffset, modelPos.y, modelPos.z).project(threeCamera);
+            const leftCenter = new THREE.Vector3(modelPos.x - fixedOffset, modelPos.y, modelPos.z).project(threeCamera);
 
             const rect = viewerContainer.getBoundingClientRect();
             const width = rect.width;
@@ -1219,53 +1206,11 @@ def test_inpainting_page():
                 color: white; font-size: 12px; pointer-events: none;
             `;
 
-            // Define Floor button (top right) - toggles floor visibility
-            const floorBtn = document.createElement('div');
-            floorBtn.className = 'floor-btn';
-            floorBtn.innerHTML = '⬚ Floor ✓';
-            floorBtn.style.cssText = `
-                position: absolute; top: 10px; right: 10px;
-                padding: 8px 16px; background: rgba(76,175,80,0.9); border-radius: 20px;
-                color: white; font-size: 12px; cursor: pointer; pointer-events: auto;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.3); user-select: none;
-            `;
-            floorBtn.title = 'Click to toggle floor visibility, long press to redefine';
-
-            // Toggle floor visibility on click
-            floorBtn.onclick = () => {
-                showFloorMarkers = !showFloorMarkers;
-                floorMarkers.forEach(m => m.style.display = showFloorMarkers ? 'flex' : 'none');
-                // Update floor lines visibility
-                const floorLines = container.querySelector('.floor-outline');
-                if (floorLines) floorLines.style.display = showFloorMarkers ? 'block' : 'none';
-                floorBtn.innerHTML = showFloorMarkers ? '⬚ Floor ✓' : '⬚ Floor';
-                floorBtn.style.background = showFloorMarkers ? 'rgba(76,175,80,0.9)' : 'rgba(100,100,100,0.7)';
-            };
-
-            // Reset Floor button - clears floor and waits for manual clicks
-            const resetFloorBtn = document.createElement('div');
-            resetFloorBtn.className = 'reset-floor-btn';
-            resetFloorBtn.innerHTML = '↻ Reset';
-            resetFloorBtn.style.cssText = `
-                position: absolute; top: 50px; right: 10px;
-                padding: 8px 16px; background: rgba(156,39,176,0.9); border-radius: 20px;
-                color: white; font-size: 12px; cursor: pointer; pointer-events: auto;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.3); user-select: none;
-            `;
-            resetFloorBtn.title = 'Click to redefine floor points';
-
-            // Reset floor on click
-            resetFloorBtn.onclick = () => {
-                startDefiningFloor(container, floorBtn, moveHint);
-            };
-
             overlay.appendChild(rotateBtn);
             overlay.appendChild(scaleControl);
             overlay.appendChild(brightnessControl);
             overlay.appendChild(tiltControl);
             overlay.appendChild(moveHint);
-            overlay.appendChild(floorBtn);
-            overlay.appendChild(resetFloorBtn);
             container.style.position = 'relative';
             container.appendChild(overlay);
 
@@ -1355,13 +1300,12 @@ def test_inpainting_page():
                 if (isDraggingTilt && currentLoadedModel) {
                     const deltaY = e.clientY - lastMouseY;
 
-                    // Update camera tilt offset (drag down = look from higher = positive offset)
-                    cameraTilt = Math.max(-3, Math.min(3, cameraTilt + deltaY * 0.02));
+                    // Update model tilt angle (drag down = tilt forward to see from above)
+                    // Range: 0 (original level) to 0.5 (max tilt ~29 degrees)
+                    modelTilt = Math.max(0, Math.min(0.5, modelTilt + deltaY * 0.005));
 
-                    // Move camera Y position relative to Y=0 (flat floor)
-                    threeCamera.position.y = cameraTilt;
-                    threeCamera.lookAt(currentLoadedModel.position.x, 0, currentLoadedModel.position.z);
-                    threeCamera.updateProjectionMatrix();
+                    // Apply combined rotation (preserves Y rotation while adding tilt)
+                    applyModelRotation(currentLoadedModel);
 
                     updateContactMarkerPositions();
                     updateControlPositions();
@@ -1424,13 +1368,12 @@ def test_inpainting_page():
                 if (isDraggingTilt && currentLoadedModel) {
                     const deltaY = e.touches[0].clientY - lastMouseY;
 
-                    // Update camera tilt offset (drag down = look from higher = positive offset)
-                    cameraTilt = Math.max(-3, Math.min(3, cameraTilt + deltaY * 0.02));
+                    // Update model tilt angle (drag down = tilt forward to see from above)
+                    // Range: 0 (original level) to 0.5 (max tilt ~29 degrees)
+                    modelTilt = Math.max(0, Math.min(0.5, modelTilt + deltaY * 0.005));
 
-                    // Move camera Y position relative to Y=0 (flat floor)
-                    threeCamera.position.y = cameraTilt;
-                    threeCamera.lookAt(currentLoadedModel.position.x, 0, currentLoadedModel.position.z);
-                    threeCamera.updateProjectionMatrix();
+                    // Apply combined rotation (preserves Y rotation while adding tilt)
+                    applyModelRotation(currentLoadedModel);
 
                     updateContactMarkerPositions();
                     updateControlPositions();
@@ -1464,27 +1407,29 @@ def test_inpainting_page():
             });
         }
 
-        function rotateAroundFloor(model, angle) {
-            // Save exact position before rotation
+        function applyModelRotation(model) {
+            // Apply combined rotation: leveling + Y rotation + X tilt
+            // Order: first level, then Y rotate, then X tilt
             const savedX = model.position.x;
             const savedY = model.position.y;
             const savedZ = model.position.z;
 
-            // Update tracked Y rotation
-            userYRotation += angle;
-
-            // Create Y rotation quaternion
+            // Create Y rotation quaternion (horizontal rotation)
             const yRotQuat = new THREE.Quaternion().setFromAxisAngle(
                 new THREE.Vector3(0, 1, 0), userYRotation
             );
 
-            // Combine: Y rotation applied to leveled model
-            // Order: first level (levelingQuaternion), then Y rotate (yRotQuat)
-            // In quaternion math: final = yRotQuat * levelingQuaternion
+            // Create X tilt quaternion (forward/backward tilt)
+            const xTiltQuat = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(1, 0, 0), modelTilt
+            );
+
+            // Combine: tilt * yRotation * leveling
+            // This applies leveling first, then Y rotation, then tilt
             if (levelingQuaternion) {
-                model.quaternion.copy(yRotQuat).multiply(levelingQuaternion);
+                model.quaternion.copy(xTiltQuat).multiply(yRotQuat).multiply(levelingQuaternion);
             } else {
-                model.quaternion.copy(yRotQuat);
+                model.quaternion.copy(xTiltQuat).multiply(yRotQuat);
             }
             model.updateMatrixWorld(true);
 
@@ -1493,12 +1438,17 @@ def test_inpainting_page():
             model.position.y = savedY;
             model.position.z = savedZ;
             model.updateMatrixWorld(true);
+        }
 
+        function rotateAroundFloor(model, angle) {
+            // Update tracked Y rotation
+            userYRotation += angle;
+            applyModelRotation(model);
             updateContactMarkerPositions();
         }
 
         function levelModelToFloorWithoutAlign(model, contactPoints) {
-            // Transform the model so all contact points lie on the floor plane (Y = floorPlaneY)
+            // Transform the model so all contact points lie on the horizontal plane (Y = 0)
             // This version does NOT call alignModelToFloorOrientation
             if (contactPoints.length < 3) return;
 
@@ -1531,65 +1481,9 @@ def test_inpainting_page():
             // Find the lowest Y after rotation
             const minY = Math.min(...newWorldPoints.map(p => p.y));
 
-            // Determine target floor Y
-            const targetY = (floorPoints.length >= 4) ? floorPlaneY : 0;
-
-            // Move model so contact points are at floor level
-            model.position.y -= (minY - targetY);
+            // Move model so contact points are at world Y=0
+            model.position.y -= minY;
             model.updateMatrixWorld(true);
-        }
-
-        function applyPerspectiveTilt(model, contactPoints) {
-            // Apply perspective tilt without changing Y rotation
-            if (floorWorldPoints.length < 4) return;
-
-            const floorBackLeft = floorWorldPoints[0];
-            const floorBackRight = floorWorldPoints[3];
-            const floorFrontLeft = floorWorldPoints[1];
-            const floorFrontRight = floorWorldPoints[2];
-
-            // Calculate perspective tilt from floor trapezoid ratio
-            const rect = viewerContainer.getBoundingClientRect();
-            const projectToScreen = (p) => {
-                const sp = p.clone().project(threeCamera);
-                return { x: (sp.x + 1) / 2 * rect.width, y: (-sp.y + 1) / 2 * rect.height };
-            };
-
-            const screenBackLeft = projectToScreen(floorBackLeft);
-            const screenBackRight = projectToScreen(floorBackRight);
-            const screenFrontLeft = projectToScreen(floorFrontLeft);
-            const screenFrontRight = projectToScreen(floorFrontRight);
-
-            const backLength = Math.sqrt(
-                Math.pow(screenBackRight.x - screenBackLeft.x, 2) +
-                Math.pow(screenBackRight.y - screenBackLeft.y, 2)
-            );
-            const frontLength = Math.sqrt(
-                Math.pow(screenFrontRight.x - screenFrontLeft.x, 2) +
-                Math.pow(screenFrontRight.y - screenFrontLeft.y, 2)
-            );
-
-            const perspectiveRatio = backLength / frontLength;
-
-            let perspectiveTilt = 0;
-            if (perspectiveRatio < 1) {
-                perspectiveTilt = Math.asin(Math.min(1 - perspectiveRatio, 1));
-            }
-
-            if (perspectiveTilt > 0.001) {
-                // Apply X rotation for perspective tilt
-                const euler = new THREE.Euler().setFromQuaternion(model.quaternion, 'XYZ');
-                euler.x = euler.x + perspectiveTilt;
-                model.setRotationFromEuler(euler);
-                model.updateMatrixWorld(true);
-
-                // Re-level model after tilt
-                const worldPoints = contactPoints.map(p => model.localToWorld(p.clone()));
-                const minY = Math.min(...worldPoints.map(p => p.y));
-                const targetY = (floorPoints.length >= 4) ? floorPlaneY : 0;
-                model.position.y -= (minY - targetY);
-                model.updateMatrixWorld(true);
-            }
         }
 
         function bakeRotation(model) {
@@ -1616,347 +1510,6 @@ def test_inpainting_page():
             model.position.copy(savedPosition);
             model.scale.copy(savedScale);
             model.updateMatrix();
-        }
-
-        function startDefiningFloor(container, floorBtn, moveHint) {
-            if (isDefiningFloor) {
-                // Cancel floor definition
-                isDefiningFloor = false;
-                floorBtn.innerHTML = '⬚ Floor';
-                floorBtn.style.background = 'rgba(76,175,80,0.9)';
-                moveHint.innerHTML = '✥ Drag object to move';
-                moveHint.style.pointerEvents = 'none';
-                return;
-            }
-
-            // Start floor definition mode
-            isDefiningFloor = true;
-            floorPoints = [];
-            floorPointsNormalized = [];
-            floorWorldPoints = [];
-            floorCenter = null;
-            clearFloorMarkers();
-
-            floorBtn.innerHTML = '✕ Cancel';
-            floorBtn.style.background = 'rgba(244,67,54,0.9)';
-            moveHint.innerHTML = 'Click 4 corners of the floor (0/4)';
-            moveHint.style.background = 'rgba(76,175,80,0.9)';
-
-            // Add click handler to canvas
-            const canvas = container.querySelector('canvas');
-            canvas.style.cursor = 'crosshair';
-
-            const clickHandler = (e) => {
-                if (!isDefiningFloor) return;
-
-                const rect = canvas.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-
-                // Add floor point (both absolute and normalized)
-                floorPoints.push({ x, y });
-                floorPointsNormalized.push({ x: x / rect.width, y: y / rect.height });
-                addFloorMarker(container, x, y, floorPoints.length);
-
-                moveHint.innerHTML = `Click 4 corners of the floor (${floorPoints.length}/4)`;
-
-                if (floorPoints.length >= 4) {
-                    // Done defining floor
-                    isDefiningFloor = false;
-                    canvas.style.cursor = 'default';
-                    canvas.removeEventListener('click', clickHandler);
-
-                    floorBtn.innerHTML = '⬚ Floor ✓';
-                    floorBtn.style.background = 'rgba(76,175,80,0.9)';
-                    moveHint.innerHTML = '✥ Drag object to move (floor locked)';
-                    moveHint.style.background = 'rgba(0,0,0,0.6)';
-
-                    // Calculate floor plane Y by converting screen coordinates to world coordinates
-                    // Use raycasting from screen position to find world Y
-                    const avgScreenY = floorPoints.reduce((sum, p) => sum + p.y, 0) / 4;
-                    const avgScreenX = floorPoints.reduce((sum, p) => sum + p.x, 0) / 4;
-                    const rect = canvas.getBoundingClientRect();
-
-                    // Convert screen position to normalized device coordinates
-                    const ndcX = (avgScreenX / rect.width) * 2 - 1;
-                    const ndcY = -(avgScreenY / rect.height) * 2 + 1;
-
-                    // First, calculate floor Y level from screen coordinates
-                    // Lower on screen (higher Y) = lower in world (lower Y)
-                    const maxScreenY = Math.max(...floorPoints.map(p => p.y));
-                    const bottomNdcY = -(maxScreenY / rect.height) * 2 + 1;
-                    floorPlaneY = bottomNdcY * 2;  // Scale factor based on camera setup
-
-                    // Convert all 4 floor screen points to world X/Z coordinates
-                    // Use raycasting with a horizontal plane at the calculated floor Y
-                    const raycaster = new THREE.Raycaster();
-                    const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -floorPlaneY);
-
-                    floorWorldPoints = [];
-                    for (const screenPt of floorPoints) {
-                        const ptNdcX = (screenPt.x / rect.width) * 2 - 1;
-                        const ptNdcY = -(screenPt.y / rect.height) * 2 + 1;
-                        raycaster.setFromCamera(new THREE.Vector2(ptNdcX, ptNdcY), threeCamera);
-
-                        const intersection = new THREE.Vector3();
-                        raycaster.ray.intersectPlane(floorPlane, intersection);
-                        if (intersection) {
-                            floorWorldPoints.push(intersection.clone());
-                        }
-                    }
-
-                    // Calculate floor center (average of 4 points)
-                    if (floorWorldPoints.length === 4) {
-                        floorCenter = new THREE.Vector3(0, 0, 0);
-                        for (const wp of floorWorldPoints) {
-                            floorCenter.add(wp);
-                        }
-                        floorCenter.divideScalar(4);
-                    } else {
-                        floorCenter = null;
-                    }
-
-                    console.log('Floor defined:', floorPoints, 'World points:', floorWorldPoints, 'Center:', floorCenter, 'Floor Y:', floorPlaneY);
-                    drawFloorOutline(container);
-
-                    // Save floor data to localStorage for persistence across page reloads
-                    saveFloorToStorage();
-
-                    // Auto-relocate object to floor and bake position
-                    if (currentLoadedModel) {
-                        // Get the lowest point of the model (either contact points or bounding box)
-                        let modelBottomY;
-                        if (objectContactPoints.length >= 4) {
-                            modelBottomY = getLowestContactPointY();
-                        } else {
-                            const box = new THREE.Box3().setFromObject(currentLoadedModel);
-                            modelBottomY = box.min.y;
-                        }
-
-                        // Move model so its bottom is at floor level
-                        const offset = modelBottomY - floorPlaneY;
-                        currentLoadedModel.position.y -= offset;
-                        console.log('Model auto-placed on floor, offset:', offset);
-
-                        // Center geometry on Y axis so rotation keeps all legs on floor
-                        // Get the center of the model's footprint
-                        const boxForCenter = new THREE.Box3().setFromObject(currentLoadedModel);
-                        const center = boxForCenter.getCenter(new THREE.Vector3());
-
-                        // Translate geometry so center X/Z is at origin
-                        // This makes the Y axis pass through the footprint center
-                        const offsetX = center.x - currentLoadedModel.position.x;
-                        const offsetZ = center.z - currentLoadedModel.position.z;
-
-                        currentLoadedModel.traverse((child) => {
-                            if (child.isMesh && child.geometry) {
-                                child.geometry.translate(-offsetX, 0, -offsetZ);
-                            }
-                        });
-
-                        // Adjust position to compensate (keep visual position same)
-                        currentLoadedModel.position.x += offsetX;
-                        currentLoadedModel.position.z += offsetZ;
-
-                        console.log('Geometry centered for Y rotation, offset X:', offsetX, 'Z:', offsetZ);
-
-                        // Re-detect contact points after geometry modification
-                        autoDetectContactPoints(currentLoadedModel);
-                    }
-                }
-            };
-
-            canvas.addEventListener('click', clickHandler);
-        }
-
-        function addFloorMarker(container, x, y, index) {
-            const marker = document.createElement('div');
-            marker.className = 'floor-marker';
-            marker.innerHTML = index;
-            marker.style.cssText = `
-                position: absolute; left: ${x}px; top: ${y}px;
-                width: 24px; height: 24px; margin-left: -12px; margin-top: -12px;
-                background: rgba(76,175,80,0.9); border-radius: 50%;
-                display: flex; align-items: center; justify-content: center;
-                color: white; font-size: 12px; font-weight: bold;
-                pointer-events: none; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            `;
-            container.appendChild(marker);
-            floorMarkers.push(marker);
-        }
-
-        function clearFloorMarkers() {
-            floorMarkers.forEach(m => m.remove());
-            floorMarkers = [];
-            // Remove floor outline if exists
-            const outline = document.querySelector('.floor-outline');
-            if (outline) outline.remove();
-        }
-
-        function drawFloorOutline(container) {
-            if (floorWorldPoints.length < 4) return;
-
-            // Remove existing outline first
-            const existingOutline = container.querySelector('.floor-outline');
-            if (existingOutline) existingOutline.remove();
-
-            const rect = container.getBoundingClientRect();
-
-            // Project floor world points to screen coordinates using current camera
-            // This ensures the outline aligns with leg marker projections
-            const screenPoints = floorWorldPoints.map(wp => {
-                const screenPt = wp.clone().project(threeCamera);
-                return {
-                    x: (screenPt.x + 1) / 2 * rect.width,
-                    y: (-screenPt.y + 1) / 2 * rect.height
-                };
-            });
-
-            // Create SVG overlay for floor outline
-            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            svg.classList.add('floor-outline');
-            svg.style.cssText = `
-                position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-                pointer-events: none;
-            `;
-
-            const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            const points = screenPoints.map(p => `${p.x},${p.y}`).join(' ');
-            polygon.setAttribute('points', points);
-            polygon.setAttribute('fill', 'rgba(76,175,80,0.1)');
-            polygon.setAttribute('stroke', 'rgba(76,175,80,0.8)');
-            polygon.setAttribute('stroke-width', '2');
-            polygon.setAttribute('stroke-dasharray', '5,5');
-
-            svg.appendChild(polygon);
-            container.appendChild(svg);
-        }
-
-        function updateFloorMarkersOnResize(container) {
-            // Update floor markers and outline based on projected world coordinates
-            if (floorWorldPoints.length < 4 || !viewerContainer || !threeCamera) return;
-
-            const rect = viewerContainer.getBoundingClientRect();
-
-            // Project floor world points to screen using current camera
-            const screenPoints = floorWorldPoints.map(wp => {
-                const screenPt = wp.clone().project(threeCamera);
-                return {
-                    x: (screenPt.x + 1) / 2 * rect.width,
-                    y: (-screenPt.y + 1) / 2 * rect.height
-                };
-            });
-
-            // Clear and redraw markers at projected positions
-            clearFloorMarkers();
-            screenPoints.forEach((p, i) => {
-                addFloorMarker(container, p.x, p.y, i + 1);
-            });
-            drawFloorOutline(container);
-        }
-
-        function saveFloorToStorage() {
-            // Save floor data to localStorage (use normalized coordinates for portability)
-            const floorData = {
-                floorPoints: floorPoints,
-                floorPointsNormalized: floorPointsNormalized,
-                floorPlaneY: floorPlaneY,
-                floorWorldPoints: floorWorldPoints.map(p => ({ x: p.x, y: p.y, z: p.z })),
-                floorCenter: floorCenter ? { x: floorCenter.x, y: floorCenter.y, z: floorCenter.z } : null
-            };
-            localStorage.setItem('floor3DData', JSON.stringify(floorData));
-            console.log('Floor data saved to localStorage');
-        }
-
-        function loadFloorFromStorage(container) {
-            // Load floor data from localStorage
-            const savedData = localStorage.getItem('floor3DData');
-            if (!savedData) return false;
-
-            try {
-                const floorData = JSON.parse(savedData);
-
-                if (floorData.floorPoints && floorData.floorPoints.length >= 4) {
-                    floorPlaneY = floorData.floorPlaneY || 0;
-
-                    // Load normalized coordinates (or calculate from absolute if not available)
-                    if (floorData.floorPointsNormalized && floorData.floorPointsNormalized.length >= 4) {
-                        floorPointsNormalized = floorData.floorPointsNormalized;
-                    } else {
-                        // Backward compatibility: calculate normalized from absolute
-                        // Assume original canvas was same aspect ratio
-                        const rect = container.getBoundingClientRect();
-                        floorPointsNormalized = floorData.floorPoints.map(p => ({
-                            x: p.x / rect.width,
-                            y: p.y / rect.height
-                        }));
-                    }
-
-                    // Calculate absolute positions from normalized for current canvas size
-                    const rect = container.getBoundingClientRect();
-                    floorPoints = floorPointsNormalized.map(p => ({
-                        x: p.x * rect.width,
-                        y: p.y * rect.height
-                    }));
-
-                    // Reconstruct THREE.Vector3 objects for world points
-                    if (floorData.floorWorldPoints) {
-                        floorWorldPoints = floorData.floorWorldPoints.map(p =>
-                            new THREE.Vector3(p.x, p.y, p.z)
-                        );
-                    }
-
-                    if (floorData.floorCenter) {
-                        floorCenter = new THREE.Vector3(
-                            floorData.floorCenter.x,
-                            floorData.floorCenter.y,
-                            floorData.floorCenter.z
-                        );
-                    }
-
-                    console.log('Floor data loaded from localStorage:', floorPoints, 'Normalized:', floorPointsNormalized, 'Floor Y:', floorPlaneY);
-
-                    // Draw floor markers and outline using projected world coordinates
-                    // This ensures alignment with leg marker projections
-                    floorWorldPoints.forEach((wp, i) => {
-                        const screenPt = wp.clone().project(threeCamera);
-                        const screenX = (screenPt.x + 1) / 2 * rect.width;
-                        const screenY = (-screenPt.y + 1) / 2 * rect.height;
-                        addFloorMarker(container, screenX, screenY, i + 1);
-                    });
-                    drawFloorOutline(container);
-
-                    // Update UI to show floor is defined
-                    const floorBtn = container.querySelector('.floor-btn');
-                    const moveHint = container.querySelector('.move-hint');
-                    if (floorBtn) {
-                        floorBtn.innerHTML = '⬚ Floor ✓';
-                    }
-                    if (moveHint) {
-                        moveHint.innerHTML = '✥ Drag object to move (floor locked)';
-                    }
-
-                    return true;
-                }
-            } catch (e) {
-                console.error('Error loading floor data:', e);
-            }
-
-            return false;
-        }
-
-        function getFloorYAtScreenPos(screenX, screenY) {
-            // Calculate Y position on floor plane based on screen position
-            // Using perspective interpolation from the 4 floor points
-            if (floorPoints.length < 4) return null;
-
-            const rect = viewerContainer.getBoundingClientRect();
-            const relX = screenX / rect.width;
-            const relY = screenY / rect.height;
-
-            // Simple linear interpolation (approximate)
-            // For more accuracy, use perspective-correct interpolation
-            return floorPlaneY;
         }
 
         function startDefiningContactPoints(container, contactBtn, moveHint) {
@@ -2028,10 +1581,10 @@ def test_inpainting_page():
 
                         contactBtn.innerHTML = '⊙ Legs ✓';
                         contactBtn.style.background = 'rgba(255,152,0,0.9)';
-                        moveHint.innerHTML = '✥ Drag object to move (legs on floor)';
+                        moveHint.innerHTML = '✥ Drag object to move';
                         moveHint.style.background = 'rgba(0,0,0,0.6)';
 
-                        // Calculate average Y of contact points as floor level
+                        // Calculate average Y of contact points
                         const avgY = objectContactPoints.reduce((sum, p) => sum + p.y, 0) / 4;
                         console.log('Contact points defined:', objectContactPoints);
                         console.log('Contact points average Y:', avgY);
@@ -2086,17 +1639,6 @@ def test_inpainting_page():
                 }
             });
             return lowestY;
-        }
-
-        function adjustModelToFloor() {
-            // Adjust model position so contact points touch the floor
-            if (objectContactPoints.length === 0 || floorPoints.length < 4 || !currentLoadedModel) return;
-
-            const lowestY = getLowestContactPointY();
-            if (lowestY !== null) {
-                const offset = lowestY - floorPlaneY;
-                currentLoadedModel.position.y -= offset;
-            }
         }
 
         function autoDetectContactPoints(model) {
@@ -2221,7 +1763,7 @@ def test_inpainting_page():
 
             console.log('Auto-detected contact points:', objectContactPoints.length, objectContactPoints);
 
-            // Level the model so all 4 contact points are at the same Y (floor level)
+            // Level the model so all 4 contact points are at the same Y (world Y=0)
             if (objectContactPoints.length >= 3) {
                 levelModelToFloor(model, objectContactPoints);
                 // Note: No perspective tilt with orthographic camera
@@ -2234,7 +1776,7 @@ def test_inpainting_page():
         }
 
         function levelModelToFloor(model, contactPoints) {
-            // Rotate model so contact plane is horizontal, then position at floor level
+            // Rotate model so contact plane is horizontal, then position at world Y=0
             if (contactPoints.length < 3) return;
 
             // Convert contact points to world coordinates
@@ -2269,14 +1811,11 @@ def test_inpainting_page():
             // Find the average Y after rotation (should all be nearly the same now)
             const avgY = newWorldPoints.reduce((sum, p) => sum + p.y, 0) / newWorldPoints.length;
 
-            // Determine target floor Y
-            const targetY = (floorPoints.length >= 4) ? floorPlaneY : 0;
-
-            // Move model so contact points are at floor level
-            model.position.y -= (avgY - targetY);
+            // Move model so contact points are at world Y=0
+            model.position.y -= avgY;
             model.updateMatrixWorld(true);
 
-            console.log('Model leveled to floor. Avg contact Y:', avgY, '-> Target Y:', targetY);
+            console.log('Model leveled to world Y=0. Avg contact Y:', avgY);
         }
 
         function showContactPointMarkers() {
@@ -2352,76 +1891,6 @@ def test_inpainting_page():
         let dragPlaneY = 0;
         let lastCursorHitPoint = null;  // Track cursor position for incremental movement
 
-        // Check if a point (x, z) is inside the floor polygon (using X-Z coordinates)
-        function isPointInFloorPolygon(x, z) {
-            if (floorWorldPoints.length < 4) return true; // No floor defined, allow all movement
-
-            // Ray casting algorithm for point-in-polygon test
-            let inside = false;
-            const points = floorWorldPoints;
-            for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-                const xi = points[i].x, zi = points[i].z;
-                const xj = points[j].x, zj = points[j].z;
-
-                if (((zi > z) !== (zj > z)) && (x < (xj - xi) * (z - zi) / (zj - zi) + xi)) {
-                    inside = !inside;
-                }
-            }
-            return inside;
-        }
-
-        // Check if all contact points would be inside floor after moving model
-        function wouldContactPointsBeInFloor(newPosX, newPosZ) {
-            if (floorWorldPoints.length < 4) return true; // No floor defined
-            if (objectContactPoints.length === 0) return true; // No contact points
-
-            // Temporarily move model to new position
-            const oldX = currentLoadedModel.position.x;
-            const oldZ = currentLoadedModel.position.z;
-            currentLoadedModel.position.x = newPosX;
-            currentLoadedModel.position.z = newPosZ;
-
-            // Check all contact points
-            let allInside = true;
-            for (const localPoint of objectContactPoints) {
-                const worldPoint = currentLoadedModel.localToWorld(localPoint.clone());
-                if (!isPointInFloorPolygon(worldPoint.x, worldPoint.z)) {
-                    allInside = false;
-                    break;
-                }
-            }
-
-            // Restore original position
-            currentLoadedModel.position.x = oldX;
-            currentLoadedModel.position.z = oldZ;
-
-            return allInside;
-        }
-
-        // Count how many contact points would be inside floor at given position
-        function countContactPointsInFloor(posX, posZ) {
-            if (floorWorldPoints.length < 4 || objectContactPoints.length === 0) return objectContactPoints.length;
-
-            const oldX = currentLoadedModel.position.x;
-            const oldZ = currentLoadedModel.position.z;
-            currentLoadedModel.position.x = posX;
-            currentLoadedModel.position.z = posZ;
-            currentLoadedModel.updateMatrixWorld(true);
-
-            let count = 0;
-            for (const localPoint of objectContactPoints) {
-                const worldPoint = currentLoadedModel.localToWorld(localPoint.clone());
-                if (isPointInFloorPolygon(worldPoint.x, worldPoint.z)) {
-                    count++;
-                }
-            }
-
-            currentLoadedModel.position.x = oldX;
-            currentLoadedModel.position.z = oldZ;
-            currentLoadedModel.updateMatrixWorld(true);
-            return count;
-        }
-
         // Update model scale to maintain constant apparent size when Z changes
         function updateScaleForConstantSize() {
             if (!currentLoadedModel || modelBaseScale === 0) return;
@@ -2438,61 +1907,32 @@ def test_inpainting_page():
             }
         }
 
-        // Check if movement is allowed - allow if it doesn't make things worse
+        // Get target position for movement (no constraints - free movement)
         function getValidPosition(startX, startZ, deltaX, deltaZ) {
-            if (floorWorldPoints.length < 4 || objectContactPoints.length === 0) {
-                return { x: startX + deltaX, z: startZ + deltaZ };
-            }
-
-            const targetX = startX + deltaX;
-            const targetZ = startZ + deltaZ;
-
-            // Count current points inside
-            const currentInside = countContactPointsInFloor(startX, startZ);
-
-            // Try full movement - allow if at least as many points inside
-            const fullMoveInside = countContactPointsInFloor(targetX, targetZ);
-            if (fullMoveInside >= currentInside) {
-                return { x: targetX, z: targetZ };
-            }
-
-            // Full movement blocked - try X only (slide along Z edge)
-            if (Math.abs(deltaX) > 0.001) {
-                const xOnlyInside = countContactPointsInFloor(targetX, startZ);
-                if (xOnlyInside >= currentInside) {
-                    return { x: targetX, z: startZ };
-                }
-            }
-
-            // Try Z only (slide along X edge)
-            if (Math.abs(deltaZ) > 0.001) {
-                const zOnlyInside = countContactPointsInFloor(startX, targetZ);
-                if (zOnlyInside >= currentInside) {
-                    return { x: startX, z: targetZ };
-                }
-            }
-
-            // No valid movement - stay in place
-            return { x: startX, z: startZ };
+            return { x: startX + deltaX, z: startZ + deltaZ };
         }
 
         function getPlaneIntersection(clientX, clientY, canvas, planeY) {
             const rect = canvas.getBoundingClientRect();
-            const mouse = new THREE.Vector2();
-            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
 
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(mouse, threeCamera);
+            // For orthographic camera looking along -Z axis:
+            // Screen X movement -> World X movement (left/right)
+            // Screen Y movement -> World Z movement (forward/backward for depth)
+            const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
+            const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
 
-            // Create horizontal plane at the specified Y height
-            const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY);
-            const intersection = new THREE.Vector3();
+            // Unproject to get world X position
+            const worldPos = new THREE.Vector3(ndcX, ndcY, 0);
+            worldPos.unproject(threeCamera);
 
-            if (raycaster.ray.intersectPlane(plane, intersection)) {
-                return intersection;
-            }
-            return null;
+            // For orthographic view from front:
+            // - worldPos.x is the correct X position
+            // - worldPos.y (screen Y) maps to world Z (depth) - invert for intuitive movement
+            // Scale factor based on camera frustum size
+            const frustumSize = 5;
+            const worldZ = -ndcY * (frustumSize / 2);
+
+            return new THREE.Vector3(worldPos.x, planeY, worldZ);
         }
 
         function setupModelDragEvents(container) {
@@ -2540,45 +1980,39 @@ def test_inpainting_page():
                         modelWasClicked = true;
                         canvas.style.cursor = 'move';
 
-                        // Store the exact 3D point where user clicked on the model
-                        dragStartHitPoint = intersects[0].point.clone();
-                        dragPlaneY = dragStartHitPoint.y;
+                        // Store starting screen position for drag tracking
+                        dragStartHitPoint = { clientX: e.clientX, clientY: e.clientY };
                         dragStartModelPosition = currentLoadedModel.position.clone();
-                        lastCursorHitPoint = dragStartHitPoint.clone();  // Initialize for incremental tracking
                     }
                 }
             });
 
             canvas.addEventListener('mousemove', (e) => {
-                if (isDraggingModel && currentLoadedModel && lastCursorHitPoint) {
-                    // Get intersection with plane at the same Y height as the original click
-                    const currentPoint = getPlaneIntersection(e.clientX, e.clientY, canvas, dragPlaneY);
+                if (isDraggingModel && currentLoadedModel && dragStartHitPoint && dragStartModelPosition) {
+                    // Calculate screen delta from drag start
+                    const screenDeltaX = e.clientX - dragStartHitPoint.clientX;
+                    const screenDeltaY = e.clientY - dragStartHitPoint.clientY;
 
-                    if (currentPoint) {
-                        // Calculate incremental movement from last cursor position
-                        const deltaX = currentPoint.x - lastCursorHitPoint.x;
-                        const deltaZ = currentPoint.z - lastCursorHitPoint.z;
+                    // Convert screen delta to world delta
+                    // For orthographic camera: screen movement maps directly to world X and Y
+                    const rect = canvas.getBoundingClientRect();
+                    const frustumSize = 5;
+                    const aspect = rect.width / rect.height;
 
-                        // Get valid position from current model position (incremental movement)
-                        const validPos = getValidPosition(
-                            currentLoadedModel.position.x,
-                            currentLoadedModel.position.z,
-                            deltaX,
-                            deltaZ
-                        );
+                    // Scale factors: how much world units per pixel
+                    const worldPerPixelX = (frustumSize * aspect) / rect.width;
+                    const worldPerPixelY = frustumSize / rect.height;
 
-                        // Move the model
-                        currentLoadedModel.position.x = validPos.x;
-                        currentLoadedModel.position.z = validPos.z;
-                        updateScaleForConstantSize();
-                        updateContactMarkerPositions();
+                    // Screen X -> World X, Screen Y -> World Y (up/down)
+                    const worldDeltaX = screenDeltaX * worldPerPixelX;
+                    const worldDeltaY = -screenDeltaY * worldPerPixelY;  // Negative because screen Y is inverted
 
-                        // Update camera to look at new model position at Y=0
-                        threeCamera.lookAt(currentLoadedModel.position.x, 0, currentLoadedModel.position.z);
+                    // Apply delta to original model position
+                    currentLoadedModel.position.x = dragStartModelPosition.x + worldDeltaX;
+                    currentLoadedModel.position.y = dragStartModelPosition.y + worldDeltaY;
 
-                        // Always update cursor tracking for next frame
-                        lastCursorHitPoint = currentPoint.clone();
-                    }
+                    updateScaleForConstantSize();
+                    updateContactMarkerPositions();
                 }
             });
 
@@ -2631,10 +2065,9 @@ def test_inpainting_page():
                         if (intersects.length > 0) {
                             isDraggingModel = true;
                             touchModelWasClicked = true;
-                            dragStartHitPoint = intersects[0].point.clone();
-                            dragPlaneY = dragStartHitPoint.y;
+                            // Store starting screen position for drag tracking
+                            dragStartHitPoint = { clientX: touch.clientX, clientY: touch.clientY };
                             dragStartModelPosition = currentLoadedModel.position.clone();
-                            lastCursorHitPoint = dragStartHitPoint.clone();
                             e.preventDefault();
                         }
                     }
@@ -2642,35 +2075,33 @@ def test_inpainting_page():
             }, { passive: false });
 
             canvas.addEventListener('touchmove', (e) => {
-                if (isDraggingModel && currentLoadedModel && lastCursorHitPoint && e.touches.length === 1) {
+                if (isDraggingModel && currentLoadedModel && dragStartHitPoint && dragStartModelPosition && e.touches.length === 1) {
                     const touch = e.touches[0];
-                    const currentPoint = getPlaneIntersection(touch.clientX, touch.clientY, canvas, dragPlaneY);
 
-                    if (currentPoint) {
-                        // Calculate incremental movement from last cursor position
-                        const deltaX = currentPoint.x - lastCursorHitPoint.x;
-                        const deltaZ = currentPoint.z - lastCursorHitPoint.z;
+                    // Calculate screen delta from drag start
+                    const screenDeltaX = touch.clientX - dragStartHitPoint.clientX;
+                    const screenDeltaY = touch.clientY - dragStartHitPoint.clientY;
 
-                        // Get valid position from current model position (incremental movement)
-                        const validPos = getValidPosition(
-                            currentLoadedModel.position.x,
-                            currentLoadedModel.position.z,
-                            deltaX,
-                            deltaZ
-                        );
+                    // Convert screen delta to world delta
+                    const rect = canvas.getBoundingClientRect();
+                    const frustumSize = 5;
+                    const aspect = rect.width / rect.height;
 
-                        // Move the model
-                        currentLoadedModel.position.x = validPos.x;
-                        currentLoadedModel.position.z = validPos.z;
-                        updateScaleForConstantSize();
-                        updateContactMarkerPositions();
+                    // Scale factors: how much world units per pixel
+                    const worldPerPixelX = (frustumSize * aspect) / rect.width;
+                    const worldPerPixelY = frustumSize / rect.height;
 
-                        // Update camera to look at new model position at Y=0
-                        threeCamera.lookAt(currentLoadedModel.position.x, 0, currentLoadedModel.position.z);
+                    // Screen X -> World X, Screen Y -> World Y (up/down)
+                    const worldDeltaX = screenDeltaX * worldPerPixelX;
+                    const worldDeltaY = -screenDeltaY * worldPerPixelY;
 
-                        // Always update cursor tracking for next frame
-                        lastCursorHitPoint = currentPoint.clone();
-                    }
+                    // Apply delta to original model position
+                    currentLoadedModel.position.x = dragStartModelPosition.x + worldDeltaX;
+                    currentLoadedModel.position.y = dragStartModelPosition.y + worldDeltaY;
+
+                    updateScaleForConstantSize();
+                    updateContactMarkerPositions();
+
                     e.preventDefault();
                 }
             }, { passive: false });
@@ -2776,23 +2207,18 @@ def test_inpainting_page():
                 // Apply max brightness by default
                 applyBrightnessToModel(modelBrightness);
 
-                // Apply floor and detect contact points after model is loaded
+                // Auto-detect contact points and set up camera after model is loaded
                 setTimeout(() => {
-                    // If floor is already defined (from background), apply it FIRST
-                    // This modifies the geometry, so contact detection must come AFTER
-                    if (floorPoints.length >= 4) {
-                        applyFloorToModel(model);
-                    }
-
-                    // THEN auto-detect contact points (chair legs)
-                    // This must happen after geometry modifications are done
+                    // Auto-detect contact points (chair legs)
                     const numPoints = autoDetectContactPoints(model);
                     if (numPoints >= 4) {
                         console.log('Auto-detected ' + numPoints + ' contact points');
                     }
 
-                    // Set camera at Y=0 (flat floor level) looking straight ahead
-                    cameraTilt = 0;
+                    // Apply default tilt (slight angle from above)
+                    applyModelRotation(model);
+
+                    // Set camera at Y=0 looking straight ahead
                     threeCamera.position.y = 0;
                     threeCamera.lookAt(0, 0, 0);
                     threeCamera.updateProjectionMatrix();
@@ -2804,49 +2230,6 @@ def test_inpainting_page():
                 document.getElementById('threejsViewer').innerHTML =
                     '<p style="color: #f5576c; padding: 2rem; text-align: center;">Error loading 3D model</p>';
             });
-        }
-
-        function applyFloorToModel(model) {
-            // Apply existing floor settings to a newly loaded model
-            if (!model || floorPoints.length < 4) return;
-
-            // Get the lowest point of the model (either contact points or bounding box)
-            let modelBottomY;
-            if (objectContactPoints.length >= 4) {
-                modelBottomY = getLowestContactPointY();
-            } else {
-                const box = new THREE.Box3().setFromObject(model);
-                modelBottomY = box.min.y;
-            }
-
-            // Move model so its bottom is at floor level
-            const offset = modelBottomY - floorPlaneY;
-            model.position.y -= offset;
-            console.log('Model placed on existing floor, offset:', offset);
-
-            // Center geometry on Y axis so rotation keeps all legs on floor
-            const boxForCenter = new THREE.Box3().setFromObject(model);
-            const center = boxForCenter.getCenter(new THREE.Vector3());
-
-            // Translate geometry so center X/Z is at origin
-            const offsetX = center.x - model.position.x;
-            const offsetZ = center.z - model.position.z;
-
-            model.traverse((child) => {
-                if (child.isMesh && child.geometry) {
-                    child.geometry.translate(-offsetX, 0, -offsetZ);
-                }
-            });
-
-            // Adjust position to compensate (keep visual position same)
-            model.position.x += offsetX;
-            model.position.z += offsetZ;
-
-            console.log('Geometry centered for Y rotation, offset X:', offsetX, 'Z:', offsetZ);
-
-            // Store reference Z and scale for constant apparent size during movement
-            modelReferenceZ = model.position.z;
-            modelBaseScale = model.scale.x;
         }
 
         function base64ToBlob(base64, mimeType) {
