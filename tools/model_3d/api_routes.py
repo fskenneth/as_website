@@ -500,6 +500,7 @@ def register_test_routes(rt):
             [
                 {
                     "model_url": "/static/models/xxx.glb",
+                    "instance_id": 0,
                     "position_x": 0.5,
                     ...
                 },
@@ -521,7 +522,57 @@ def register_test_routes(rt):
             print(f"Get all models error: {e}")
             return JSONResponse({'error': str(e)}, status_code=500)
 
-    print("Test API routes registered: /api/temp-image, /api/test-inpainting, /api/inpainting-history, /api/remove-background, /api/convert-to-3d, /api/model3d-history, /api/model-state, /api/models-for-background")
+    @rt('/api/save-all-models', methods=['POST'])
+    async def save_all_models_endpoint(request: Request):
+        """
+        Save all model instances for a background image.
+        Replaces all existing models with the new set.
+
+        Request body:
+            {
+                "background_image": "/static/images/areas/xxx.jpg",
+                "model_url": "/static/models/xxx.glb",
+                "models": [
+                    {
+                        "position_x": 0.5,
+                        "position_y": -0.3,
+                        "position_z": 0,
+                        "scale": 1.2,
+                        "rotation_y": 0.5,
+                        "tilt": 0.1745,
+                        "brightness": 2.5
+                    },
+                    ...
+                ],
+                "staging_id": 123  // optional
+            }
+
+        Returns:
+            {"success": true, "count": 2}
+        """
+        from tools.user_db import save_all_model_states
+
+        try:
+            data = await request.json()
+            background_image = data.get('background_image')
+            model_url = data.get('model_url')
+            models = data.get('models', [])
+
+            if not background_image or not model_url:
+                return JSONResponse({'success': False, 'error': 'background_image and model_url are required'}, status_code=400)
+
+            staging_id = data.get('staging_id')
+
+            result = save_all_model_states(background_image, model_url, models, staging_id)
+            return JSONResponse(result)
+
+        except Exception as e:
+            print(f"Save all models error: {e}")
+            import traceback
+            traceback.print_exc()
+            return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+
+    print("Test API routes registered: /api/temp-image, /api/test-inpainting, /api/inpainting-history, /api/remove-background, /api/convert-to-3d, /api/model3d-history, /api/model-state, /api/models-for-background, /api/save-all-models")
 
 
 # =========================================================================

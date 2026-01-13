@@ -952,7 +952,8 @@ def test_inpainting_page():
             });
         }
 
-        let currentLoadedModel = null;
+        let currentLoadedModel = null;  // Currently selected model for controls
+        let allLoadedModels = [];  // All models in the scene
         let isDraggingModel = false;
         let isDraggingRotate = false;
         let isDraggingScale = false;
@@ -986,58 +987,97 @@ def test_inpainting_page():
         let currentBackgroundImage = null;  // Track current background image URL
         let saveStateTimeout = null;  // Debounce timer for auto-save
 
-        // Debounced save function (500ms delay)
+        // Debounced save function for single model (500ms delay)
         function saveModelState() {
-            console.log('saveModelState called:', {
-                hasModel: !!currentLoadedModel,
+            // Now delegates to saveAllModelStates
+            saveAllModelStates();
+        }
+
+        // Save all model instances to the server
+        function saveAllModelStates() {
+            console.log('saveAllModelStates called with:', {
                 bgImage: currentBackgroundImage,
-                modelUrl: current3DModel?.model_url
+                modelUrl: current3DModel?.model_url,
+                numModels: allLoadedModels.length
             });
 
-            if (!currentLoadedModel) {
-                console.log('saveModelState: No loaded model');
-                return;
-            }
             if (!currentBackgroundImage) {
-                console.log('saveModelState: No background image');
+                console.log('saveAllModelStates: No background image');
                 return;
             }
             if (!current3DModel?.model_url) {
-                console.log('saveModelState: No model URL');
+                console.log('saveAllModelStates: No model URL');
+                return;
+            }
+            if (allLoadedModels.length === 0) {
+                console.log('saveAllModelStates: No models to save');
                 return;
             }
 
             if (saveStateTimeout) clearTimeout(saveStateTimeout);
             saveStateTimeout = setTimeout(() => {
-                const state = {
+                // Collect state from all models - each model has its own rotation stored in userData
+                const models = allLoadedModels.map(model => {
+                    // Get per-model rotation from userData, fallback to globals for current model
+                    const yRot = model.userData.yRotation !== undefined ? model.userData.yRotation :
+                                 (model === currentLoadedModel ? userYRotation : 0);
+                    const tilt = model.userData.tilt !== undefined ? model.userData.tilt :
+                                 (model === currentLoadedModel ? modelTilt : DEFAULT_TILT);
+                    return {
+                        position_x: model.position.x,
+                        position_y: model.position.y,
+                        position_z: model.position.z,
+                        scale: model.scale.x,
+                        rotation_y: yRot,
+                        tilt: tilt,
+                        brightness: modelBrightness
+                    };
+                });
+
+                const payload = {
                     background_image: currentBackgroundImage,
                     model_url: current3DModel.model_url,
-                    position_x: currentLoadedModel.position.x,
-                    position_y: currentLoadedModel.position.y,
-                    position_z: currentLoadedModel.position.z,
-                    scale: currentLoadedModel.scale.x,
-                    rotation_y: userYRotation,
-                    tilt: modelTilt,
-                    brightness: modelBrightness
+                    models: models
                 };
 
-                console.log('Saving model state:', state);
+                console.log('Saving all model states:', payload);
 
-                fetch('/api/model-state', {
+                fetch('/api/save-all-models', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(state)
+                    body: JSON.stringify(payload)
                 }).then(r => r.json()).then(result => {
                     if (result.success) {
-                        console.log('Model state saved successfully');
+                        console.log('All model states saved successfully, count:', result.count);
                     } else {
-                        console.error('Failed to save model state:', result.error);
+                        console.error('Failed to save model states:', result.error);
                     }
-                }).catch(err => console.error('Save state error:', err));
+                }).catch(err => console.error('Save all states error:', err));
             }, 500);
         }
 
-        // Load saved state for a model
+        // Load all saved models for a background
+        async function loadAllSavedModels(backgroundImage) {
+            console.log('loadAllSavedModels called with backgroundImage:', backgroundImage);
+            try {
+                const params = new URLSearchParams({
+                    background_image: backgroundImage
+                });
+                const response = await fetch(`/api/models-for-background?${params}`);
+                if (response.ok) {
+                    const models = await response.json();
+                    console.log('Loaded models from server:', models);
+                    if (Array.isArray(models) && models.length > 0) {
+                        return models;
+                    }
+                }
+            } catch (err) {
+                console.error('Load all models error:', err);
+            }
+            return null;
+        }
+
+        // Load saved state for a model (kept for backwards compatibility)
         async function loadSavedModelState(backgroundImage, modelUrl) {
             try {
                 const params = new URLSearchParams({
@@ -1203,25 +1243,42 @@ def test_inpainting_page():
             const brightnessCtrl = controlOverlay.querySelector('.brightness-control');
             const tiltCtrl = controlOverlay.querySelector('.tilt-control');
             const tiltResetCtrl = controlOverlay.querySelector('.tilt-reset-control');
+            const addModelCtrl = controlOverlay.querySelector('.add-model-control');
+            const removeModelCtrl = controlOverlay.querySelector('.remove-model-control');
 
+            // Use consistent offset from model edges for symmetry
+            const buttonOffset = 20;
+
+            // Top row buttons centered as a group: brightness, +, -
+            const topRowY = Math.max(pos.topY - buttonOffset, 10);
+            if (brightnessCtrl) {
+                brightnessCtrl.style.left = (pos.centerX - 45) + 'px';
+                brightnessCtrl.style.top = topRowY + 'px';
+            }
+            if (addModelCtrl) {
+                addModelCtrl.style.left = (pos.centerX + 10) + 'px';
+                addModelCtrl.style.top = topRowY + 'px';
+            }
+            if (removeModelCtrl) {
+                removeModelCtrl.style.left = (pos.centerX + 50) + 'px';
+                removeModelCtrl.style.top = topRowY + 'px';
+            }
+            // Bottom rotate button - closer to model
             if (rotateCtrl) {
                 rotateCtrl.style.left = pos.centerX + 'px';
-                rotateCtrl.style.top = Math.min(pos.bottomY + 15, viewerContainer.clientHeight - 50) + 'px';
+                rotateCtrl.style.top = Math.min(pos.bottomY - 35, viewerContainer.clientHeight - 50) + 'px';
             }
+            // Side buttons - closer to model
             if (scaleCtrl) {
-                scaleCtrl.style.left = Math.min(pos.rightX + 15, viewerContainer.clientWidth - 50) + 'px';
+                scaleCtrl.style.left = Math.min(pos.rightX + buttonOffset - 30, viewerContainer.clientWidth - 50) + 'px';
                 scaleCtrl.style.top = pos.centerY + 'px';
             }
-            if (brightnessCtrl) {
-                brightnessCtrl.style.left = pos.centerX + 'px';
-                brightnessCtrl.style.top = Math.max(pos.topY - 55, 10) + 'px';
-            }
             if (tiltCtrl) {
-                tiltCtrl.style.left = Math.max(pos.leftX - 55, 10) + 'px';
+                tiltCtrl.style.left = Math.max(pos.leftX - buttonOffset - 6, 10) + 'px';
                 tiltCtrl.style.top = pos.centerY + 'px';
             }
             if (tiltResetCtrl) {
-                tiltResetCtrl.style.left = Math.max(pos.leftX - 55, 10) + 'px';
+                tiltResetCtrl.style.left = Math.max(pos.leftX - buttonOffset - 6, 10) + 'px';
                 tiltResetCtrl.style.top = (pos.centerY + 45) + 'px';
             }
         }
@@ -1233,7 +1290,7 @@ def test_inpainting_page():
 
             const overlay = document.createElement('div');
             overlay.className = 'viewer-controls';
-            overlay.style.cssText = 'position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none;';
+            overlay.style.cssText = 'position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 100;';
             controlOverlay = overlay;
 
             // Rotate control (left-right arrows) - positioned under object (Y rotation)
@@ -1306,6 +1363,34 @@ def test_inpainting_page():
             `;
             tiltResetBtn.title = 'Reset tilt to default angle';
 
+            // Add another model button (+ icon) - positioned right of brightness
+            const addModelBtn = document.createElement('div');
+            addModelBtn.className = 'add-model-control';
+            addModelBtn.innerHTML = '+';
+            addModelBtn.style.cssText = `
+                position: absolute;
+                width: 36px; height: 36px; background: rgba(255,255,255,0.9); border-radius: 50%;
+                display: none; align-items: center; justify-content: center; font-size: 24px;
+                cursor: pointer; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                user-select: none; color: #000; font-weight: bold; z-index: 101;
+                transform: translate(-50%, 0);
+            `;
+            addModelBtn.title = 'Add another instance of this model';
+
+            // Remove model button (- icon) - positioned right of add button
+            const removeModelBtn = document.createElement('div');
+            removeModelBtn.className = 'remove-model-control';
+            removeModelBtn.innerHTML = '−';
+            removeModelBtn.style.cssText = `
+                position: absolute;
+                width: 36px; height: 36px; background: rgba(255,255,255,0.9); border-radius: 50%;
+                display: none; align-items: center; justify-content: center; font-size: 24px;
+                cursor: pointer; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                user-select: none; color: #000; font-weight: bold; z-index: 101;
+                transform: translate(-50%, 0);
+            `;
+            removeModelBtn.title = 'Remove current model';
+
             // Move hint in center
             const moveHint = document.createElement('div');
             moveHint.className = 'move-hint';
@@ -1321,6 +1406,8 @@ def test_inpainting_page():
             overlay.appendChild(brightnessControl);
             overlay.appendChild(tiltControl);
             overlay.appendChild(tiltResetBtn);
+            overlay.appendChild(addModelBtn);
+            overlay.appendChild(removeModelBtn);
             overlay.appendChild(moveHint);
             container.style.position = 'relative';
             container.appendChild(overlay);
@@ -1391,6 +1478,7 @@ def test_inpainting_page():
                 e.stopPropagation();
                 if (currentLoadedModel) {
                     modelTilt = DEFAULT_TILT;
+                    currentLoadedModel.userData.tilt = DEFAULT_TILT;  // Store per-model
                     applyModelRotation(currentLoadedModel);
                     updateContactMarkerPositions();
                     tiltResetBtn.style.background = 'rgba(200,100,255,0.9)';
@@ -1399,6 +1487,28 @@ def test_inpainting_page():
                     }, 150);
                     saveModelState();  // Save after tilt reset
                 }
+            });
+
+            // Add model button click event
+            addModelBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                addModelBtn.style.background = 'rgba(200,200,200,0.9)';
+                setTimeout(() => {
+                    addModelBtn.style.background = 'rgba(255,255,255,0.9)';
+                }, 150);
+                addAnotherModelInstance();
+            });
+
+            // Remove model button click event
+            removeModelBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                removeModelBtn.style.background = 'rgba(200,200,200,0.9)';
+                setTimeout(() => {
+                    removeModelBtn.style.background = 'rgba(255,255,255,0.9)';
+                }, 150);
+                removeCurrentModel();
             });
 
             // Global mouse events
@@ -1430,6 +1540,7 @@ def test_inpainting_page():
                     // Update model tilt angle (drag down = tilt forward to see from above)
                     // Range: 0 (original level) to 0.5 (max tilt ~29 degrees)
                     modelTilt = Math.max(0, Math.min(0.5, modelTilt + deltaY * 0.005));
+                    currentLoadedModel.userData.tilt = modelTilt;  // Store per-model
 
                     // Apply combined rotation (preserves Y rotation while adding tilt)
                     applyModelRotation(currentLoadedModel);
@@ -1504,6 +1615,7 @@ def test_inpainting_page():
                     // Update model tilt angle (drag down = tilt forward to see from above)
                     // Range: 0 (original level) to 0.5 (max tilt ~29 degrees)
                     modelTilt = Math.max(0, Math.min(0.5, modelTilt + deltaY * 0.005));
+                    currentLoadedModel.userData.tilt = modelTilt;  // Store per-model
 
                     // Apply combined rotation (preserves Y rotation while adding tilt)
                     applyModelRotation(currentLoadedModel);
@@ -1580,8 +1692,12 @@ def test_inpainting_page():
         }
 
         function rotateAroundFloor(model, angle) {
-            // Update tracked Y rotation
-            userYRotation += angle;
+            // Update per-model Y rotation stored in userData
+            if (model.userData.yRotation === undefined) {
+                model.userData.yRotation = userYRotation;  // Initialize from global
+            }
+            model.userData.yRotation += angle;
+            userYRotation = model.userData.yRotation;  // Sync global for current model
             applyModelRotation(model);
             updateContactMarkerPositions();
         }
@@ -1788,6 +1904,137 @@ def test_inpainting_page():
                 updateContactMarkerPositions();
                 updateControlPositions();
             }
+        }
+
+        const DEFAULT_Y_POSITION = -1.15;  // Default bottom center position
+        const MODEL_SPACING = 1.5;  // Horizontal spacing between models
+
+        function addAnotherModelInstance() {
+            if (!current3DModel?.model_url) {
+                console.log('No model URL to duplicate');
+                return;
+            }
+
+            const modelUrl = current3DModel.model_url;
+            const loader = new THREE.GLTFLoader();
+
+            loader.load(modelUrl, (gltf) => {
+                const newModel = gltf.scene;
+
+                // Copy scale from first model if exists
+                if (currentLoadedModel) {
+                    newModel.scale.copy(currentLoadedModel.scale);
+                }
+
+                // Determine placement position
+                let newX = 0;
+                const newY = DEFAULT_Y_POSITION;
+
+                if (allLoadedModels.length === 0) {
+                    // First model - place at center
+                    newX = 0;
+                } else {
+                    // Check if default position (center) is occupied
+                    const centerOccupied = allLoadedModels.some(m =>
+                        Math.abs(m.position.x) < 0.5 && Math.abs(m.position.y - DEFAULT_Y_POSITION) < 0.5
+                    );
+
+                    if (!centerOccupied) {
+                        // Place at default center position
+                        newX = 0;
+                    } else {
+                        // Find rightmost model and place new one beside it
+                        let maxX = -Infinity;
+                        allLoadedModels.forEach(m => {
+                            if (m.position.x > maxX) maxX = m.position.x;
+                        });
+                        newX = maxX + MODEL_SPACING;
+                    }
+                }
+
+                newModel.position.set(newX, newY, 0);
+
+                // Initialize per-model data in userData (start with defaults, not current model's rotation)
+                newModel.userData.yRotation = 0;
+                newModel.userData.tilt = DEFAULT_TILT;
+                // Assign new instance_id as max existing + 1
+                const maxInstanceId = allLoadedModels.reduce((max, m) =>
+                    Math.max(max, m.userData.instanceId || 0), -1);
+                newModel.userData.instanceId = maxInstanceId + 1;
+
+                // Add to scene and tracking array
+                threeScene.add(newModel);
+                allLoadedModels.push(newModel);
+
+                // Select the new model and set globals to its values
+                currentLoadedModel = newModel;
+                userYRotation = newModel.userData.yRotation;
+                modelTilt = newModel.userData.tilt;
+
+                // Apply rotation (tilt) using the same method as original model
+                applyModelRotation(newModel);
+
+                // Apply brightness using the same method as original model
+                applyBrightnessToModel(modelBrightness);
+
+                showControlButtons = true;
+                updateControlVisibility();
+                updateControlPositions();
+
+                // Save the new model state
+                saveAllModelStates();
+
+                console.log('Added new model instance at x=' + newX);
+            }, undefined, (error) => {
+                console.error('Error loading model for duplication:', error);
+            });
+        }
+
+        function removeCurrentModel() {
+            if (!currentLoadedModel) return;
+
+            // Find the index of the current model in allLoadedModels
+            const modelIndex = allLoadedModels.indexOf(currentLoadedModel);
+            if (modelIndex === -1) return;
+
+            // Remove from scene
+            threeScene.remove(currentLoadedModel);
+
+            // Remove from array
+            allLoadedModels.splice(modelIndex, 1);
+
+            // Clear contact markers
+            clearContactMarkers();
+            objectContactPoints = [];
+
+            // Hide buttons after deletion (don't auto-select another model)
+            currentLoadedModel = null;
+            showControlButtons = false;
+            updateControlVisibility();
+
+            // Save the updated state
+            saveAllModelStates();
+
+            console.log('Removed model. Remaining models:', allLoadedModels.length);
+        }
+
+        function updateControlVisibility() {
+            if (!controlOverlay) return;
+            const display = showControlButtons ? 'flex' : 'none';
+            const rotateCtrl = controlOverlay.querySelector('.rotate-control');
+            const scaleCtrl = controlOverlay.querySelector('.scale-control');
+            const brightnessCtrl = controlOverlay.querySelector('.brightness-control');
+            const tiltCtrl = controlOverlay.querySelector('.tilt-control');
+            const tiltResetCtrl = controlOverlay.querySelector('.tilt-reset-control');
+            const addModelCtrl = controlOverlay.querySelector('.add-model-control');
+            const removeModelCtrl = controlOverlay.querySelector('.remove-model-control');
+            if (rotateCtrl) rotateCtrl.style.display = display;
+            if (scaleCtrl) scaleCtrl.style.display = display;
+            if (brightnessCtrl) brightnessCtrl.style.display = display;
+            if (tiltCtrl) tiltCtrl.style.display = display;
+            if (tiltResetCtrl) tiltResetCtrl.style.display = display;
+            if (addModelCtrl) addModelCtrl.style.display = display;
+            if (removeModelCtrl) removeModelCtrl.style.display = display;
         }
 
         function getLowestContactPointY() {
@@ -2115,6 +2362,8 @@ def test_inpainting_page():
                 const brightnessCtrl = controlOverlay?.querySelector('.brightness-control');
                 const tiltCtrl = controlOverlay?.querySelector('.tilt-control');
                 const tiltResetCtrl = controlOverlay?.querySelector('.tilt-reset-control');
+                const addModelCtrl = controlOverlay?.querySelector('.add-model-control');
+                const removeModelCtrl = controlOverlay?.querySelector('.remove-model-control');
                 // Completely hide all buttons when toggled off
                 const display = showControlButtons ? 'flex' : 'none';
                 if (rotateCtrl) rotateCtrl.style.display = display;
@@ -2122,6 +2371,8 @@ def test_inpainting_page():
                 if (brightnessCtrl) brightnessCtrl.style.display = display;
                 if (tiltCtrl) tiltCtrl.style.display = display;
                 if (tiltResetCtrl) tiltResetCtrl.style.display = display;
+                if (addModelCtrl) addModelCtrl.style.display = display;
+                if (removeModelCtrl) removeModelCtrl.style.display = display;
                 // Also toggle leg points visibility with controls
                 contactMarkers.forEach(m => m.style.display = showControlButtons ? 'flex' : 'none');
             }
@@ -2138,18 +2389,35 @@ def test_inpainting_page():
 
                 raycaster.setFromCamera(mouse, threeCamera);
 
-                if (currentLoadedModel) {
-                    const intersects = raycaster.intersectObject(currentLoadedModel, true);
-                    if (intersects.length > 0) {
-                        isDraggingModel = true;
-                        modelWasClicked = true;
-                        canvas.style.cursor = 'move';
+                // Check all models for intersection and select the clicked one
+                let clickedModel = null;
+                let closestIntersect = null;
 
-                        // Store the world position where user clicked (for click-point tracking)
-                        const clickWorldPos = screenToWorld(e.clientX, e.clientY);
-                        dragStartHitPoint = clickWorldPos;  // World position of click
-                        dragStartModelPosition = currentLoadedModel.position.clone();
+                for (const model of allLoadedModels) {
+                    const intersects = raycaster.intersectObject(model, true);
+                    if (intersects.length > 0) {
+                        if (!closestIntersect || intersects[0].distance < closestIntersect.distance) {
+                            closestIntersect = intersects[0];
+                            clickedModel = model;
+                        }
                     }
+                }
+
+                if (clickedModel) {
+                    // Switch to the clicked model
+                    currentLoadedModel = clickedModel;
+                    // Load per-model rotation from userData
+                    userYRotation = clickedModel.userData.yRotation !== undefined ? clickedModel.userData.yRotation : 0;
+                    modelTilt = clickedModel.userData.tilt !== undefined ? clickedModel.userData.tilt : DEFAULT_TILT;
+
+                    isDraggingModel = true;
+                    modelWasClicked = true;
+                    canvas.style.cursor = 'move';
+
+                    // Store the world position where user clicked (for click-point tracking)
+                    const clickWorldPos = screenToWorld(e.clientX, e.clientY);
+                    dragStartHitPoint = clickWorldPos;  // World position of click
+                    dragStartModelPosition = currentLoadedModel.position.clone();
                 }
             });
 
@@ -2180,11 +2448,15 @@ def test_inpainting_page():
                     const distance = Math.sqrt(dx * dx + dy * dy);
                     // If movement is less than 5 pixels, treat as click
                     if (distance < 5) {
-                        if (showControlButtons) {
-                            // Buttons are showing - hide them on any click (object or background)
-                            toggleControlButtons();
-                        } else if (modelWasClicked) {
-                            // Buttons are hidden - show them only when clicking on model
+                        if (modelWasClicked) {
+                            // Clicked on a model - show buttons (or keep showing if already visible)
+                            if (!showControlButtons) {
+                                toggleControlButtons();
+                            }
+                            // Update control positions for the newly selected model
+                            updateControlPositions();
+                        } else if (showControlButtons) {
+                            // Clicked on background while buttons showing - hide them
                             toggleControlButtons();
                         }
                     }
@@ -2226,17 +2498,34 @@ def test_inpainting_page():
 
                     raycaster.setFromCamera(mouse, threeCamera);
 
-                    if (currentLoadedModel) {
-                        const intersects = raycaster.intersectObject(currentLoadedModel, true);
+                    // Check all models for intersection and select the touched one
+                    let touchedModel = null;
+                    let closestIntersect = null;
+
+                    for (const model of allLoadedModels) {
+                        const intersects = raycaster.intersectObject(model, true);
                         if (intersects.length > 0) {
-                            isDraggingModel = true;
-                            touchModelWasClicked = true;
-                            // Store the world position where user touched (for touch-point tracking)
-                            const touchWorldPos = screenToWorld(touch.clientX, touch.clientY);
-                            dragStartHitPoint = touchWorldPos;  // World position of touch
-                            dragStartModelPosition = currentLoadedModel.position.clone();
-                            e.preventDefault();
+                            if (!closestIntersect || intersects[0].distance < closestIntersect.distance) {
+                                closestIntersect = intersects[0];
+                                touchedModel = model;
+                            }
                         }
+                    }
+
+                    if (touchedModel) {
+                        // Switch to the touched model
+                        currentLoadedModel = touchedModel;
+                        // Load per-model rotation from userData
+                        userYRotation = touchedModel.userData.yRotation !== undefined ? touchedModel.userData.yRotation : 0;
+                        modelTilt = touchedModel.userData.tilt !== undefined ? touchedModel.userData.tilt : DEFAULT_TILT;
+
+                        isDraggingModel = true;
+                        touchModelWasClicked = true;
+                        // Store the world position where user touched (for touch-point tracking)
+                        const touchWorldPos = screenToWorld(touch.clientX, touch.clientY);
+                        dragStartHitPoint = touchWorldPos;  // World position of touch
+                        dragStartModelPosition = currentLoadedModel.position.clone();
+                        e.preventDefault();
                     }
                 }
             }, { passive: false });
@@ -2273,11 +2562,15 @@ def test_inpainting_page():
                     const distance = Math.sqrt(dx * dx + dy * dy);
                     // If movement is less than 10 pixels, treat as tap
                     if (distance < 10) {
-                        if (showControlButtons) {
-                            // Buttons are showing - hide them on any tap (object or background)
-                            toggleControlButtons();
-                        } else if (touchModelWasClicked) {
-                            // Buttons are hidden - show them only when tapping on model
+                        if (touchModelWasClicked) {
+                            // Tapped on a model - show buttons (or keep showing if already visible)
+                            if (!showControlButtons) {
+                                toggleControlButtons();
+                            }
+                            // Update control positions for the newly selected model
+                            updateControlPositions();
+                        } else if (showControlButtons) {
+                            // Tapped on background while buttons showing - hide them
                             toggleControlButtons();
                         }
                     }
@@ -2332,7 +2625,9 @@ def test_inpainting_page():
         function loadGLTFModel(url) {
             const loader = new THREE.GLTFLoader();
             loader.load(url, (gltf) => {
-                // Remove existing model
+                // Remove all existing models
+                allLoadedModels.forEach(m => threeScene.remove(m));
+                allLoadedModels = [];
                 if (currentLoadedModel) {
                     threeScene.remove(currentLoadedModel);
                 }
@@ -2372,7 +2667,14 @@ def test_inpainting_page():
 
                 // Store reference for drag controls
                 currentLoadedModel = model;
+                model.visible = false;  // Hide until saved state is loaded
                 threeScene.add(model);
+                allLoadedModels.push(model);  // Track in models array
+
+                // Initialize per-model data in userData (will be overwritten if saved state exists)
+                model.userData.yRotation = 0;
+                model.userData.tilt = DEFAULT_TILT;
+                model.userData.instanceId = 0;
 
                 // Apply max brightness by default
                 applyBrightnessToModel(modelBrightness);
@@ -2385,32 +2687,96 @@ def test_inpainting_page():
                         console.log('Auto-detected ' + numPoints + ' contact points');
                     }
 
-                    // Try to load saved state for this model
+                    // Try to load all saved model instances
                     const modelUrl = current3DModel?.url || current3DModel?.model_url;
-                    if (currentBackgroundImage && modelUrl) {
-                        const savedState = await loadSavedModelState(currentBackgroundImage, modelUrl);
-                        if (savedState) {
-                            console.log('Restoring saved model state:', savedState);
-                            // Apply saved position
-                            model.position.set(
-                                savedState.position_x || 0,
-                                savedState.position_y || 0,
-                                savedState.position_z || 0
-                            );
-                            // Apply saved scale
-                            if (savedState.scale) {
-                                model.scale.setScalar(savedState.scale);
-                                modelBaseScale = savedState.scale;
-                            }
-                            // Apply saved rotation and tilt
-                            userYRotation = savedState.rotation_y || 0;
-                            modelTilt = savedState.tilt !== undefined ? savedState.tilt : DEFAULT_TILT;
-                            modelBrightness = savedState.brightness !== undefined ? savedState.brightness : 2.5;
+                    if (currentBackgroundImage) {
+                        const allSavedModels = await loadAllSavedModels(currentBackgroundImage);
+                        // Filter to only include models matching the current model_url
+                        const savedModels = allSavedModels ? allSavedModels.filter(m => m.model_url === modelUrl) : [];
+                        if (savedModels && savedModels.length > 0) {
+                            console.log('Restoring ' + savedModels.length + ' saved instances of ' + modelUrl);
 
-                            // Apply the rotation
+                            // Apply first saved state to the initial model
+                            const firstState = savedModels[0];
+                            model.position.set(
+                                firstState.position_x || 0,
+                                firstState.position_y || 0,
+                                firstState.position_z || 0
+                            );
+                            if (firstState.scale) {
+                                model.scale.setScalar(firstState.scale);
+                                modelBaseScale = firstState.scale;
+                            }
+                            userYRotation = firstState.rotation_y || 0;
+                            modelTilt = firstState.tilt !== undefined ? firstState.tilt : DEFAULT_TILT;
+                            // Store per-model data in userData
+                            model.userData.yRotation = userYRotation;
+                            model.userData.tilt = modelTilt;
+                            model.userData.instanceId = firstState.instance_id || 0;
+                            modelBrightness = firstState.brightness !== undefined ? firstState.brightness : 2.5;
                             applyModelRotation(model);
-                            // Apply brightness
                             applyBrightnessToModel(modelBrightness);
+
+                            // Load additional model instances if any
+                            if (savedModels.length > 1 && modelUrl) {
+                                const loader = new THREE.GLTFLoader();
+                                for (let i = 1; i < savedModels.length; i++) {
+                                    const savedState = savedModels[i];
+                                    // Load another copy of the model
+                                    loader.load(modelUrl, (gltf) => {
+                                        const additionalModel = gltf.scene;
+
+                                        // Apply saved state
+                                        additionalModel.position.set(
+                                            savedState.position_x || 0,
+                                            savedState.position_y || 0,
+                                            savedState.position_z || 0
+                                        );
+                                        if (savedState.scale) {
+                                            additionalModel.scale.setScalar(savedState.scale);
+                                        }
+
+                                        // Store per-model data in userData
+                                        const savedYRot = savedState.rotation_y || 0;
+                                        const savedTilt = savedState.tilt !== undefined ? savedState.tilt : DEFAULT_TILT;
+                                        const savedInstanceId = savedState.instance_id || 0;
+                                        additionalModel.userData.yRotation = savedYRot;
+                                        additionalModel.userData.tilt = savedTilt;
+                                        additionalModel.userData.instanceId = savedInstanceId;
+
+                                        // Add to scene
+                                        threeScene.add(additionalModel);
+
+                                        // Insert in correct position based on instance_id to maintain order
+                                        let insertIndex = allLoadedModels.length;
+                                        for (let j = 0; j < allLoadedModels.length; j++) {
+                                            const existingId = allLoadedModels[j].userData.instanceId || 0;
+                                            if (savedInstanceId < existingId) {
+                                                insertIndex = j;
+                                                break;
+                                            }
+                                        }
+                                        allLoadedModels.splice(insertIndex, 0, additionalModel);
+
+                                        // Apply this model's saved rotation
+                                        // Temporarily set globals for applyModelRotation
+                                        const prevModel = currentLoadedModel;
+                                        const prevYRot = userYRotation;
+                                        const prevTilt = modelTilt;
+                                        currentLoadedModel = additionalModel;
+                                        userYRotation = savedYRot;
+                                        modelTilt = savedTilt;
+                                        applyModelRotation(additionalModel);
+                                        applyBrightnessToModel(modelBrightness);
+                                        // Restore globals
+                                        currentLoadedModel = prevModel;
+                                        userYRotation = prevYRot;
+                                        modelTilt = prevTilt;
+
+                                        console.log('Loaded additional model instance ' + i + ' with rotation:', savedYRot, savedTilt);
+                                    });
+                                }
+                            }
                         } else {
                             // No saved state, apply default tilt
                             applyModelRotation(model);
@@ -2428,6 +2794,10 @@ def test_inpainting_page():
                     threeCamera.position.y = 0;
                     threeCamera.lookAt(0, 0, 0);
                     threeCamera.updateProjectionMatrix();
+
+                    // Show model now that position is set
+                    model.visible = true;
+
                     updateContactMarkerPositions();
                     updateControlPositions();
                 }, 100);

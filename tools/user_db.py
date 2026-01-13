@@ -98,12 +98,14 @@ def init_db():
         pass  # Column already exists
 
     # Design models table - stores 3D model placement state for staging designs
+    # Supports multiple instances of same model via instance_id
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS design_models (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             staging_id INTEGER,
             background_image TEXT NOT NULL,
             model_url TEXT NOT NULL,
+            instance_id INTEGER DEFAULT 0,
             position_x REAL DEFAULT 0,
             position_y REAL DEFAULT 0,
             position_z REAL DEFAULT 0,
@@ -114,9 +116,19 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (staging_id) REFERENCES stagings (id),
-            UNIQUE(background_image, model_url)
+            UNIQUE(background_image, model_url, instance_id)
         )
     ''')
+
+    # Migration: Add instance_id column if it doesn't exist (for existing databases)
+    try:
+        cursor.execute('ALTER TABLE design_models ADD COLUMN instance_id INTEGER DEFAULT 0')
+    except:
+        pass  # Column already exists
+
+    # Drop old unique constraint and add new one with instance_id
+    # SQLite doesn't support DROP CONSTRAINT, so we need to recreate the table
+    # For now, just ensure the new table structure is used for new installations
 
     # Create indexes for faster lookups
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)')
@@ -670,10 +682,10 @@ def update_staging_status(staging_id: int, status: str,
 
 # ============== Design Model State Functions ==============
 
-def save_model_state(background_image: str, model_url: str, state: dict, staging_id: int = None) -> dict:
+def save_model_state(background_image: str, model_url: str, state: dict, staging_id: int = None, instance_id: int = 0) -> dict:
     """
     Save or update a 3D model's placement state.
-    Uses INSERT OR REPLACE to upsert based on background_image + model_url unique constraint.
+    Uses INSERT OR REPLACE to upsert based on background_image + model_url + instance_id unique constraint.
     """
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -681,12 +693,12 @@ def save_model_state(background_image: str, model_url: str, state: dict, staging
     try:
         cursor.execute('''
             INSERT INTO design_models (
-                staging_id, background_image, model_url,
+                staging_id, background_image, model_url, instance_id,
                 position_x, position_y, position_z,
                 scale, rotation_y, tilt, brightness,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(background_image, model_url) DO UPDATE SET
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(background_image, model_url, instance_id) DO UPDATE SET
                 staging_id = excluded.staging_id,
                 position_x = excluded.position_x,
                 position_y = excluded.position_y,
@@ -700,6 +712,7 @@ def save_model_state(background_image: str, model_url: str, state: dict, staging
             staging_id,
             background_image,
             model_url,
+            instance_id,
             state.get('position_x', 0),
             state.get('position_y', 0),
             state.get('position_z', 0),
@@ -712,6 +725,53 @@ def save_model_state(background_image: str, model_url: str, state: dict, staging
 
         conn.commit()
         return {'success': True, 'id': cursor.lastrowid}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        conn.close()
+
+
+def save_all_model_states(background_image: str, model_url: str, models: list, staging_id: int = None) -> dict:
+    """
+    Save all model instances for a background image.
+    Deletes existing models first, then saves all current models.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # Delete existing models for this background/model_url combination
+        cursor.execute('''
+            DELETE FROM design_models
+            WHERE background_image = ? AND model_url = ?
+        ''', (background_image, model_url))
+
+        # Insert all models with their instance_id
+        for idx, model_state in enumerate(models):
+            cursor.execute('''
+                INSERT INTO design_models (
+                    staging_id, background_image, model_url, instance_id,
+                    position_x, position_y, position_z,
+                    scale, rotation_y, tilt, brightness,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                staging_id,
+                background_image,
+                model_url,
+                idx,
+                model_state.get('position_x', 0),
+                model_state.get('position_y', 0),
+                model_state.get('position_z', 0),
+                model_state.get('scale', 1),
+                model_state.get('rotation_y', 0),
+                model_state.get('tilt', 0.1745),
+                model_state.get('brightness', 2.5),
+                datetime.now()
+            ))
+
+        conn.commit()
+        return {'success': True, 'count': len(models)}
     except Exception as e:
         return {'success': False, 'error': str(e)}
     finally:
@@ -738,14 +798,15 @@ def get_model_state(background_image: str, model_url: str) -> dict:
 
 
 def get_all_models_for_background(background_image: str) -> list:
-    """Get all saved models for a specific background image."""
+    """Get all saved models for a specific background image, ordered by instance_id."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute('''
-        SELECT model_url, position_x, position_y, position_z, scale, rotation_y, tilt, brightness
+        SELECT model_url, instance_id, position_x, position_y, position_z, scale, rotation_y, tilt, brightness
         FROM design_models
         WHERE background_image = ?
+        ORDER BY model_url, instance_id
     ''', (background_image,))
 
     rows = cursor.fetchall()
