@@ -3052,418 +3052,6 @@ def test_inpainting_page():
             return new Blob([byteArray], { type: mimeType });
         }
 
-        function download3DModel(format) {
-            if (!current3DModel) {
-                showError('No 3D model available');
-                return;
-            }
-            // Download the GLB file
-            if (current3DModel.model_url) {
-                const a = document.createElement('a');
-                a.href = current3DModel.model_url;
-                a.download = 'model.' + (format || 'glb');
-                a.click();
-            } else {
-                alert('Download not available for this model');
-            }
-        }
-
-        // =====================================================
-        // MESH EDITOR FUNCTIONS
-        // =====================================================
-        let editMode = false;
-        let selectedMesh = null;
-        let transformControls = null;
-        let currentTransformMode = 'translate';
-        let originalMaterials = new Map();  // Store original materials for restore
-        let meshList = [];  // All meshes in the scene
-
-        function toggleEditMode() {
-            editMode = !editMode;
-            const editorControls = document.getElementById('meshEditorControls');
-            const editBtn = document.getElementById('editModeBtn');
-
-            if (editMode) {
-                editorControls.classList.remove('hidden');
-                editBtn.textContent = '❌ Exit Edit Mode';
-                editBtn.style.background = '#dc2626';
-
-                // Initialize transform controls if not exists
-                if (!transformControls && threeScene && threeCamera) {
-                    transformControls = new THREE.TransformControls(threeCamera, threeRenderer.domElement);
-                    transformControls.addEventListener('dragging-changed', (event) => {
-                        if (orbitControls) orbitControls.enabled = !event.value;
-                    });
-                    threeScene.add(transformControls);
-                }
-
-                // Populate mesh list
-                updateMeshList();
-
-                // Add click handler for mesh selection
-                document.getElementById('threejsViewer').addEventListener('click', onEditorClick);
-            } else {
-                editorControls.classList.add('hidden');
-                editBtn.textContent = '✏️ Edit Model';
-                editBtn.style.background = '';
-
-                // Deselect and hide transform controls
-                if (selectedMesh) {
-                    deselectMesh();
-                }
-                if (transformControls) {
-                    transformControls.detach();
-                }
-
-                // Remove click handler
-                document.getElementById('threejsViewer').removeEventListener('click', onEditorClick);
-            }
-        }
-
-        function onEditorClick(event) {
-            if (!editMode || !threeScene || !threeCamera) return;
-
-            const container = document.getElementById('threejsViewer');
-            const rect = container.getBoundingClientRect();
-            const mouse = new THREE.Vector2();
-            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(mouse, threeCamera);
-
-            // Get all meshes
-            const meshes = [];
-            threeScene.traverse((child) => {
-                if (child.isMesh && child.visible) {
-                    meshes.push(child);
-                }
-            });
-
-            const intersects = raycaster.intersectObjects(meshes, false);
-
-            if (intersects.length > 0) {
-                selectMesh(intersects[0].object);
-            }
-        }
-
-        function selectMesh(mesh) {
-            // Deselect previous
-            if (selectedMesh) {
-                deselectMesh();
-            }
-
-            selectedMesh = mesh;
-
-            // Store original material and apply highlight
-            if (!originalMaterials.has(mesh.uuid)) {
-                originalMaterials.set(mesh.uuid, mesh.material.clone());
-            }
-
-            // Create highlight material
-            const highlightMaterial = mesh.material.clone();
-            highlightMaterial.emissive = new THREE.Color(0xff6600);
-            highlightMaterial.emissiveIntensity = 0.3;
-            mesh.material = highlightMaterial;
-
-            // Attach transform controls
-            if (transformControls) {
-                transformControls.attach(mesh);
-                transformControls.setMode(currentTransformMode);
-            }
-
-            // Update UI
-            document.getElementById('deleteBtn').disabled = false;
-            document.getElementById('duplicateBtn').disabled = false;
-
-            // Update mesh list selection
-            updateMeshListSelection();
-
-            console.log('Selected mesh:', mesh.name || mesh.uuid);
-        }
-
-        function deselectMesh() {
-            if (!selectedMesh) return;
-
-            // Restore original material
-            if (originalMaterials.has(selectedMesh.uuid)) {
-                selectedMesh.material = originalMaterials.get(selectedMesh.uuid);
-            }
-
-            selectedMesh = null;
-
-            // Update UI
-            document.getElementById('deleteBtn').disabled = true;
-            document.getElementById('duplicateBtn').disabled = true;
-
-            // Update mesh list selection
-            updateMeshListSelection();
-        }
-
-        function setTransformMode(mode) {
-            currentTransformMode = mode;
-            if (transformControls) {
-                transformControls.setMode(mode);
-            }
-
-            // Update button styles
-            ['translateBtn', 'rotateBtn', 'scaleBtn'].forEach(id => {
-                document.getElementById(id).style.background = '';
-                document.getElementById(id).style.color = '';
-            });
-
-            const activeBtn = document.getElementById(mode === 'translate' ? 'translateBtn' :
-                                                       mode === 'rotate' ? 'rotateBtn' : 'scaleBtn');
-            activeBtn.style.background = '#6366f1';
-            activeBtn.style.color = 'white';
-        }
-
-        function deleteSelectedMesh() {
-            if (!selectedMesh) return;
-
-            const meshName = selectedMesh.name || 'Unnamed mesh';
-            if (!confirm(`Delete "${meshName}"?`)) return;
-
-            // Remove from scene
-            if (transformControls) {
-                transformControls.detach();
-            }
-
-            selectedMesh.parent.remove(selectedMesh);
-            selectedMesh.geometry.dispose();
-            if (selectedMesh.material) {
-                if (Array.isArray(selectedMesh.material)) {
-                    selectedMesh.material.forEach(m => m.dispose());
-                } else {
-                    selectedMesh.material.dispose();
-                }
-            }
-
-            originalMaterials.delete(selectedMesh.uuid);
-            selectedMesh = null;
-
-            // Update UI
-            document.getElementById('deleteBtn').disabled = true;
-            document.getElementById('duplicateBtn').disabled = true;
-            updateMeshList();
-
-            console.log('Deleted mesh:', meshName);
-        }
-
-        function duplicateSelectedMesh() {
-            if (!selectedMesh) return;
-
-            const clone = selectedMesh.clone();
-            clone.position.x += 0.5;  // Offset slightly
-            clone.name = (selectedMesh.name || 'mesh') + '_copy';
-
-            // Clone materials
-            if (clone.material) {
-                if (Array.isArray(clone.material)) {
-                    clone.material = clone.material.map(m => m.clone());
-                } else {
-                    clone.material = clone.material.clone();
-                }
-            }
-
-            selectedMesh.parent.add(clone);
-            updateMeshList();
-
-            // Select the new clone
-            selectMesh(clone);
-
-            console.log('Duplicated mesh:', clone.name);
-        }
-
-        function mergeAllMeshes() {
-            if (!confirm('Merge all visible meshes into one? This cannot be undone.')) return;
-
-            const meshes = [];
-            threeScene.traverse((child) => {
-                if (child.isMesh && child.visible) {
-                    meshes.push(child);
-                }
-            });
-
-            if (meshes.length < 2) {
-                alert('Need at least 2 meshes to merge');
-                return;
-            }
-
-            // Use BufferGeometryUtils to merge
-            const geometries = meshes.map(mesh => {
-                const geo = mesh.geometry.clone();
-                geo.applyMatrix4(mesh.matrixWorld);
-                return geo;
-            });
-
-            try {
-                const mergedGeometry = THREE.BufferGeometryUtils.mergeGeometries(geometries, false);
-                const mergedMesh = new THREE.Mesh(mergedGeometry, meshes[0].material.clone());
-                mergedMesh.name = 'merged_mesh';
-
-                // Remove old meshes
-                meshes.forEach(mesh => {
-                    mesh.parent.remove(mesh);
-                    mesh.geometry.dispose();
-                });
-
-                // Add merged mesh
-                threeScene.add(mergedMesh);
-                updateMeshList();
-
-                console.log('Merged', meshes.length, 'meshes');
-            } catch (e) {
-                alert('Merge failed: ' + e.message);
-                console.error('Merge error:', e);
-            }
-        }
-
-        function applyColorToSelected() {
-            if (!selectedMesh) {
-                alert('Select a mesh first');
-                return;
-            }
-
-            const color = document.getElementById('meshColorPicker').value;
-            const threeColor = new THREE.Color(color);
-
-            if (selectedMesh.material) {
-                if (Array.isArray(selectedMesh.material)) {
-                    selectedMesh.material.forEach(m => {
-                        if (m.color) m.color.set(threeColor);
-                    });
-                } else {
-                    if (selectedMesh.material.color) {
-                        selectedMesh.material.color.set(threeColor);
-                    }
-                }
-            }
-
-            // Update stored original material too
-            if (originalMaterials.has(selectedMesh.uuid)) {
-                const origMat = originalMaterials.get(selectedMesh.uuid);
-                if (origMat.color) origMat.color.set(threeColor);
-            }
-
-            console.log('Applied color', color, 'to', selectedMesh.name || selectedMesh.uuid);
-        }
-
-        function changeMeshColor(color) {
-            // Just update the picker, actual application is via button
-        }
-
-        function updateMeshList() {
-            meshList = [];
-            const listContainer = document.getElementById('meshPartsList');
-            listContainer.innerHTML = '';
-
-            if (!threeScene) return;
-
-            threeScene.traverse((child) => {
-                if (child.isMesh) {
-                    meshList.push(child);
-
-                    const item = document.createElement('div');
-                    item.className = 'mesh-part-item';
-                    item.dataset.uuid = child.uuid;
-
-                    const name = child.name || `Mesh_${meshList.length}`;
-                    item.innerHTML = `
-                        <span class="part-name" title="${name}">${name}</span>
-                        <span class="part-actions">
-                            <button onclick="event.stopPropagation(); toggleMeshVisibility('${child.uuid}')" title="Toggle visibility">
-                                ${child.visible ? '👁️' : '👁️‍🗨️'}
-                            </button>
-                            <button onclick="event.stopPropagation(); selectMeshByUuid('${child.uuid}')" title="Select">✓</button>
-                        </span>
-                    `;
-
-                    item.onclick = () => selectMeshByUuid(child.uuid);
-                    listContainer.appendChild(item);
-                }
-            });
-        }
-
-        function updateMeshListSelection() {
-            document.querySelectorAll('.mesh-part-item').forEach(item => {
-                if (selectedMesh && item.dataset.uuid === selectedMesh.uuid) {
-                    item.classList.add('selected');
-                } else {
-                    item.classList.remove('selected');
-                }
-            });
-        }
-
-        function selectMeshByUuid(uuid) {
-            const mesh = meshList.find(m => m.uuid === uuid);
-            if (mesh) {
-                selectMesh(mesh);
-            }
-        }
-
-        function toggleMeshVisibility(uuid) {
-            const mesh = meshList.find(m => m.uuid === uuid);
-            if (mesh) {
-                mesh.visible = !mesh.visible;
-                updateMeshList();
-            }
-        }
-
-        async function exportModifiedGLB() {
-            if (!threeScene) {
-                alert('No scene to export');
-                return;
-            }
-
-            // Deselect to restore materials
-            if (selectedMesh) {
-                deselectMesh();
-            }
-
-            try {
-                const exporter = new THREE.GLTFExporter();
-
-                // Find the model group to export
-                let modelToExport = null;
-                threeScene.traverse((child) => {
-                    if (child.isGroup || child.isMesh) {
-                        if (!modelToExport && child.parent === threeScene) {
-                            modelToExport = child;
-                        }
-                    }
-                });
-
-                if (!modelToExport) {
-                    modelToExport = threeScene;
-                }
-
-                exporter.parse(modelToExport, (glb) => {
-                    const blob = new Blob([glb], { type: 'application/octet-stream' });
-                    const url = URL.createObjectURL(blob);
-
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'modified_model.glb';
-                    a.click();
-
-                    URL.revokeObjectURL(url);
-                    console.log('Exported modified GLB');
-                }, (error) => {
-                    alert('Export failed: ' + error.message);
-                    console.error('Export error:', error);
-                }, { binary: true });
-
-            } catch (e) {
-                alert('Export failed: ' + e.message);
-                console.error('Export error:', e);
-            }
-        }
-
-        // =====================================================
-        // END MESH EDITOR FUNCTIONS
-        // =====================================================
-
         async function load3DHistory() {
             try {
                 const response = await fetch('/api/model3d-history');
@@ -3532,6 +3120,7 @@ def test_inpainting_page():
         }
 
         function load3DModelFromHistory(item) {
+            // Update current3DModel reference
             current3DModel = {
                 model_url: item.model_url,
                 format: item.format,
@@ -3544,10 +3133,92 @@ def test_inpainting_page():
                 `Method: ${item.method} | Time: ${item.processing_time?.toFixed(2) || '?'}s | Format: ${item.format || 'glb'}`;
 
             document.getElementById('convert3DResults').classList.remove('hidden');
-            init3DViewer(item.model_url, item.format);
+
+            // If scene already exists with models, add as new instance instead of reinitializing
+            if (threeScene && allLoadedModels.length > 0) {
+                addModelFromUrlToScene(item.model_url);
+            } else {
+                init3DViewer(item.model_url, item.format);
+            }
 
             // Scroll to viewer
             document.getElementById('convert3DResults').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function addModelFromUrlToScene(modelUrl) {
+            // Add a model from a URL to the existing scene
+            const loader = new THREE.GLTFLoader();
+
+            loader.load(modelUrl, (gltf) => {
+                const newModel = gltf.scene;
+
+                // Copy scale from first model if exists
+                if (currentLoadedModel) {
+                    newModel.scale.copy(currentLoadedModel.scale);
+                }
+
+                // Determine placement position
+                let newX = 0;
+                const newY = DEFAULT_Y_POSITION;
+
+                if (allLoadedModels.length === 0) {
+                    // First model - place at center
+                    newX = 0;
+                } else {
+                    // Check if default position (center) is occupied
+                    const centerOccupied = allLoadedModels.some(m =>
+                        Math.abs(m.position.x) < 0.5 && Math.abs(m.position.y - DEFAULT_Y_POSITION) < 0.5
+                    );
+
+                    if (!centerOccupied) {
+                        // Place at default center position
+                        newX = 0;
+                    } else {
+                        // Find rightmost model and place new one beside it
+                        let maxX = -Infinity;
+                        allLoadedModels.forEach(m => {
+                            if (m.position.x > maxX) maxX = m.position.x;
+                        });
+                        newX = maxX + MODEL_SPACING;
+                    }
+                }
+
+                newModel.position.set(newX, newY, 0);
+
+                // Initialize per-model data in userData
+                newModel.userData.yRotation = 0;
+                newModel.userData.tilt = DEFAULT_TILT;
+                // Assign new instance_id
+                const maxInstanceId = allLoadedModels.reduce((max, m) =>
+                    Math.max(max, m.userData.instanceId || 0), -1);
+                newModel.userData.instanceId = maxInstanceId + 1;
+
+                // Add to scene and tracking array
+                threeScene.add(newModel);
+                allLoadedModels.push(newModel);
+
+                // Select the new model
+                currentLoadedModel = newModel;
+                userYRotation = newModel.userData.yRotation;
+                modelTilt = newModel.userData.tilt;
+
+                // Apply rotation (tilt)
+                applyModelRotation(newModel);
+
+                // Apply brightness
+                applyBrightnessToModel(modelBrightness);
+
+                showControlButtons = true;
+                updateControlVisibility();
+                updateControlPositions();
+
+                // Save state
+                saveAllModelStates();
+
+                console.log('Added model from history at x=' + newX);
+            }, undefined, (error) => {
+                console.error('Error loading model from history:', error);
+            });
         }
 
         async function delete3DModel(index, modelUrl) {
@@ -3838,65 +3509,6 @@ def test_inpainting_page():
                     H4("3D Model Generated"),
                     Div(id="threejsViewer", style="background: #1a1a2e;"),
                     P("", id="3dModelInfo", style="color: #666; font-size: 0.9rem; margin-top: 0.5rem;"),
-                    Div(
-                        Button("Download .glb", onclick="download3DModel('glb')", cls="vacate-btn method-1",
-                               style="font-size: 0.9rem; padding: 0.5rem 1rem;"),
-                        Button("Download .obj", onclick="download3DModel('obj')", cls="vacate-btn method-3",
-                               style="font-size: 0.9rem; padding: 0.5rem 1rem;"),
-                        Button("✏️ Edit Model", onclick="toggleEditMode()", cls="vacate-btn method-4",
-                               id="editModeBtn", style="font-size: 0.9rem; padding: 0.5rem 1rem; margin-left: 0.5rem;"),
-                        style="margin-top: 1rem;"
-                    ),
-                    # Mesh Editor Controls (hidden by default)
-                    Div(
-                        H4("🛠️ Mesh Editor", style="margin-bottom: 1rem;"),
-                        P("Click on a mesh part to select it. Selected parts are highlighted in orange.",
-                          style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;"),
-                        # Transform mode buttons
-                        Div(
-                            Button("↔️ Move", onclick="setTransformMode('translate')", cls="edit-btn",
-                                   id="translateBtn", style="background: #6366f1;"),
-                            Button("🔄 Rotate", onclick="setTransformMode('rotate')", cls="edit-btn",
-                                   id="rotateBtn"),
-                            Button("📐 Scale", onclick="setTransformMode('scale')", cls="edit-btn",
-                                   id="scaleBtn"),
-                            style="margin-bottom: 1rem; display: flex; gap: 0.5rem; justify-content: center;"
-                        ),
-                        # Action buttons
-                        Div(
-                            Button("🗑️ Delete", onclick="deleteSelectedMesh()", cls="edit-btn danger",
-                                   id="deleteBtn", disabled=True),
-                            Button("📋 Duplicate", onclick="duplicateSelectedMesh()", cls="edit-btn",
-                                   id="duplicateBtn", disabled=True),
-                            Button("🔗 Merge All", onclick="mergeAllMeshes()", cls="edit-btn",
-                                   title="Merge all visible meshes into one"),
-                            style="margin-bottom: 1rem; display: flex; gap: 0.5rem; justify-content: center;"
-                        ),
-                        # Color picker
-                        Div(
-                            Label("🎨 Color: ", fr="meshColorPicker", style="color: #333;"),
-                            Input(type="color", id="meshColorPicker", value="#ffffff",
-                                  onchange="changeMeshColor(this.value)", style="width: 60px; height: 30px; cursor: pointer;"),
-                            Button("Apply to Selected", onclick="applyColorToSelected()", cls="edit-btn small",
-                                   style="margin-left: 0.5rem;"),
-                            style="margin-bottom: 1rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;"
-                        ),
-                        # Mesh list
-                        Div(
-                            H5("Mesh Parts:", style="margin-bottom: 0.5rem;"),
-                            Div(id="meshPartsList", style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; padding: 0.5rem;"),
-                            style="margin-bottom: 1rem;"
-                        ),
-                        # Export button
-                        Div(
-                            Button("💾 Export Modified GLB", onclick="exportModifiedGLB()", cls="vacate-btn method-1",
-                                   style="width: 100%;"),
-                            style="margin-top: 1rem;"
-                        ),
-                        id="meshEditorControls",
-                        cls="hidden",
-                        style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-top: 1rem; border: 2px solid #6366f1;"
-                    ),
                     id="convert3DResults",
                     cls="result-card hidden",
                     style="text-align: center; margin-top: 1.5rem;"
