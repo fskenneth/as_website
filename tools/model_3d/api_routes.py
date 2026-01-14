@@ -269,6 +269,12 @@ def register_test_routes(rt):
             data = await request.json()
             image_data = data.get('image', '')
             method = data.get('method', 'sam3d')
+            prompt = data.get('prompt', None)  # Optional text guidance
+            negative_prompt = data.get('negative_prompt', None)
+            # Tripo3D specific parameters
+            pbr = data.get('pbr', True)
+            enable_image_autofix = data.get('enable_image_autofix', True)
+            orientation = data.get('orientation', 'align_image')
 
             # Decode base64 image
             if image_data.startswith('data:image'):
@@ -286,28 +292,47 @@ def register_test_routes(rt):
                 result = await convert_3d_sharp(image, image_bytes)
             elif method == 'triposr':
                 result = await convert_3d_triposr(image_bytes)
+            elif method == 'tripo3d':
+                result = await convert_3d_tripo3d(
+                    image_bytes,
+                    prompt=prompt,
+                    negative_prompt=negative_prompt,
+                    pbr=pbr,
+                    enable_image_autofix=enable_image_autofix,
+                    orientation=orientation
+                )
             else:
                 return JSONResponse({'success': False, 'error': f'Unknown method: {method}'}, status_code=400)
 
             processing_time = time.time() - start_time
 
             # Save to 3D model history
+            input_thumbnail_url = None
+            input_original_url = None
             try:
                 import uuid
                 from datetime import datetime
                 timestamp = datetime.now()
                 unique_id = uuid.uuid4().hex[:8]
 
-                # Save input image thumbnail
+                # Save input image thumbnail and original
                 thumbnail_dir = Path('static/models/thumbnails')
                 thumbnail_dir.mkdir(parents=True, exist_ok=True)
                 thumbnail_filename = f"{unique_id}_input.png"
+                original_filename = f"{unique_id}_original.png"
                 thumbnail_path = thumbnail_dir / thumbnail_filename
+                original_path = thumbnail_dir / original_filename
 
-                # Save thumbnail
+                # Save thumbnail (small, for button icon)
                 thumb = image.copy()
                 thumb.thumbnail((200, 200))
                 thumb.save(thumbnail_path, 'PNG')
+
+                # Save original image (full size, for modal display)
+                image.save(original_path, 'PNG')
+
+                input_thumbnail_url = f'/static/models/thumbnails/{thumbnail_filename}'
+                input_original_url = f'/static/models/thumbnails/{original_filename}'
 
                 # Update history file
                 history_file = Path('tools/model_3d/model3d_history.json')
@@ -318,7 +343,8 @@ def register_test_routes(rt):
 
                 history.append({
                     'timestamp': timestamp.isoformat(),
-                    'input_thumbnail': f'/static/models/thumbnails/{thumbnail_filename}',
+                    'input_thumbnail': input_thumbnail_url,
+                    'input_original': input_original_url,
                     'model_url': result.get('model_url'),
                     'format': result.get('format', 'glb'),
                     'method': method,
@@ -343,7 +369,9 @@ def register_test_routes(rt):
                 'processing_time': processing_time,
                 'format': result.get('format', 'glb'),
                 'method': method,
-                'info': result.get('info', '')
+                'info': result.get('info', ''),
+                'input_thumbnail': input_thumbnail_url,
+                'input_original': input_original_url
             })
 
         except Exception as e:
@@ -367,6 +395,85 @@ def register_test_routes(rt):
         except Exception as e:
             print(f"Error loading 3D history: {e}")
             return JSONResponse({'error': str(e)}, status_code=500)
+
+    @rt('/api/delete-model3d', methods=['POST'])
+    async def delete_model3d(request: Request):
+        """
+        Delete a 3D model from history and optionally delete the files.
+
+        Request body:
+            {
+                "index": 0,  // Index in the history array
+                "model_url": "/static/models/xxx.glb"  // For verification
+            }
+
+        Returns:
+            {"success": true}
+        """
+        try:
+            data = await request.json()
+            index = data.get('index')
+            model_url = data.get('model_url')
+
+            if index is None:
+                return JSONResponse({'success': False, 'error': 'Index is required'}, status_code=400)
+
+            history_file = Path('tools/model_3d/model3d_history.json')
+            if not history_file.exists():
+                return JSONResponse({'success': False, 'error': 'No history file found'}, status_code=404)
+
+            with open(history_file, 'r') as f:
+                history = json.load(f)
+
+            if index < 0 or index >= len(history):
+                return JSONResponse({'success': False, 'error': 'Invalid index'}, status_code=400)
+
+            # Verify the model URL matches (optional safety check)
+            item = history[index]
+            if model_url and item.get('model_url') != model_url:
+                return JSONResponse({'success': False, 'error': 'Model URL mismatch'}, status_code=400)
+
+            # Try to delete the actual files
+            try:
+                # Delete the GLB model file
+                if item.get('model_url'):
+                    model_path = Path('.' + item['model_url'])  # Convert /static/... to ./static/...
+                    if model_path.exists():
+                        model_path.unlink()
+                        print(f"Deleted model file: {model_path}")
+
+                # Delete the thumbnail
+                if item.get('input_thumbnail'):
+                    thumb_path = Path('.' + item['input_thumbnail'])
+                    if thumb_path.exists():
+                        thumb_path.unlink()
+                        print(f"Deleted thumbnail: {thumb_path}")
+
+                # Delete the original image
+                if item.get('input_original'):
+                    original_path = Path('.' + item['input_original'])
+                    if original_path.exists():
+                        original_path.unlink()
+                        print(f"Deleted original: {original_path}")
+            except Exception as file_error:
+                print(f"Warning: Could not delete files: {file_error}")
+                # Continue even if file deletion fails
+
+            # Remove from history
+            history.pop(index)
+
+            # Save updated history
+            with open(history_file, 'w') as f:
+                json.dump(history, f, indent=2)
+
+            print(f"Deleted 3D model at index {index}")
+            return JSONResponse({'success': True})
+
+        except Exception as e:
+            print(f"Delete 3D model error: {e}")
+            import traceback
+            traceback.print_exc()
+            return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
 
     # =========================================================================
     # MODEL STATE PERSISTENCE ENDPOINTS
@@ -874,3 +981,164 @@ async def create_placeholder_3d(image, info):
         'info': info,
         'texture_url': f'/static/models/{model_id}_texture.png'
     }
+
+
+async def convert_3d_tripo3d(image_bytes, prompt=None, negative_prompt=None, pbr=True, enable_image_autofix=True, orientation='align_image'):
+    """
+    Convert 2D image to 3D using Tripo3D Pro API.
+    This uses the official Tripo3D API for high-quality 3D model generation.
+
+    API Flow:
+    1. Upload image -> get file_token
+    2. Create task (image_to_model) -> get task_id
+    3. Poll task until complete -> get model URL
+    4. Download GLB file
+
+    Parameters:
+    - pbr: Enable PBR materials (default: True)
+    - enable_image_autofix: Optimize input image (default: True)
+    - orientation: 'align_image' or 'default' (default: align_image)
+    - prompt: Text guidance for generation
+    - negative_prompt: What to avoid
+    """
+    import os
+    import uuid
+    import httpx
+    import asyncio
+
+    api_key = os.getenv('TRIPO_API_KEY')
+    if not api_key:
+        raise Exception("TRIPO_API_KEY not set in environment. Get one at https://platform.tripo3d.ai/api-keys")
+
+    model_id = uuid.uuid4().hex[:8]
+    model_dir = Path('static/models')
+    model_dir.mkdir(parents=True, exist_ok=True)
+
+    base_url = "https://api.tripo3d.ai/v2/openapi"
+    headers = {
+        "Authorization": f"Bearer {api_key}"
+    }
+
+    async with httpx.AsyncClient(timeout=300.0) as client:
+        # Step 1: Upload the image
+        print("Tripo3D: Uploading image...")
+        upload_response = await client.post(
+            f"{base_url}/upload",
+            headers=headers,
+            files={"file": ("image.png", image_bytes, "image/png")}
+        )
+
+        if upload_response.status_code != 200:
+            raise Exception(f"Tripo3D upload error: {upload_response.status_code} - {upload_response.text}")
+
+        upload_data = upload_response.json()
+        if upload_data.get("code") != 0:
+            raise Exception(f"Tripo3D upload error: {upload_data}")
+
+        file_token = upload_data["data"]["image_token"]
+        print(f"Tripo3D: Image uploaded, token: {file_token[:20]}...")
+
+        # Step 2: Create image-to-model task
+        print("Tripo3D: Creating 3D generation task...")
+
+        # Build task payload with parameters from UI
+        task_payload = {
+            "type": "image_to_model",
+            "model_version": "v2.5-20250123",  # v2.5 quality version
+            "file": {
+                "type": "png",
+                "file_token": file_token
+            },
+        }
+
+        # Add optional parameters based on UI settings
+        if pbr:
+            task_payload["pbr"] = True
+        if enable_image_autofix:
+            task_payload["enable_image_autofix"] = True
+        if orientation and orientation != 'default':
+            task_payload["orientation"] = orientation
+
+        # Add prompt if provided
+        if prompt:
+            task_payload["prompt"] = prompt
+            print(f"Tripo3D: Using prompt: {prompt}")
+        if negative_prompt:
+            task_payload["negative_prompt"] = negative_prompt
+
+        task_response = await client.post(
+            f"{base_url}/task",
+            headers={**headers, "Content-Type": "application/json"},
+            json=task_payload
+        )
+
+        if task_response.status_code != 200:
+            raise Exception(f"Tripo3D task creation error: {task_response.status_code} - {task_response.text}")
+
+        task_data = task_response.json()
+        if task_data.get("code") != 0:
+            raise Exception(f"Tripo3D task creation error: {task_data}")
+
+        task_id = task_data["data"]["task_id"]
+        print(f"Tripo3D: Task created, id: {task_id}")
+
+        # Step 3: Poll for task completion
+        print("Tripo3D: Waiting for 3D model generation...")
+        for attempt in range(180):  # Max 3 minutes
+            await asyncio.sleep(2)  # Poll every 2 seconds
+
+            status_response = await client.get(
+                f"{base_url}/task/{task_id}",
+                headers=headers
+            )
+
+            status_data = status_response.json()
+            if status_data.get("code") != 0:
+                raise Exception(f"Tripo3D status error: {status_data}")
+
+            task_info = status_data["data"]
+            status = task_info["status"]
+            progress = task_info.get("progress", 0)
+
+            print(f"Tripo3D: Status={status}, Progress={progress}%")
+
+            if status == "success":
+                # Step 4: Download the model
+                output = task_info.get("output", {})
+                print(f"Tripo3D: Output keys: {output.keys() if output else 'None'}")
+                print(f"Tripo3D: Full output: {output}")
+
+                # Try different possible keys for model URL
+                model_url = output.get("model") or output.get("mesh") or output.get("glb") or output.get("pbr_model") or output.get("base_model")
+
+                if not model_url:
+                    raise Exception("Tripo3D: No model URL in successful task output")
+
+                print(f"Tripo3D: Downloading model from {model_url[:50]}...")
+                model_response = await client.get(model_url)
+
+                if model_response.status_code != 200:
+                    raise Exception(f"Tripo3D: Failed to download model: {model_response.status_code}")
+
+                output_path = model_dir / f"{model_id}.glb"
+                with open(output_path, 'wb') as f:
+                    f.write(model_response.content)
+
+                print(f"Tripo3D: Model saved to {output_path}")
+
+                return {
+                    'model_url': f'/static/models/{model_id}.glb',
+                    'format': 'glb',
+                    'info': 'Tripo3D Pro API - High quality 3D mesh'
+                }
+
+            elif status == "failed":
+                raise Exception(f"Tripo3D: Task failed - {task_info.get('error', 'Unknown error')}")
+
+            elif status == "banned":
+                raise Exception("Tripo3D: Task banned - content policy violation")
+
+            elif status == "cancelled":
+                raise Exception("Tripo3D: Task was cancelled")
+
+        raise Exception("Tripo3D: Task timed out after 3 minutes")

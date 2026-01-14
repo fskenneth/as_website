@@ -204,6 +204,82 @@ def test_inpainting_page():
             background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
         }
 
+        /* Mesh Editor Styles */
+        .edit-btn {
+            background: #e5e7eb;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .edit-btn:hover:not(:disabled) {
+            background: #d1d5db;
+        }
+        .edit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .edit-btn.active, .edit-btn[style*="background: #6366f1"] {
+            background: #6366f1 !important;
+            color: white !important;
+            border-color: #6366f1 !important;
+        }
+        .edit-btn.danger {
+            background: #fee2e2;
+            color: #dc2626;
+            border-color: #fecaca;
+        }
+        .edit-btn.danger:hover:not(:disabled) {
+            background: #fecaca;
+        }
+        .edit-btn.small {
+            padding: 0.3rem 0.6rem;
+            font-size: 0.75rem;
+        }
+        .mesh-part-item {
+            padding: 0.4rem 0.6rem;
+            margin: 0.2rem 0;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+        }
+        .mesh-part-item:hover {
+            background: #f3f4f6;
+        }
+        .mesh-part-item.selected {
+            background: #fef3c7;
+            border-color: #f59e0b;
+        }
+        .mesh-part-item .part-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .mesh-part-item .part-actions {
+            display: flex;
+            gap: 0.3rem;
+        }
+        .mesh-part-item .part-actions button {
+            padding: 0.15rem 0.3rem;
+            font-size: 0.7rem;
+            background: #e5e7eb;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .mesh-part-item .part-actions button:hover {
+            background: #d1d5db;
+        }
+
         .preview-section {
             margin: 2rem 0;
             text-align: center;
@@ -851,7 +927,7 @@ def test_inpainting_page():
                 return;
             }
 
-            const method3D = document.querySelector('input[name="3dMethod"]:checked').value;
+            const method3D = 'tripo3d';  // Using Tripo3D API only
             const useBgRemovedCheckbox = document.getElementById('useBgRemoved');
 
             // Determine which image to use
@@ -862,7 +938,7 @@ def test_inpainting_page():
 
             // Show loading
             document.getElementById('convert3DLoading').classList.remove('hidden');
-            document.getElementById('convert3DStatus').textContent = 'Converting to 3D with TripoSR... (this may take 30-60 seconds)';
+            document.getElementById('convert3DStatus').textContent = 'Converting to 3D with Tripo3D... (this may take 60-90 seconds)';
             document.getElementById('convertBtn').disabled = true;
 
             // Start a timer to show progress
@@ -870,7 +946,7 @@ def test_inpainting_page():
             const timer = setInterval(() => {
                 elapsed++;
                 document.getElementById('convert3DStatus').textContent =
-                    `Converting to 3D with TripoSR... ${elapsed}s elapsed`;
+                    `Converting to 3D with Tripo3D... ${elapsed}s elapsed`;
             }, 1000);
 
             try {
@@ -878,12 +954,21 @@ def test_inpainting_page():
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 180000);
 
+                // Get Tripo3D parameters from UI
+                const tripo3dParams = {
+                    pbr: document.getElementById('tripo3dPbr')?.checked ?? true,
+                    enable_image_autofix: document.getElementById('tripo3dAutofix')?.checked ?? true,
+                    orientation: document.getElementById('tripo3dOrientation')?.checked ? 'align_image' : 'default',
+                    prompt: document.getElementById('tripo3dPrompt')?.value || ''
+                };
+
                 const response3D = await fetch('/api/convert-to-3d', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         image: imageToConvert,
-                        method: method3D
+                        method: method3D,
+                        ...tripo3dParams
                     }),
                     signal: controller.signal
                 });
@@ -898,7 +983,7 @@ def test_inpainting_page():
                 current3DModel = data3D;
                 const usedImage = (useBgRemovedCheckbox.checked && bgRemovedImage) ? 'bg-removed' : 'original';
                 document.getElementById('3dModelInfo').textContent =
-                    `Method: TripoSR | Time: ${data3D.processing_time?.toFixed(2) || '?'}s | Format: ${data3D.format || 'glb'} | Source: ${usedImage}`;
+                    `Method: Tripo3D | Time: ${data3D.processing_time?.toFixed(2) || '?'}s | Format: ${data3D.format || 'glb'} | Source: ${usedImage}`;
 
                 // Show results
                 document.getElementById('convert3DResults').classList.remove('hidden');
@@ -927,6 +1012,10 @@ def test_inpainting_page():
             const container = document.getElementById('threejsViewer');
             container.innerHTML = ''; // Clear previous
 
+            // Reset control state since we're creating a new viewer
+            showControlButtons = false;
+            controlOverlay = null;
+
             // Check if Three.js is loaded
             if (typeof THREE === 'undefined') {
                 loadThreeJS().then(() => setupThreeScene(container, modelData, format));
@@ -940,6 +1029,9 @@ def test_inpainting_page():
             await loadScript('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js');
             await loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js');
             await loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js');
+            await loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js');
+            await loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js');
+            await loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js');
         }
 
         function loadScript(src) {
@@ -1245,23 +1337,28 @@ def test_inpainting_page():
             const tiltResetCtrl = controlOverlay.querySelector('.tilt-reset-control');
             const addModelCtrl = controlOverlay.querySelector('.add-model-control');
             const removeModelCtrl = controlOverlay.querySelector('.remove-model-control');
+            const thumbnailCtrl = controlOverlay.querySelector('.thumbnail-control');
 
             // Use consistent offset from model edges for symmetry
             const buttonOffset = 20;
 
-            // Top row buttons centered as a group: brightness, +, -
+            // Top row buttons centered as a group: brightness, +, -, thumbnail
             const topRowY = Math.max(pos.topY - buttonOffset, 10);
             if (brightnessCtrl) {
-                brightnessCtrl.style.left = (pos.centerX - 45) + 'px';
+                brightnessCtrl.style.left = (pos.centerX - 65) + 'px';
                 brightnessCtrl.style.top = topRowY + 'px';
             }
             if (addModelCtrl) {
-                addModelCtrl.style.left = (pos.centerX + 10) + 'px';
+                addModelCtrl.style.left = (pos.centerX - 10) + 'px';
                 addModelCtrl.style.top = topRowY + 'px';
             }
             if (removeModelCtrl) {
-                removeModelCtrl.style.left = (pos.centerX + 50) + 'px';
+                removeModelCtrl.style.left = (pos.centerX + 30) + 'px';
                 removeModelCtrl.style.top = topRowY + 'px';
+            }
+            if (thumbnailCtrl) {
+                thumbnailCtrl.style.left = (pos.centerX + 70) + 'px';
+                thumbnailCtrl.style.top = topRowY + 'px';
             }
             // Bottom rotate button - closer to model
             if (rotateCtrl) {
@@ -1391,6 +1488,21 @@ def test_inpainting_page():
             `;
             removeModelBtn.title = 'Remove current model';
 
+            // Thumbnail button (shows actual thumbnail image) - positioned right of remove button
+            const thumbnailBtn = document.createElement('div');
+            thumbnailBtn.className = 'thumbnail-control';
+            thumbnailBtn.style.cssText = `
+                position: absolute;
+                width: 36px; height: 36px; background: rgba(255,255,255,0.9); border-radius: 50%;
+                display: none; align-items: center; justify-content: center;
+                cursor: pointer; pointer-events: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                user-select: none; color: #000; z-index: 101;
+                transform: translate(-50%, 0);
+                background-size: cover; background-position: center;
+                border: 2px solid rgba(255,255,255,0.9);
+            `;
+            thumbnailBtn.title = 'View original 2D image';
+
             // Move hint in center
             const moveHint = document.createElement('div');
             moveHint.className = 'move-hint';
@@ -1408,6 +1520,7 @@ def test_inpainting_page():
             overlay.appendChild(tiltResetBtn);
             overlay.appendChild(addModelBtn);
             overlay.appendChild(removeModelBtn);
+            overlay.appendChild(thumbnailBtn);
             overlay.appendChild(moveHint);
             container.style.position = 'relative';
             container.appendChild(overlay);
@@ -1509,6 +1622,17 @@ def test_inpainting_page():
                     removeModelBtn.style.background = 'rgba(255,255,255,0.9)';
                 }, 150);
                 removeCurrentModel();
+            });
+
+            // Thumbnail button click event - show original 2D image in modal
+            thumbnailBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                thumbnailBtn.style.background = 'rgba(200,200,200,0.9)';
+                setTimeout(() => {
+                    thumbnailBtn.style.background = 'rgba(255,255,255,0.9)';
+                }, 150);
+                showThumbnailModal();
             });
 
             // Global mouse events
@@ -2018,6 +2142,101 @@ def test_inpainting_page():
             console.log('Removed model. Remaining models:', allLoadedModels.length);
         }
 
+        function updateThumbnailButtonIcon() {
+            // Update the thumbnail button to show the current model's thumbnail
+            if (!controlOverlay) return;
+            const thumbnailCtrl = controlOverlay.querySelector('.thumbnail-control');
+            if (!thumbnailCtrl) return;
+
+            const thumbnailUrl = current3DModel?.input_thumbnail;
+            if (thumbnailUrl) {
+                thumbnailCtrl.style.backgroundImage = `url(${thumbnailUrl})`;
+            } else {
+                thumbnailCtrl.style.backgroundImage = 'none';
+            }
+        }
+
+        function showThumbnailModal() {
+            // Get the original image (or fall back to thumbnail for older entries)
+            const originalUrl = current3DModel?.input_original || current3DModel?.input_thumbnail;
+            if (!originalUrl) {
+                console.warn('No input image available for this model');
+                return;
+            }
+
+            // Create modal overlay
+            const modalOverlay = document.createElement('div');
+            modalOverlay.id = 'thumbnailModal';
+            modalOverlay.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.8); display: flex; align-items: center;
+                justify-content: center; z-index: 10000; cursor: pointer;
+            `;
+
+            // Create modal content container
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                position: relative; width: 100%; max-height: 95vh;
+                background: white; padding: 15px;
+                box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+            `;
+
+            // Create close button
+            const closeBtn = document.createElement('button');
+            closeBtn.innerHTML = '&times;';
+            closeBtn.style.cssText = `
+                position: absolute; top: 5px; right: 15px;
+                background: rgba(255,255,255,0.9); border: none; font-size: 36px;
+                cursor: pointer; color: #333; line-height: 1;
+                width: 44px; height: 44px; border-radius: 50%;
+                z-index: 10001;
+            `;
+            closeBtn.onclick = (e) => {
+                e.stopPropagation();
+                modalOverlay.remove();
+            };
+
+            // Create image
+            const img = document.createElement('img');
+            img.src = originalUrl;
+            img.alt = 'Original 2D Image';
+            img.style.cssText = `
+                width: 100%; max-height: 90vh; display: block;
+                object-fit: contain;
+            `;
+
+            // Create label
+            const label = document.createElement('div');
+            label.textContent = 'Original 2D Input Image';
+            label.style.cssText = `
+                text-align: center; margin-top: 8px; font-size: 14px;
+                color: #666;
+            `;
+
+            modalContent.appendChild(closeBtn);
+            modalContent.appendChild(img);
+            modalContent.appendChild(label);
+            modalOverlay.appendChild(modalContent);
+
+            // Close on overlay click (but not on content click)
+            modalOverlay.onclick = (e) => {
+                if (e.target === modalOverlay) {
+                    modalOverlay.remove();
+                }
+            };
+
+            // Close on Escape key
+            const escHandler = (e) => {
+                if (e.key === 'Escape') {
+                    modalOverlay.remove();
+                    document.removeEventListener('keydown', escHandler);
+                }
+            };
+            document.addEventListener('keydown', escHandler);
+
+            document.body.appendChild(modalOverlay);
+        }
+
         function updateControlVisibility() {
             if (!controlOverlay) return;
             const display = showControlButtons ? 'flex' : 'none';
@@ -2028,6 +2247,7 @@ def test_inpainting_page():
             const tiltResetCtrl = controlOverlay.querySelector('.tilt-reset-control');
             const addModelCtrl = controlOverlay.querySelector('.add-model-control');
             const removeModelCtrl = controlOverlay.querySelector('.remove-model-control');
+            const thumbnailCtrl = controlOverlay.querySelector('.thumbnail-control');
             if (rotateCtrl) rotateCtrl.style.display = display;
             if (scaleCtrl) scaleCtrl.style.display = display;
             if (brightnessCtrl) brightnessCtrl.style.display = display;
@@ -2035,6 +2255,11 @@ def test_inpainting_page():
             if (tiltResetCtrl) tiltResetCtrl.style.display = display;
             if (addModelCtrl) addModelCtrl.style.display = display;
             if (removeModelCtrl) removeModelCtrl.style.display = display;
+            if (thumbnailCtrl) thumbnailCtrl.style.display = display;
+            // Update thumbnail button icon when showing controls
+            if (showControlButtons) {
+                updateThumbnailButtonIcon();
+            }
         }
 
         function getLowestContactPointY() {
@@ -2083,8 +2308,11 @@ def test_inpainting_page():
                 return;
             }
 
-            // Find the minimum Y (lowest point)
-            const minY = Math.min(...allVertices.map(v => v.y));
+            // Find the minimum Y (lowest point) - use loop to avoid stack overflow with large arrays
+            let minY = Infinity;
+            for (const v of allVertices) {
+                if (v.y < minY) minY = v.y;
+            }
 
             // Find vertices within a small threshold of the minimum Y
             const threshold = 0.08;  // 8% of model size tolerance
@@ -2364,6 +2592,7 @@ def test_inpainting_page():
                 const tiltResetCtrl = controlOverlay?.querySelector('.tilt-reset-control');
                 const addModelCtrl = controlOverlay?.querySelector('.add-model-control');
                 const removeModelCtrl = controlOverlay?.querySelector('.remove-model-control');
+                const thumbnailCtrl = controlOverlay?.querySelector('.thumbnail-control');
                 // Completely hide all buttons when toggled off
                 const display = showControlButtons ? 'flex' : 'none';
                 if (rotateCtrl) rotateCtrl.style.display = display;
@@ -2373,6 +2602,11 @@ def test_inpainting_page():
                 if (tiltResetCtrl) tiltResetCtrl.style.display = display;
                 if (addModelCtrl) addModelCtrl.style.display = display;
                 if (removeModelCtrl) removeModelCtrl.style.display = display;
+                if (thumbnailCtrl) thumbnailCtrl.style.display = display;
+                // Update thumbnail button icon when showing controls
+                if (showControlButtons) {
+                    updateThumbnailButtonIcon();
+                }
                 // Also toggle leg points visibility with controls
                 contactMarkers.forEach(m => m.style.display = showControlButtons ? 'flex' : 'none');
             }
@@ -2834,6 +3068,402 @@ def test_inpainting_page():
             }
         }
 
+        // =====================================================
+        // MESH EDITOR FUNCTIONS
+        // =====================================================
+        let editMode = false;
+        let selectedMesh = null;
+        let transformControls = null;
+        let currentTransformMode = 'translate';
+        let originalMaterials = new Map();  // Store original materials for restore
+        let meshList = [];  // All meshes in the scene
+
+        function toggleEditMode() {
+            editMode = !editMode;
+            const editorControls = document.getElementById('meshEditorControls');
+            const editBtn = document.getElementById('editModeBtn');
+
+            if (editMode) {
+                editorControls.classList.remove('hidden');
+                editBtn.textContent = '❌ Exit Edit Mode';
+                editBtn.style.background = '#dc2626';
+
+                // Initialize transform controls if not exists
+                if (!transformControls && threeScene && threeCamera) {
+                    transformControls = new THREE.TransformControls(threeCamera, threeRenderer.domElement);
+                    transformControls.addEventListener('dragging-changed', (event) => {
+                        if (orbitControls) orbitControls.enabled = !event.value;
+                    });
+                    threeScene.add(transformControls);
+                }
+
+                // Populate mesh list
+                updateMeshList();
+
+                // Add click handler for mesh selection
+                document.getElementById('threejsViewer').addEventListener('click', onEditorClick);
+            } else {
+                editorControls.classList.add('hidden');
+                editBtn.textContent = '✏️ Edit Model';
+                editBtn.style.background = '';
+
+                // Deselect and hide transform controls
+                if (selectedMesh) {
+                    deselectMesh();
+                }
+                if (transformControls) {
+                    transformControls.detach();
+                }
+
+                // Remove click handler
+                document.getElementById('threejsViewer').removeEventListener('click', onEditorClick);
+            }
+        }
+
+        function onEditorClick(event) {
+            if (!editMode || !threeScene || !threeCamera) return;
+
+            const container = document.getElementById('threejsViewer');
+            const rect = container.getBoundingClientRect();
+            const mouse = new THREE.Vector2();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, threeCamera);
+
+            // Get all meshes
+            const meshes = [];
+            threeScene.traverse((child) => {
+                if (child.isMesh && child.visible) {
+                    meshes.push(child);
+                }
+            });
+
+            const intersects = raycaster.intersectObjects(meshes, false);
+
+            if (intersects.length > 0) {
+                selectMesh(intersects[0].object);
+            }
+        }
+
+        function selectMesh(mesh) {
+            // Deselect previous
+            if (selectedMesh) {
+                deselectMesh();
+            }
+
+            selectedMesh = mesh;
+
+            // Store original material and apply highlight
+            if (!originalMaterials.has(mesh.uuid)) {
+                originalMaterials.set(mesh.uuid, mesh.material.clone());
+            }
+
+            // Create highlight material
+            const highlightMaterial = mesh.material.clone();
+            highlightMaterial.emissive = new THREE.Color(0xff6600);
+            highlightMaterial.emissiveIntensity = 0.3;
+            mesh.material = highlightMaterial;
+
+            // Attach transform controls
+            if (transformControls) {
+                transformControls.attach(mesh);
+                transformControls.setMode(currentTransformMode);
+            }
+
+            // Update UI
+            document.getElementById('deleteBtn').disabled = false;
+            document.getElementById('duplicateBtn').disabled = false;
+
+            // Update mesh list selection
+            updateMeshListSelection();
+
+            console.log('Selected mesh:', mesh.name || mesh.uuid);
+        }
+
+        function deselectMesh() {
+            if (!selectedMesh) return;
+
+            // Restore original material
+            if (originalMaterials.has(selectedMesh.uuid)) {
+                selectedMesh.material = originalMaterials.get(selectedMesh.uuid);
+            }
+
+            selectedMesh = null;
+
+            // Update UI
+            document.getElementById('deleteBtn').disabled = true;
+            document.getElementById('duplicateBtn').disabled = true;
+
+            // Update mesh list selection
+            updateMeshListSelection();
+        }
+
+        function setTransformMode(mode) {
+            currentTransformMode = mode;
+            if (transformControls) {
+                transformControls.setMode(mode);
+            }
+
+            // Update button styles
+            ['translateBtn', 'rotateBtn', 'scaleBtn'].forEach(id => {
+                document.getElementById(id).style.background = '';
+                document.getElementById(id).style.color = '';
+            });
+
+            const activeBtn = document.getElementById(mode === 'translate' ? 'translateBtn' :
+                                                       mode === 'rotate' ? 'rotateBtn' : 'scaleBtn');
+            activeBtn.style.background = '#6366f1';
+            activeBtn.style.color = 'white';
+        }
+
+        function deleteSelectedMesh() {
+            if (!selectedMesh) return;
+
+            const meshName = selectedMesh.name || 'Unnamed mesh';
+            if (!confirm(`Delete "${meshName}"?`)) return;
+
+            // Remove from scene
+            if (transformControls) {
+                transformControls.detach();
+            }
+
+            selectedMesh.parent.remove(selectedMesh);
+            selectedMesh.geometry.dispose();
+            if (selectedMesh.material) {
+                if (Array.isArray(selectedMesh.material)) {
+                    selectedMesh.material.forEach(m => m.dispose());
+                } else {
+                    selectedMesh.material.dispose();
+                }
+            }
+
+            originalMaterials.delete(selectedMesh.uuid);
+            selectedMesh = null;
+
+            // Update UI
+            document.getElementById('deleteBtn').disabled = true;
+            document.getElementById('duplicateBtn').disabled = true;
+            updateMeshList();
+
+            console.log('Deleted mesh:', meshName);
+        }
+
+        function duplicateSelectedMesh() {
+            if (!selectedMesh) return;
+
+            const clone = selectedMesh.clone();
+            clone.position.x += 0.5;  // Offset slightly
+            clone.name = (selectedMesh.name || 'mesh') + '_copy';
+
+            // Clone materials
+            if (clone.material) {
+                if (Array.isArray(clone.material)) {
+                    clone.material = clone.material.map(m => m.clone());
+                } else {
+                    clone.material = clone.material.clone();
+                }
+            }
+
+            selectedMesh.parent.add(clone);
+            updateMeshList();
+
+            // Select the new clone
+            selectMesh(clone);
+
+            console.log('Duplicated mesh:', clone.name);
+        }
+
+        function mergeAllMeshes() {
+            if (!confirm('Merge all visible meshes into one? This cannot be undone.')) return;
+
+            const meshes = [];
+            threeScene.traverse((child) => {
+                if (child.isMesh && child.visible) {
+                    meshes.push(child);
+                }
+            });
+
+            if (meshes.length < 2) {
+                alert('Need at least 2 meshes to merge');
+                return;
+            }
+
+            // Use BufferGeometryUtils to merge
+            const geometries = meshes.map(mesh => {
+                const geo = mesh.geometry.clone();
+                geo.applyMatrix4(mesh.matrixWorld);
+                return geo;
+            });
+
+            try {
+                const mergedGeometry = THREE.BufferGeometryUtils.mergeGeometries(geometries, false);
+                const mergedMesh = new THREE.Mesh(mergedGeometry, meshes[0].material.clone());
+                mergedMesh.name = 'merged_mesh';
+
+                // Remove old meshes
+                meshes.forEach(mesh => {
+                    mesh.parent.remove(mesh);
+                    mesh.geometry.dispose();
+                });
+
+                // Add merged mesh
+                threeScene.add(mergedMesh);
+                updateMeshList();
+
+                console.log('Merged', meshes.length, 'meshes');
+            } catch (e) {
+                alert('Merge failed: ' + e.message);
+                console.error('Merge error:', e);
+            }
+        }
+
+        function applyColorToSelected() {
+            if (!selectedMesh) {
+                alert('Select a mesh first');
+                return;
+            }
+
+            const color = document.getElementById('meshColorPicker').value;
+            const threeColor = new THREE.Color(color);
+
+            if (selectedMesh.material) {
+                if (Array.isArray(selectedMesh.material)) {
+                    selectedMesh.material.forEach(m => {
+                        if (m.color) m.color.set(threeColor);
+                    });
+                } else {
+                    if (selectedMesh.material.color) {
+                        selectedMesh.material.color.set(threeColor);
+                    }
+                }
+            }
+
+            // Update stored original material too
+            if (originalMaterials.has(selectedMesh.uuid)) {
+                const origMat = originalMaterials.get(selectedMesh.uuid);
+                if (origMat.color) origMat.color.set(threeColor);
+            }
+
+            console.log('Applied color', color, 'to', selectedMesh.name || selectedMesh.uuid);
+        }
+
+        function changeMeshColor(color) {
+            // Just update the picker, actual application is via button
+        }
+
+        function updateMeshList() {
+            meshList = [];
+            const listContainer = document.getElementById('meshPartsList');
+            listContainer.innerHTML = '';
+
+            if (!threeScene) return;
+
+            threeScene.traverse((child) => {
+                if (child.isMesh) {
+                    meshList.push(child);
+
+                    const item = document.createElement('div');
+                    item.className = 'mesh-part-item';
+                    item.dataset.uuid = child.uuid;
+
+                    const name = child.name || `Mesh_${meshList.length}`;
+                    item.innerHTML = `
+                        <span class="part-name" title="${name}">${name}</span>
+                        <span class="part-actions">
+                            <button onclick="event.stopPropagation(); toggleMeshVisibility('${child.uuid}')" title="Toggle visibility">
+                                ${child.visible ? '👁️' : '👁️‍🗨️'}
+                            </button>
+                            <button onclick="event.stopPropagation(); selectMeshByUuid('${child.uuid}')" title="Select">✓</button>
+                        </span>
+                    `;
+
+                    item.onclick = () => selectMeshByUuid(child.uuid);
+                    listContainer.appendChild(item);
+                }
+            });
+        }
+
+        function updateMeshListSelection() {
+            document.querySelectorAll('.mesh-part-item').forEach(item => {
+                if (selectedMesh && item.dataset.uuid === selectedMesh.uuid) {
+                    item.classList.add('selected');
+                } else {
+                    item.classList.remove('selected');
+                }
+            });
+        }
+
+        function selectMeshByUuid(uuid) {
+            const mesh = meshList.find(m => m.uuid === uuid);
+            if (mesh) {
+                selectMesh(mesh);
+            }
+        }
+
+        function toggleMeshVisibility(uuid) {
+            const mesh = meshList.find(m => m.uuid === uuid);
+            if (mesh) {
+                mesh.visible = !mesh.visible;
+                updateMeshList();
+            }
+        }
+
+        async function exportModifiedGLB() {
+            if (!threeScene) {
+                alert('No scene to export');
+                return;
+            }
+
+            // Deselect to restore materials
+            if (selectedMesh) {
+                deselectMesh();
+            }
+
+            try {
+                const exporter = new THREE.GLTFExporter();
+
+                // Find the model group to export
+                let modelToExport = null;
+                threeScene.traverse((child) => {
+                    if (child.isGroup || child.isMesh) {
+                        if (!modelToExport && child.parent === threeScene) {
+                            modelToExport = child;
+                        }
+                    }
+                });
+
+                if (!modelToExport) {
+                    modelToExport = threeScene;
+                }
+
+                exporter.parse(modelToExport, (glb) => {
+                    const blob = new Blob([glb], { type: 'application/octet-stream' });
+                    const url = URL.createObjectURL(blob);
+
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'modified_model.glb';
+                    a.click();
+
+                    URL.revokeObjectURL(url);
+                    console.log('Exported modified GLB');
+                }, (error) => {
+                    alert('Export failed: ' + error.message);
+                    console.error('Export error:', error);
+                }, { binary: true });
+
+            } catch (e) {
+                alert('Export failed: ' + e.message);
+                console.error('Export error:', e);
+            }
+        }
+
+        // =====================================================
+        // END MESH EDITOR FUNCTIONS
+        // =====================================================
+
         async function load3DHistory() {
             try {
                 const response = await fetch('/api/model3d-history');
@@ -2849,8 +3479,10 @@ def test_inpainting_page():
                         const historyItem = document.createElement('div');
                         historyItem.className = 'history-item';
                         historyItem.style.cursor = 'pointer';
+                        historyItem.style.position = 'relative';
 
                         const timestamp = new Date(item.timestamp).toLocaleString();
+                        const originalIndex = data.history.length - 1 - index;  // Index in original array
 
                         historyItem.innerHTML = `
                             <div style="text-align: center;">
@@ -2858,8 +3490,28 @@ def test_inpainting_page():
                                 <div class="label" style="margin-top: 0.5rem;">3D Model</div>
                                 <div style="font-size: 0.8rem; color: #666;">${item.method} | ${item.processing_time?.toFixed(1) || '?'}s</div>
                                 <div class="timestamp">${timestamp}</div>
+                                <button class="delete-model-btn" data-index="${originalIndex}"
+                                    style="position: absolute; top: 5px; right: 5px; background: #ff4444; color: white;
+                                           border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer;
+                                           font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center;
+                                           opacity: 0; transition: opacity 0.2s;"
+                                    title="Delete this model">×</button>
                             </div>
                         `;
+
+                        // Show delete button on hover
+                        historyItem.onmouseenter = () => {
+                            historyItem.querySelector('.delete-model-btn').style.opacity = '1';
+                        };
+                        historyItem.onmouseleave = () => {
+                            historyItem.querySelector('.delete-model-btn').style.opacity = '0';
+                        };
+
+                        // Handle delete button click
+                        historyItem.querySelector('.delete-model-btn').onclick = (e) => {
+                            e.stopPropagation();
+                            delete3DModel(originalIndex, item.model_url);
+                        };
 
                         historyItem.onclick = () => load3DModelFromHistory(item);
                         historyGrid.appendChild(historyItem);
@@ -2883,7 +3535,9 @@ def test_inpainting_page():
             current3DModel = {
                 model_url: item.model_url,
                 format: item.format,
-                processing_time: item.processing_time
+                processing_time: item.processing_time,
+                input_thumbnail: item.input_thumbnail,
+                input_original: item.input_original
             };
 
             document.getElementById('3dModelInfo').textContent =
@@ -2894,6 +3548,36 @@ def test_inpainting_page():
 
             // Scroll to viewer
             document.getElementById('convert3DResults').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function delete3DModel(index, modelUrl) {
+            if (!confirm('Delete this 3D model? This cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/delete-model3d', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ index, model_url: modelUrl })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    // Reload the history to reflect the deletion
+                    load3DHistory();
+                    // Hide the viewer if the deleted model was being displayed
+                    if (current3DModel && current3DModel.model_url === modelUrl) {
+                        document.getElementById('convert3DResults').classList.add('hidden');
+                        document.getElementById('roomPlacementSection').classList.add('hidden');
+                        current3DModel = null;
+                    }
+                } else {
+                    showError('Failed to delete model: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                showError('Delete error: ' + error.message);
+            }
         }
 
         function populateRoomSelector() {
@@ -3089,19 +3773,45 @@ def test_inpainting_page():
                 Div(
                     Div(
                         H4("🧊 2D to 3D Conversion", style="margin-bottom: 0.5rem;"),
-                        P("Converts image to real 3D mesh using TripoSR (Stability AI)", style="color: #666; font-size: 0.9rem; margin-bottom: 0.5rem;"),
+                        P("Converts image to real 3D mesh using Tripo3D API (v2.5)", style="color: #666; font-size: 0.9rem; margin-bottom: 1rem;"),
+
+                        # Tripo3D Parameters
                         Div(
-                            Label(
-                                Input(type="radio", name="3dMethod", value="triposr", checked=True),
-                                " TripoSR (Free, HuggingFace)",
-                                style="cursor: pointer;"
+                            P("⚙️ Parameters:", style="font-weight: bold; margin-bottom: 0.5rem; color: #333;"),
+                            Div(
+                                Label(
+                                    Input(type="checkbox", id="tripo3dPbr", checked=True),
+                                    " PBR Materials",
+                                    style="cursor: pointer; margin-right: 1rem;"
+                                ),
+                                Label(
+                                    Input(type="checkbox", id="tripo3dAutofix", checked=True),
+                                    " Image Autofix",
+                                    style="cursor: pointer; margin-right: 1rem;"
+                                ),
+                                Label(
+                                    Input(type="checkbox", id="tripo3dOrientation", checked=True),
+                                    " Align Orientation",
+                                    style="cursor: pointer;"
+                                ),
+                                style="display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-bottom: 0.75rem;"
                             ),
-                            style="display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center;"
+                            style="background: #f5f5f5; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;"
                         ),
-                        P("⏱️ Processing takes 30-60 seconds", style="color: #888; font-size: 0.8rem; margin-top: 0.5rem;"),
+
+                        # Prompt field
+                        Div(
+                            P("📝 Prompt:", style="font-weight: bold; margin-bottom: 0.5rem; color: #333;"),
+                            Input(type="text", id="tripo3dPrompt",
+                                  value="Front facing, legs touching floor level.",
+                                  style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 6px; font-size: 0.9rem;"),
+                            style="text-align: left; margin-bottom: 1rem;"
+                        ),
+
+                        P("⏱️ Processing takes 60-90 seconds", style="color: #888; font-size: 0.8rem; margin-top: 0.5rem;"),
                         Div(
                             Label(
-                                Input(type="checkbox", id="useBgRemoved", checked=True),
+                                Input(type="checkbox", id="useBgRemoved", checked=False),
                                 " Use background-removed image (if available)",
                                 style="cursor: pointer; font-size: 0.9rem; color: #666;"
                             ),
@@ -3133,7 +3843,59 @@ def test_inpainting_page():
                                style="font-size: 0.9rem; padding: 0.5rem 1rem;"),
                         Button("Download .obj", onclick="download3DModel('obj')", cls="vacate-btn method-3",
                                style="font-size: 0.9rem; padding: 0.5rem 1rem;"),
+                        Button("✏️ Edit Model", onclick="toggleEditMode()", cls="vacate-btn method-4",
+                               id="editModeBtn", style="font-size: 0.9rem; padding: 0.5rem 1rem; margin-left: 0.5rem;"),
                         style="margin-top: 1rem;"
+                    ),
+                    # Mesh Editor Controls (hidden by default)
+                    Div(
+                        H4("🛠️ Mesh Editor", style="margin-bottom: 1rem;"),
+                        P("Click on a mesh part to select it. Selected parts are highlighted in orange.",
+                          style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;"),
+                        # Transform mode buttons
+                        Div(
+                            Button("↔️ Move", onclick="setTransformMode('translate')", cls="edit-btn",
+                                   id="translateBtn", style="background: #6366f1;"),
+                            Button("🔄 Rotate", onclick="setTransformMode('rotate')", cls="edit-btn",
+                                   id="rotateBtn"),
+                            Button("📐 Scale", onclick="setTransformMode('scale')", cls="edit-btn",
+                                   id="scaleBtn"),
+                            style="margin-bottom: 1rem; display: flex; gap: 0.5rem; justify-content: center;"
+                        ),
+                        # Action buttons
+                        Div(
+                            Button("🗑️ Delete", onclick="deleteSelectedMesh()", cls="edit-btn danger",
+                                   id="deleteBtn", disabled=True),
+                            Button("📋 Duplicate", onclick="duplicateSelectedMesh()", cls="edit-btn",
+                                   id="duplicateBtn", disabled=True),
+                            Button("🔗 Merge All", onclick="mergeAllMeshes()", cls="edit-btn",
+                                   title="Merge all visible meshes into one"),
+                            style="margin-bottom: 1rem; display: flex; gap: 0.5rem; justify-content: center;"
+                        ),
+                        # Color picker
+                        Div(
+                            Label("🎨 Color: ", fr="meshColorPicker", style="color: #333;"),
+                            Input(type="color", id="meshColorPicker", value="#ffffff",
+                                  onchange="changeMeshColor(this.value)", style="width: 60px; height: 30px; cursor: pointer;"),
+                            Button("Apply to Selected", onclick="applyColorToSelected()", cls="edit-btn small",
+                                   style="margin-left: 0.5rem;"),
+                            style="margin-bottom: 1rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;"
+                        ),
+                        # Mesh list
+                        Div(
+                            H5("Mesh Parts:", style="margin-bottom: 0.5rem;"),
+                            Div(id="meshPartsList", style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; padding: 0.5rem;"),
+                            style="margin-bottom: 1rem;"
+                        ),
+                        # Export button
+                        Div(
+                            Button("💾 Export Modified GLB", onclick="exportModifiedGLB()", cls="vacate-btn method-1",
+                                   style="width: 100%;"),
+                            style="margin-top: 1rem;"
+                        ),
+                        id="meshEditorControls",
+                        cls="hidden",
+                        style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-top: 1rem; border: 2px solid #6366f1;"
                     ),
                     id="convert3DResults",
                     cls="result-card hidden",
