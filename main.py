@@ -28,6 +28,12 @@ from page.areas import AREAS, AREA_PAGE_FUNCTIONS
 from page.blog_listing import blog_listing_page, load_blog_metadata
 from page.signin import signin_page
 from page.portal import portal_page
+# Item Management and Zoho Sync pages
+from page.item_management import item_management_app_export
+from page.zoho_sync import zoho_sync_app_export
+from tools.zoho_sync.database import db as zoho_db
+from tools.zoho_sync.zoho_api import zoho_api
+from tools.zoho_sync.image_downloader import image_downloader
 from starlette.staticfiles import StaticFiles
 from starlette.responses import Response, JSONResponse, RedirectResponse
 from tools.instagram import get_cached_posts
@@ -68,6 +74,23 @@ _image_cache = {}
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Mount Item Management and Zoho Sync sub-apps
+app.mount("/item_management", item_management_app_export)
+app.mount("/zoho_sync", zoho_sync_app_export)
+
+# Startup/shutdown events for Zoho Sync database
+@app.on_event("startup")
+async def startup():
+    """Initialize database connection on startup"""
+    await zoho_db.connect()
+
+@app.on_event("shutdown")
+async def shutdown():
+    """Close database connection on shutdown"""
+    await zoho_db.disconnect()
+    await zoho_api.close()
+    await image_downloader.close()
 
 
 @rt('/api/instagram-image/{image_id}')

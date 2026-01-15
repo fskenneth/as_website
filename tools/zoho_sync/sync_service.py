@@ -1,0 +1,263 @@
+import json
+from datetime import datetime
+from typing import List, Dict, Optional, Tuple
+from .database import db
+from .zoho_api import zoho_api
+from .image_downloader import image_downloader
+from .image_url_processor import image_url_processor
+from .utils import get_toronto_now
+import logging
+
+logger = logging.getLogger(__name__)
+
+class SyncService:
+    async def sync_report(self, report_name: str, sync_type: str = "daily") -> Dict:
+        """Sync a single report from Zoho Creator"""
+        start_time = get_toronto_now()
+        synced_count = 0
+
+        try:
+            logger.info(f"Starting {sync_type} sync for {report_name}")
+
+            # Prepare table name
+            table_name = db._sanitize_name(report_name)
+
+            # Check if table exists, create if needed
+            if not await db.table_exists(table_name):
+                logger.info(f"Table {table_name} doesn't exist, creating from API metadata...")
+                metadata = await zoho_api.get_report_metadata(report_name)
+                if metadata and metadata["fields"]:
+                    await db.create_table_from_fields(table_name, metadata["fields"])
+                    logger.info(f"Created table {table_name} with {len(metadata['fields'])} fields")
+                else:
+                    raise Exception(f"Could not fetch metadata for {report_name}")
+
+            # Get total count for verification (especially for full sync)
+            expected_total_count = None
+            if sync_type == "full":
+                logger.info(f"Getting total record count for {report_name}...")
+                expected_total_count = await zoho_api.get_report_total_count(report_name)
+                logger.info(f"Total records in Zoho for {report_name}: {expected_total_count}")
+
+            # Get records based on sync type
+            if sync_type == "daily":
+                records = await zoho_api.get_today_modified_records(report_name)
+            elif sync_type == "full":
+                records = await zoho_api.get_all_report_data(report_name)
+            else:
+                # For incremental sync, get last sync time
+                sync_meta = await db.get_sync_metadata(table_name)
+                if sync_meta and sync_meta["last_modified_time"]:
+                    last_sync = datetime.fromisoformat(sync_meta["last_modified_time"])
+                    records = await zoho_api.get_modified_records_since(report_name, last_sync)
+                else:
+                    # First sync, get all records
+                    records = await zoho_api.get_all_report_data(report_name)
+
+            if not records:
+                logger.info(f"No modified records found for {report_name}")
+                await db.log_sync(sync_type, table_name, "success", 0)
+                return {
+                    "report_name": report_name,
+                    "status": "success",
+                    "records_synced": 0,
+                    "message": "No records to sync"
+                }
+
+            # Get existing records for image comparison
+            existing_records = {}
+            try:
+                # Get existing records from database
+                existing_data = await db.get_all_records(table_name)
+                existing_records = {str(r.get('ID', '')): r for r in existing_data}
+            except Exception as e:
+                logger.warning(f"Could not fetch existing records for comparison: {e}")
+
+            # Process image URLs to use Zoho Creator URLs
+            urls_processed = 0
+            logger.info(f"Processing image URLs for {len(records)} records in {report_name}")
+            records_with_urls, urls_processed = image_url_processor.process_records_for_urls(
+                records,
+                report_name
+            )
+
+            # Verify record count for full sync
+            if sync_type == "full" and expected_total_count:
+                if len(records) != expected_total_count:
+                    logger.warning(f"⚠️  Record count mismatch! Expected {expected_total_count} records from Zoho, but fetched {len(records)}")
+                else:
+                    logger.info(f"✓ Pre-sync verification passed: {len(records)} records match expected count")
+
+            # Clear table for full sync
+            if sync_type == "full":
+                await db.clear_table(table_name)
+
+            # Upsert records with Zoho Creator URLs
+            upsert_result = await db.upsert_records(table_name, records_with_urls)
+            synced_count = upsert_result["successful"]
+            skipped_count = upsert_result["skipped"]
+
+            # Log warning if any records were skipped
+            if skipped_count > 0:
+                logger.warning(f"⚠️  {skipped_count} records were skipped during sync for {report_name} (missing ID field)")
+
+            # Update sync metadata with actual successful count
+            last_modified = max(
+                (r.get("Modified_Time", "") for r in records if r.get("Modified_Time")),
+                default=""
+            )
+
+            if last_modified:
+                await db.update_sync_metadata(table_name, last_modified, synced_count)
+
+            await db.log_sync(sync_type, table_name, "success", synced_count)
+
+            # Perform post-sync verification
+            verification = await db.verify_sync_counts(table_name)
+            if verification["mismatch"]:
+                logger.warning(f"Post-sync verification found count mismatch for {table_name}: " +
+                             f"expected {synced_count}, actual {verification['actual_count']}")
+
+            # Final verification for full sync
+            if sync_type == "full":
+                # Count actual records in database
+                count_query = f"SELECT COUNT(*) as count FROM {table_name}"
+                result = await db.fetchone(count_query)
+                actual_count = result['count'] if result else 0
+
+                # Special checks for Item_Report
+                if report_name == "Item_Report":
+                    # Count images
+                    item_image_query = f"SELECT COUNT(*) as count FROM {table_name} WHERE Item_Image IS NOT NULL"
+                    resized_image_query = f"SELECT COUNT(*) as count FROM {table_name} WHERE Resized_Image IS NOT NULL"
+
+                    item_result = await db.fetchone(item_image_query)
+                    resized_result = await db.fetchone(resized_image_query)
+
+                    item_image_count = item_result['count'] if item_result else 0
+                    resized_image_count = resized_result['count'] if resized_result else 0
+
+                    logger.info(f"=== {report_name} Full Sync Verification ===")
+                    logger.info(f"Expected records (from Zoho): {expected_total_count}")
+                    logger.info(f"Actual records in DB: {actual_count}")
+                    logger.info(f"Records with Item_Image: {item_image_count}")
+                    logger.info(f"Records with Resized_Image: {resized_image_count}")
+                else:
+                    logger.info(f"=== {report_name} Full Sync Verification ===")
+                    logger.info(f"Expected records (from Zoho): {expected_total_count}")
+                    logger.info(f"Actual records in DB: {actual_count}")
+
+                if expected_total_count and actual_count != expected_total_count:
+                    logger.warning(f"⚠️  Final record count mismatch! Expected {expected_total_count}, got {actual_count}")
+                    logger.warning(f"Missing records: {expected_total_count - actual_count}")
+                elif expected_total_count:
+                    logger.info(f"✅ Final verification passed: {actual_count} records successfully synced")
+
+            duration = (get_toronto_now() - start_time).total_seconds()
+            logger.info(f"Synced {synced_count} records for {report_name} in {duration:.2f}s")
+
+            # Build message with skipped records info
+            message = f"Successfully synced {synced_count} records and processed {urls_processed} image URLs"
+            if skipped_count > 0:
+                message += f" (⚠️ {skipped_count} records skipped - missing ID field)"
+
+            return {
+                "report_name": report_name,
+                "status": "success",
+                "records_synced": synced_count,
+                "records_skipped": skipped_count,
+                "urls_processed": urls_processed,
+                "duration": duration,
+                "message": message,
+            }
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Failed to sync {report_name}: {error_msg}")
+            await db.log_sync(sync_type, table_name, "failed", synced_count, error_msg)
+
+            return {
+                "report_name": report_name,
+                "status": "failed",
+                "records_synced": synced_count,
+                "error": error_msg,
+                "message": f"Sync failed: {error_msg}"
+            }
+
+    async def sync_reports(self, report_names: List[str], sync_type: str = "daily") -> Dict:
+        """Sync multiple reports"""
+        results = []
+
+        for report_name in report_names:
+            result = await self.sync_report(report_name, sync_type)
+            results.append(result)
+
+        # Summary
+        total_synced = sum(r["records_synced"] for r in results if r["status"] == "success")
+        total_urls = sum(r.get("urls_processed", 0) for r in results if r["status"] == "success")
+        failed_reports = [r["report_name"] for r in results if r["status"] == "failed"]
+
+        return {
+            "status": "success" if not failed_reports else "partial",
+            "total_records_synced": total_synced,
+            "total_urls_processed": total_urls,
+            "results": results,
+            "failed_reports": failed_reports,
+            "message": f"Synced {total_synced} records across {len(report_names)} reports and processed {total_urls} image URLs",
+        }
+
+    async def get_available_reports(self) -> List[str]:
+        """Get list of available reports from Zoho API"""
+        try:
+            # Fetch all reports from Zoho API
+            reports = await zoho_api.list_all_reports()
+
+            # Extract report link names (used for API calls)
+            report_names = [report["link_name"] for report in reports]
+
+            logger.info(f"Found {len(report_names)} reports from Zoho API")
+            return sorted(report_names)
+        except Exception as e:
+            logger.error(f"Failed to fetch reports from API, falling back to defaults: {e}")
+            # Fallback to known reports if API fails
+            return ["Item_Report", "All_Quotes"]
+
+    async def get_available_reports_with_display_names(self) -> List[Dict]:
+        """Get list of available reports with display names from Zoho API"""
+        try:
+            # Fetch all reports from Zoho API
+            reports = await zoho_api.list_all_reports()
+
+            # Return sorted list of report info
+            return sorted(reports, key=lambda x: x["display_name"])
+        except Exception as e:
+            logger.error(f"Failed to fetch reports from API, falling back to defaults: {e}")
+            # Fallback to known reports if API fails
+            return [
+                {"link_name": "Item_Report", "display_name": "Item Report"},
+                {"link_name": "All_Quotes", "display_name": "All Quotes"}
+            ]
+
+    async def get_sync_status(self) -> Dict:
+        """Get sync status for all reports"""
+        stats = await db.get_table_stats()
+        history = await db.get_sync_history(limit=10)
+
+        # Format stats
+        report_status = {}
+        for stat in stats:
+            report_status[stat["table_name"]] = {
+                "last_modified": stat["last_modified_time"],
+                "record_count": stat["record_count"],
+                "last_sync": stat["updated_at"],
+                "successful_syncs": stat["successful_syncs"],
+                "failed_syncs": stat["failed_syncs"]
+            }
+
+        return {
+            "reports": report_status,
+            "recent_syncs": history
+        }
+
+# Service instance
+sync_service = SyncService()

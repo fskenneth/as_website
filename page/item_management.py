@@ -1,0 +1,1160 @@
+from fasthtml.common import *
+from monsterui.all import *
+import os
+import sqlite3
+from datetime import datetime
+from typing import List, Dict, Tuple
+import json
+from starlette.responses import JSONResponse
+
+# Database path
+ZOHO_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "zoho_sync.db")
+
+# Initialize FastHTML app
+item_management_app, rt = fast_app(
+    live=True,  # Always enable live reload
+    hdrs=[
+        Theme.blue.headers(daisy=True),
+        Meta(name="viewport", content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"),
+        Style("""
+            /* CSS Variables for Themes */
+            :root, [data-theme="light"] {
+                --bg-primary: #ffffff;
+                --bg-secondary: #f8f9fa;
+                --bg-card: #ffffff;
+                --color-primary: #212529;
+                --color-secondary: #6c757d;
+                --color-accent: #666666;
+                --border-color: #e0e0e0;
+                --border-hover: #333333;
+                --shadow-color: rgba(0, 0, 0, 0.1);
+                --modal-bg: rgba(0, 0, 0, 0.5);
+            }
+
+            [data-theme="dark"] {
+                --bg-primary: #1a1a1a;
+                --bg-secondary: #2d2d2d;
+                --bg-card: #242424;
+                --color-primary: #f8f9fa;
+                --color-secondary: #adb5bd;
+                --color-accent: #999999;
+                --border-color: #404040;
+                --border-hover: #ffffff;
+                --shadow-color: rgba(0, 0, 0, 0.3);
+                --modal-bg: rgba(0, 0, 0, 0.8);
+            }
+
+            html, body {
+                background-color: var(--bg-primary) !important;
+                color: var(--color-primary) !important;
+                transition: background-color 0.3s ease, color 0.3s ease;
+            }
+
+            /* Ensure all text elements use the theme colors */
+            h1, h2, h3, h4, h5, h6, p, span, div, label, input, select, textarea {
+                color: var(--color-primary);
+            }
+
+            label, .uk-label {
+                color: var(--color-primary) !important;
+                border: none !important;
+                background: transparent !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+            }
+
+            .container {
+                max-width: 1450px; /* Increased max-width for 4 columns */
+                margin: 0 auto;
+                padding: 20px;
+            }
+
+            .item-card {
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                padding: 16px;
+                margin-bottom: 16px;
+                background-color: var(--bg-card);
+                box-shadow: 0 2px 4px var(--shadow-color);
+            }
+
+            .item-image {
+                width: 100%;
+                height: 300px;
+                object-fit: contain;
+                border-radius: 4px;
+                margin-bottom: 12px;
+                cursor: pointer;
+                background-color: white;
+            }
+
+            .item-info {
+                margin-bottom: 8px;
+                font-size: 14px;
+            }
+
+            .item-name {
+                font-weight: bold;
+                font-size: 16px;
+                margin-bottom: 4px;
+            }
+
+            .item-dimensions {
+                color: var(--color-secondary);
+                font-size: 14px;
+            }
+
+            .item-attributes {
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+                margin: 8px 0;
+            }
+
+            .attribute-tag {
+                background-color: var(--bg-secondary);
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 12px;
+            }
+
+            .location-section {
+                background-color: var(--bg-secondary);
+                padding: 8px;
+                border-radius: 4px;
+                margin: 8px 0;
+            }
+
+            .location-header {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 8px;
+                font-weight: 500;
+            }
+
+            .qr-codes {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+
+            .qr-code-tag {
+                background-color: var(--bg-secondary);
+                border: 1px solid var(--border-color);
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 12px;
+                font-family: monospace;
+                cursor: pointer;
+                color: var(--color-primary);
+            }
+
+            .qr-code-tag:hover {
+                background-color: var(--color-primary);
+                color: var(--bg-primary);
+            }
+
+            .filter-section {
+                background-color: var(--bg-secondary);
+                padding: 16px;
+                border-radius: 8px;
+                margin-bottom: 24px;
+                box-shadow: 0 2px 4px var(--shadow-color);
+                border: 1px solid var(--border-color);
+            }
+
+            .filter-section h4 {
+                color: var(--color-primary) !important;
+            }
+
+            .count-badge {
+                background-color: var(--color-primary);
+                color: var(--bg-primary);
+                padding: 2px 6px;
+                border-radius: 12px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+
+            .scroll-top-btn {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                z-index: 999;
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                background-color: rgba(128, 128, 128, 0.7);
+                color: white;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+                transition: background-color 0.3s, transform 0.3s;
+            }
+
+            .scroll-top-btn:hover {
+                background-color: rgba(128, 128, 128, 0.9);
+                transform: scale(1.05);
+            }
+
+            /* Navigation Menu */
+            nav {
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+            }
+
+            nav a {
+                text-decoration: none;
+                color: var(--color-primary);
+                transition: all 0.3s ease;
+            }
+
+            nav a:hover {
+                transform: translateY(-1px);
+            }
+
+            /* Theme Toggle Button */
+            .theme-toggle {
+                background: none;
+                border: 2px solid var(--color-primary);
+                border-radius: 50%;
+                cursor: pointer;
+                padding: 8px;
+                width: 40px;
+                height: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.3s ease;
+                margin-left: 20px;
+            }
+            .theme-toggle:hover {
+                transform: scale(1.1);
+                background: var(--color-primary);
+            }
+            .theme-toggle:hover .theme-icon {
+                stroke: var(--bg-primary);
+            }
+            .theme-icon {
+                width: 20px;
+                height: 20px;
+                transition: all 0.3s ease;
+            }
+            .theme-icon.sun { display: block; }
+            .theme-icon.moon { display: none; }
+            [data-theme="dark"] .theme-icon.sun { display: none; }
+            [data-theme="dark"] .theme-icon.moon { display: block; }
+
+            /* Global input styles */
+            input[type="text"], input[type="number"], select, textarea {
+                background: var(--bg-secondary);
+                color: var(--color-primary);
+                border: 1px solid var(--border-color);
+            }
+
+            /* Fix dropdown menu width to match select field */
+            .uk-dropdown {
+                min-width: 100% !important;
+                width: 100% !important;
+            }
+
+            /* Ensure select elements and their dropdowns have consistent width */
+            select, .uk-select, .uk-input-fake {
+                width: 100% !important;
+            }
+
+            /* Make dropdown position relative to its parent */
+            .uk-form-controls {
+                position: relative;
+            }
+        """),
+    ],
+)
+
+
+def get_db_connection():
+    """Get SQLite database connection"""
+    conn = sqlite3.connect(ZOHO_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def get_items_grouped() -> Dict[str, List[sqlite3.Row]]:
+    """Get all items grouped by Item_Name"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Get all items ordered by Item_Name, Current_Location, and Barcode
+        cursor.execute("""
+            SELECT * FROM Item_Report
+            WHERE Item_Name IS NOT NULL AND Item_Name != ''
+            ORDER BY Item_Name,
+                     CASE WHEN Current_Location LIKE '%3600 Warehouse%' THEN 0 ELSE 1 END,
+                     Current_Location,
+                     Barcode
+        """)
+
+        items = cursor.fetchall()
+        conn.close()
+
+        # Group by Item_Name
+        grouped_items = {}
+        for item in items:
+            item_name = item['Item_Name']
+            if item_name not in grouped_items:
+                grouped_items[item_name] = []
+            grouped_items[item_name].append(item)
+    except sqlite3.OperationalError:
+        # Table doesn't exist yet
+        return {}
+
+    return grouped_items
+
+
+def parse_location(location_str: str) -> str:
+    """Parse location JSON to get display_value"""
+    if not location_str:
+        return 'Unknown Location'
+
+    # Check if it's a JSON string
+    if location_str.startswith('{') and 'display_value' in location_str:
+        try:
+            location_data = json.loads(location_str)
+            return location_data.get('display_value', location_str)
+        except json.JSONDecodeError:
+            return location_str
+    return location_str
+
+
+def get_location_groups(items: List[sqlite3.Row]) -> Dict[str, List[sqlite3.Row]]:
+    """Group items by location"""
+    location_groups = {}
+    for item in items:
+        location = parse_location(item['Current_Location'])
+        if location not in location_groups:
+            location_groups[location] = []
+        location_groups[location].append(item)
+    return location_groups
+
+
+def get_item_image_url(item: sqlite3.Row) -> str:
+    """Get the appropriate image URL for an item"""
+    # Check if we have a resized image
+    if item['Resized_Image'] and item['Resized_Image'] != 'blank.png':
+        # If it's already a full URL (starts with http), use it directly
+        if item['Resized_Image'].startswith('http'):
+            return item['Resized_Image']
+        # Otherwise, return a data URL for white background
+        else:
+            # Return white background as data URL
+            return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Crect width='300' height='300' fill='white'/%3E%3C/svg%3E"
+    # Check if we have an original image
+    elif item['Item_Image'] and item['Item_Image'] != 'blank.png':
+        # If it's already a full URL (starts with http), use it directly
+        if item['Item_Image'].startswith('http'):
+            return item['Item_Image']
+        # Otherwise, return a data URL for white background
+        else:
+            # Return white background as data URL
+            return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Crect width='300' height='300' fill='white'/%3E%3C/svg%3E"
+    # Default to white background
+    else:
+        # Return white background as data URL
+        return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Crect width='300' height='300' fill='white'/%3E%3C/svg%3E"
+
+
+def get_item_attributes(item: sqlite3.Row) -> List[str]:
+    """Get item attributes as a list"""
+    attributes = []
+    if item['Item_Style']:
+        attributes.append(item['Item_Style'])
+    if item['Item_Color']:
+        attributes.append(item['Item_Color'])
+    if item['Item_Tone']:
+        attributes.append(item['Item_Tone'])
+    if item['Item_Material']:
+        attributes.append(item['Item_Material'])
+    if item['Item_Size']:
+        attributes.append(item['Item_Size'])
+    return attributes
+
+
+def create_item_card(item_name: str, items: List[sqlite3.Row]) -> Div:
+    """Create a card for an item group"""
+    if not items:
+        return Div()
+
+    # Use the first item for display
+    first_item = items[0]
+
+    # Get dimensions
+    width = first_item['Item_Width'] or '0'
+    height = first_item['Item_Height'] or '0'
+    depth = first_item['Item_Depth'] or '0'
+    dimensions = f"{width}x{height}x{depth}"
+
+    # Get counts
+    warehouse_count = len([i for i in items if '3600 Warehouse' in parse_location(i['Current_Location'])])
+    total_count = len(items)
+
+    # Get attributes
+    attributes = get_item_attributes(first_item)
+
+    # Group by location
+    location_groups = get_location_groups(items)
+
+    # Create location sections with QR codes
+    location_sections = []
+    for location, location_items in location_groups.items():
+        qr_codes = []
+        for item in location_items:
+            if item['Barcode']:
+                qr_codes.append(
+                    Span(
+                        item['Barcode'],
+                        cls="qr-code-tag",
+                        onclick=f"showItemDetails('{item['ID']}')"
+                    )
+                )
+
+        location_sections.append(
+            Div(
+                Div(
+                    UkIcon("map-pin", height=16, width=16),
+                    Span(f"{location} ({len(location_items)})"),
+                    cls="location-header"
+                ),
+                Div(*qr_codes, cls="qr-codes") if qr_codes else Div("No QR codes", style="color: #999; font-size: 12px;"),
+                cls="location-section"
+            )
+        )
+
+    return Div(
+        # Count badges
+        Div(
+            Span(str(warehouse_count), cls="count-badge", style="background-color: green; color: white; margin-right: 4px;"),
+            Span(str(total_count), cls="count-badge", style="background-color: black; color: white;"),
+            style="position: absolute; top: 20px; right: 22px; z-index: 10;"
+        ),
+
+        # Item image with lazy loading
+        Img(
+            src=get_item_image_url(first_item),
+            alt=item_name,
+            cls="item-image",
+            loading="lazy",
+            onclick=f"showImageModal('{first_item['ID']}')"
+        ),
+
+        # Item name and dimensions
+        Div(
+            Div(item_name, cls="item-name"),
+            Div(dimensions, cls="item-dimensions", style="text-align: right;"),
+            cls="item-info",
+            style="display: flex; justify-content: space-between; align-items: center;"
+        ),
+
+        # Attributes
+        Div(
+            *[Span(attr, cls="attribute-tag") for attr in attributes],
+            cls="item-attributes"
+        ) if attributes else None,
+
+        # Location sections
+        *location_sections,
+
+        cls="item-card",
+        style="position: relative;"
+    )
+
+
+@rt("/")
+async def get(request):
+    """Main page handler"""
+
+    # Get all grouped items
+    grouped_items = get_items_grouped()
+
+    # Get unique item types and locations for filters
+    item_types = []
+    locations = []
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT DISTINCT Item_Type FROM Item_Report WHERE Item_Type IS NOT NULL ORDER BY Item_Type")
+        item_types = [row[0] for row in cursor.fetchall()]
+
+        cursor.execute("SELECT DISTINCT Current_Location FROM Item_Report WHERE Current_Location IS NOT NULL ORDER BY Current_Location")
+        for row in cursor.fetchall():
+            parsed_location = parse_location(row[0])
+            if parsed_location not in locations:
+                locations.append(parsed_location)
+        locations.sort()
+
+        conn.close()
+    except sqlite3.OperationalError:
+        # Table doesn't exist yet
+        pass
+
+    return [
+        Title("Item Management"),
+        # Navigation Menu
+        Nav(
+            Div(
+                Div(
+                    A("Item", href="/item_management/", cls="px-4 py-2 bg-blue-500 text-white rounded", style="font-weight: bold;"),
+                    A("Zoho Sync", href="/zoho_sync/", cls="px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"),
+                    cls="flex gap-2 items-center"
+                ),
+                # Theme Toggle Button
+                Button(
+                    Svg(
+                        Path(d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"),
+                        viewBox="0 0 24 24",
+                        fill="none",
+                        stroke="currentColor",
+                        stroke_width="2",
+                        stroke_linecap="round",
+                        stroke_linejoin="round",
+                        cls="theme-icon sun"
+                    ),
+                    Svg(
+                        Path(d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"),
+                        viewBox="0 0 24 24",
+                        fill="none",
+                        stroke="currentColor",
+                        stroke_width="2",
+                        stroke_linecap="round",
+                        stroke_linejoin="round",
+                        cls="theme-icon moon"
+                    ),
+                    cls="theme-toggle",
+                    id="theme-toggle",
+                    **{"aria-label": "Toggle theme"}
+                ),
+                cls="flex justify-between items-center",
+                style="margin: 0 auto; max-width: 1450px; width: 100%;"
+            ),
+            style="background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); padding: 10px 20px; margin-bottom: 20px;",
+            cls="sticky top-0 z-50"
+        ),
+        Container(
+            H2("Item Management", style="margin-bottom: 24px;"),
+
+            # Filter section
+            Div(
+                H4("Filters", style="margin-bottom: 16px;"),
+                Grid(
+                    Div(
+                        Label("Search by Name or QR Code", **{"for": "filter_name"}, style="display: block; margin-bottom: 4px;"),
+                        Input(
+                            type="text",
+                            id="filter_name",
+                            name="filter_name",
+                            placeholder="Enter item name or QR code...",
+                            hx_get="/item_management/filter_items",
+                            hx_trigger="keyup changed delay:500ms",
+                            hx_target="#items-container",
+                            hx_include="#filter_type, #filter_location",
+                            cls="uk-input",
+                            style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary); color: var(--color-primary);"
+                        ),
+                    ),
+                    Div(
+                        Label("Item Type", **{"for": "filter_type"}, style="display: block; margin-bottom: 4px;"),
+                        NotStr(f'''<select id="filter_type" name="filter_type"
+                            hx-get="/item_management/filter_items"
+                            hx-trigger="change"
+                            hx-target="#items-container"
+                            hx-include="#filter_name, #filter_location"
+                            style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary); color: var(--color-primary);">
+                            <option value="All" selected>All</option>
+                            {"".join([f'<option value="{t}">{t}</option>' for t in item_types])}
+                        </select>''')
+                    ),
+                    Div(
+                        Label("Location", **{"for": "filter_location"}, style="display: block; margin-bottom: 4px;"),
+                        NotStr(f'''<select id="filter_location" name="filter_location"
+                            hx-get="/item_management/filter_items"
+                            hx-trigger="change"
+                            hx-target="#items-container"
+                            hx-include="#filter_name, #filter_type"
+                            style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary); color: var(--color-primary);">
+                            <option value="All" selected>All</option>
+                            {"".join([f'<option value="{l}">{l}</option>' for l in locations])}
+                        </select>''')
+                    ),
+                    cols_lg=3
+                ),
+                cls="filter-section"
+            ),
+
+            # Items container
+            Div(
+                Grid(
+                    *[create_item_card(name, items) for name, items in grouped_items.items()],
+                    cols_xl=3, cols_lg=3, cols_md=2, cols_sm=1,  # Responsive columns
+                    cls="gap-4"
+                ) if grouped_items else Div(
+                    H3("No Items Found"),
+                    P("The Item_Report table doesn't exist yet or is empty."),
+                    P("Please go to ", A("Zoho Sync", href="/zoho_sync/"), " and sync the Item_Report first."),
+                    style="text-align: center; padding: 40px; background: var(--bg-secondary); border-radius: 8px;"
+                ),
+                id="items-container"
+            ),
+
+            # Scroll to top button
+            Div(
+                UkIcon("chevron-up", height=24, width=24),
+                cls="scroll-top-btn",
+                onclick="window.scrollTo({top: 0, behavior: 'smooth'})"
+            ),
+
+            cls="mt-4 mb-4"
+        ),
+
+        # Item Details Modal
+        Div(
+            Div(
+                Div(
+                    Div(
+                        H3("Item Details", style="margin: 0; padding: 0;"),
+                        Span("×",
+                             onclick="closeModal()",
+                             style="font-size: 24px; cursor: pointer; color: var(--color-secondary);"),
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;"
+                    ),
+                    Div(id="modal-content", style="max-height: 70vh; overflow-y: auto;"),
+                    Div(
+                        Button("Save Changes",
+                               onclick="saveItemChanges()",
+                               style="background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; margin-right: 10px; cursor: pointer;"),
+                        Button("Delete Item",
+                               onclick="deleteItem()",
+                               style="background-color: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 4px; margin-right: 10px; cursor: pointer;"),
+                        Button("Cancel",
+                               onclick="closeModal()",
+                               style="background-color: #6c757d; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer;"),
+                        style="display: flex; justify-content: flex-end; margin-top: 20px; gap: 10px;"
+                    ),
+                    style="background: var(--bg-card); color: var(--color-primary); padding: 30px; border-radius: 8px; width: 90%; max-width: 800px; position: relative;"
+                ),
+                id="item-modal",
+                style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--modal-bg); display: none; z-index: 1000; justify-content: center; align-items: center;"
+            )
+        ),
+
+        # Image Modal
+        Div(
+            Div(
+                Div(
+                    Span("×",
+                         onclick="closeImageModal()",
+                         style="position: absolute; top: 10px; right: 20px; font-size: 32px; cursor: pointer; color: var(--color-secondary);"),
+                    Div(id="image-modal-content", style="display: flex; gap: 10px; justify-content: center; align-items: center;"),
+                    style="background: var(--bg-card); color: var(--color-primary); padding: 20px; border-radius: 8px; width: 95%; max-width: 95vw; position: relative;"
+                ),
+                id="image-modal",
+                style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--modal-bg); display: none; z-index: 1001; justify-content: center; align-items: center;"
+            )
+        ),
+
+        # Add JavaScript for modal handling and enhanced lazy loading
+        Script("""
+            let currentItemId = null;
+
+            async function showItemDetails(itemId) {
+                currentItemId = itemId;
+                try {
+                    const response = await fetch(`/item_management/get_item_details/${itemId}`);
+                    const item = await response.json();
+
+                    if (item.error) {
+                        alert('Error: ' + item.error);
+                        return;
+                    }
+
+                    const modalContent = document.getElementById('modal-content');
+                    modalContent.innerHTML = createItemDetailsHTML(item);
+
+                    document.getElementById('item-modal').style.display = 'flex';
+                } catch (error) {
+                    console.error('Error loading item details:', error);
+                    alert('Error loading item details');
+                }
+            }
+
+            function createItemDetailsHTML(item) {
+                return `
+                    <div class="grid gap-4">
+                        <!-- Row 1: Images -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block font-bold mb-2">Original Image</label>
+                                <img src="${item.Item_Image}" class="w-full h-auto rounded-lg border cursor-pointer mb-2" style="background-color: white;" onclick="window.open('${item.Item_Image}', '_blank')">
+                                <button onclick="downloadImage('${item.Item_Image}', '${item.Item_Name}_original.jpg')" class="w-full px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition">
+                                    Download Original
+                                </button>
+                            </div>
+                            <div>
+                                <label class="block font-bold mb-2">Resized Image</label>
+                                <img src="${item.Resized_Image}" class="w-full h-auto rounded-lg border cursor-pointer mb-2" style="background-color: white;" onclick="window.open('${item.Resized_Image}', '_blank')">
+                                <button onclick="downloadImage('${item.Resized_Image}', '${item.Item_Name}_resized.jpg')" class="w-full px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition">
+                                    Download Resized
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Basic Information -->
+                        <div>
+                            <h4 class="font-bold text-lg mb-2">Basic Information</h4>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block mb-1">Item Name:</label>
+                                    <input type="text" id="edit_Item_Name" value="${item.Item_Name || ''}" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label class="block mb-1">Item Type:</label>
+                                    <input type="text" id="edit_Item_Type" value="${item.Item_Type || ''}" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label class="block mb-1">QR Code:</label>
+                                    <input type="text" id="edit_Barcode" value="${item.Barcode || ''}" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-700">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Row 3: Attributes -->
+                        <div>
+                            <h4 class="font-bold text-lg mb-2">Attributes</h4>
+                            <div class="grid grid-cols-5 gap-4">
+                                <div>
+                                    <label class="block mb-1">Style:</label>
+                                    <input type="text" id="edit_Item_Style" value="${item.Item_Style || ''}" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label class="block mb-1">Color:</label>
+                                    <input type="text" id="edit_Item_Color" value="${item.Item_Color || ''}" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label class="block mb-1">Tone:</label>
+                                    <input type="text" id="edit_Item_Tone" value="${item.Item_Tone || ''}" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label class="block mb-1">Material:</label>
+                                    <input type="text" id="edit_Item_Material" value="${item.Item_Material || ''}" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label class="block mb-1">Size:</label>
+                                    <input type="text" id="edit_Item_Size" value="${item.Item_Size || ''}" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-700">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Row 4: Dimensions -->
+                        <div>
+                            <h4 class="font-bold text-lg mb-2">Dimensions</h4>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block mb-1">Width:</label>
+                                    <input type="number" id="edit_Item_Width" value="${item.Item_Width || ''}" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label class="block mb-1">Height:</label>
+                                    <input type="number" id="edit_Item_Height" value="${item.Item_Height || ''}" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label class="block mb-1">Depth:</label>
+                                    <input type="number" id="edit_Item_Depth" value="${item.Item_Depth || ''}" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-700">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 20px;">
+                        <h4>System Information</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; font-size: 14px; color: #666;">
+                            <div>ID: ${item.ID}</div>
+                            <div>Added: ${item.Added_Time || 'N/A'} by ${item.Added_User || 'N/A'}</div>
+                            <div>Modified: ${item.Modified_Time || 'N/A'} by ${item.Modified_User || 'N/A'}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            async function saveItemChanges() {
+                if (!currentItemId) return;
+
+                const formData = {
+                    Item_Name: document.getElementById('edit_Item_Name').value,
+                    Item_Type: document.getElementById('edit_Item_Type').value,
+                    Barcode: document.getElementById('edit_Barcode').value,
+                    Item_Width: document.getElementById('edit_Item_Width').value,
+                    Item_Height: document.getElementById('edit_Item_Height').value,
+                    Item_Depth: document.getElementById('edit_Item_Depth').value,
+                    Item_Style: document.getElementById('edit_Item_Style').value,
+                    Item_Color: document.getElementById('edit_Item_Color').value,
+                    Item_Tone: document.getElementById('edit_Item_Tone').value,
+                    Item_Material: document.getElementById('edit_Item_Material').value,
+                    Item_Size: document.getElementById('edit_Item_Size').value
+                };
+
+                try {
+                    const response = await fetch(`/item_management/update_item/${currentItemId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formData)
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        closeModal();
+                        // Refresh the page to show updated data
+                        location.reload();
+                    } else {
+                        alert('Error updating item: ' + (result.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Error saving item:', error);
+                    alert('Error saving item changes');
+                }
+            }
+
+            async function deleteItem() {
+                if (!currentItemId) return;
+
+                if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/item_management/delete_item/${currentItemId}`, {
+                        method: 'DELETE'
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        alert('Item deleted successfully!');
+                        closeModal();
+                        // Refresh the page to show updated data
+                        location.reload();
+                    } else {
+                        alert('Error deleting item: ' + (result.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Error deleting item:', error);
+                    alert('Error deleting item');
+                }
+            }
+
+            function closeModal() {
+                document.getElementById('item-modal').style.display = 'none';
+                currentItemId = null;
+            }
+
+            function closeImageModal() {
+                document.getElementById('image-modal').style.display = 'none';
+            }
+
+            async function downloadImage(imageUrl, filename) {
+                try {
+                    // Fetch the image
+                    const response = await fetch(imageUrl);
+                    const blob = await response.blob();
+
+                    // Create a temporary URL for the blob
+                    const url = window.URL.createObjectURL(blob);
+
+                    // Create a temporary anchor element and trigger download
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename.replace(/[^a-zA-Z0-9._-]/g, '_'); // Sanitize filename
+                    document.body.appendChild(a);
+                    a.click();
+
+                    // Cleanup
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } catch (error) {
+                    console.error('Error downloading image:', error);
+                    alert('Error downloading image. You can right-click the image and choose "Save Image As..." instead.');
+                }
+            }
+
+            // Close modal when clicking outside
+            document.addEventListener('DOMContentLoaded', function() {
+                const modal = document.getElementById('item-modal');
+                if (modal) {
+                    modal.addEventListener('click', function(e) {
+                        if (e.target === this) {
+                            closeModal();
+                        }
+                    });
+                }
+                const imageModal = document.getElementById('image-modal');
+                if (imageModal) {
+                    imageModal.addEventListener('click', function(e) {
+                        if (e.target === this) {
+                            closeImageModal();
+                        }
+                    });
+                }
+            });
+
+            async function showImageModal(itemId) {
+                try {
+                    const response = await fetch(`/item_management/get_item_details/${itemId}`);
+                    const item = await response.json();
+
+                    if (item.error) {
+                        alert('Error: ' + item.error);
+                        return;
+                    }
+
+                    const imageModalContent = document.getElementById('image-modal-content');
+                    imageModalContent.innerHTML = `
+                        <div style="flex: 1; text-align: center;">
+                            <label class="block font-bold mb-2">Original Image</label>
+                            <img src="${item.Item_Image}" style="max-width: 100%; max-height: 80vh; background-color: white; border-radius: 4px;">
+                        </div>
+                        <div style="flex: 1; text-align: center;">
+                            <label class="block font-bold mb-2">Resized Image</label>
+                            <img src="${item.Resized_Image}" style="max-width: 100%; max-height: 80vh; background-color: white; border-radius: 4px;">
+                        </div>
+                    `;
+
+                    document.getElementById('image-modal').style.display = 'flex';
+                } catch (error) {
+                    console.error('Error loading item images:', error);
+                    alert('Error loading item images');
+                }
+            }
+
+            // Enhanced lazy loading with Intersection Observer
+            document.addEventListener('DOMContentLoaded', function() {
+                // Native lazy loading is already enabled with loading="lazy"
+                // This is additional optimization for browsers that support it
+                if ('loading' in HTMLImageElement.prototype) {
+                    // Browser supports native lazy loading
+                    console.log('Native lazy loading is supported');
+                } else {
+                    // Fallback for older browsers
+                    const images = document.querySelectorAll('img[loading="lazy"]');
+                    const imageObserver = new IntersectionObserver((entries, observer) => {
+                        entries.forEach(entry => {
+                            if (entry.isIntersecting) {
+                                const img = entry.target;
+                                img.src = img.dataset.src || img.src;
+                                img.classList.remove('lazy');
+                                imageObserver.unobserve(img);
+                            }
+                        });
+                    });
+
+                    images.forEach(img => imageObserver.observe(img));
+                }
+            });
+
+            // Theme Management
+            const ThemeManager = {
+                init() {
+                    this.themeToggle = document.getElementById('theme-toggle');
+                    this.prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+                    // Check for saved theme preference
+                    const savedTheme = localStorage.getItem('theme');
+                    if (savedTheme) {
+                        this.setTheme(savedTheme);
+                    } else {
+                        // Default to light theme if no preference is saved
+                        this.setTheme('light');
+                    }
+
+                    // Theme toggle button
+                    if (this.themeToggle) {
+                        this.themeToggle.addEventListener('click', () => {
+                            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+                            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                            this.setTheme(newTheme);
+                            localStorage.setItem('theme', newTheme);
+                        });
+                    }
+                },
+
+                setTheme(theme) {
+                    document.documentElement.setAttribute('data-theme', theme);
+                    // Force a style recalculation
+                    document.documentElement.style.display = 'none';
+                    document.documentElement.offsetHeight; // Trigger reflow
+                    document.documentElement.style.display = '';
+                }
+            };
+
+            // Initialize theme on DOM load
+            document.addEventListener('DOMContentLoaded', function() {
+                ThemeManager.init();
+            });
+        """)
+    ]
+
+
+@rt("/filter_items")
+def filter_items(filter_name: str = "", filter_type: str = "All", filter_location: str = "All"):
+    """Filter items based on criteria"""
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Build query with filters
+    query = """
+        SELECT * FROM Item_Report
+        WHERE Item_Name IS NOT NULL AND Item_Name != ''
+    """
+    params = []
+
+    if filter_name:
+        query += " AND (Item_Name LIKE ? OR Barcode LIKE ?)"
+        params.append(f"%{filter_name}%")
+        params.append(f"%{filter_name}%")
+
+    if filter_type != "All":
+        query += " AND Item_Type = ?"
+        params.append(filter_type)
+
+    if filter_location != "All":
+        # Need to handle JSON location values
+        query += " AND Current_Location LIKE ?"
+        params.append(f"%{filter_location}%")
+
+    query += """ ORDER BY Item_Name,
+                 CASE WHEN Current_Location LIKE '%3600 Warehouse%' THEN 0 ELSE 1 END,
+                 Current_Location,
+                 Barcode"""
+
+    cursor.execute(query, params)
+    items = cursor.fetchall()
+    conn.close()
+
+    # Group filtered items
+    grouped_items = {}
+    for item in items:
+        item_name = item['Item_Name']
+        if item_name not in grouped_items:
+            grouped_items[item_name] = []
+        grouped_items[item_name].append(item)
+
+    # Return filtered grid
+    return Grid(
+        *[create_item_card(name, items) for name, items in grouped_items.items()],
+        cols_xl=3, cols_lg=3, cols_md=2, cols_sm=1,  # Responsive columns
+        cls="gap-4"
+    )
+
+
+@rt("/get_item_details/{item_id}")
+def get_item_details(item_id: str):
+    """Get detailed information for a specific item"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM Item_Report WHERE ID = ?", (item_id,))
+    item = cursor.fetchone()
+    conn.close()
+
+    if not item:
+        return JSONResponse({"error": "Item not found"}, status_code=404)
+
+    # Convert Row to dict and handle None values
+    item_dict = dict(item)
+    for key, value in item_dict.items():
+        if value is None:
+            item_dict[key] = ""
+
+    return JSONResponse(item_dict)
+
+
+@rt("/update_item/{item_id}", methods=["POST"])
+async def update_item(item_id: str, request):
+    """Update an item's information"""
+    try:
+        # Get JSON data from request
+        import json
+        body = await request.body()
+        data = json.loads(body.decode())
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Build update query dynamically based on provided fields
+        fields_to_update = []
+        values = []
+
+        # Define which fields can be updated
+        updateable_fields = [
+            'Item_Name', 'Item_Type', 'Barcode',
+            'Item_Width', 'Item_Height', 'Item_Depth',
+            'Item_Style', 'Item_Color', 'Item_Tone', 'Item_Material', 'Item_Size'
+        ]
+
+        for field in updateable_fields:
+            if field in data:
+                fields_to_update.append(f"{field} = ?")
+                values.append(data[field])
+
+        if not fields_to_update:
+            return {"error": "No valid fields to update"}, 400
+
+        # Add modified timestamp and user
+        fields_to_update.append("Modified_Time = ?")
+        fields_to_update.append("Modified_User = ?")
+        values.extend([datetime.now().strftime("%m/%d/%Y %H:%M:%S"), "web_user"])
+
+        # Add item_id for WHERE clause
+        values.append(item_id)
+
+        update_query = f"UPDATE Item_Report SET {', '.join(fields_to_update)} WHERE ID = ?"
+
+        cursor.execute(update_query, values)
+        conn.commit()
+        conn.close()
+
+        return JSONResponse({"success": True, "message": "Item updated successfully"})
+
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@rt("/delete_item/{item_id}", methods=["DELETE"])
+def delete_item(item_id: str):
+    """Delete an item from the database"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check if item exists
+        cursor.execute("SELECT ID FROM Item_Report WHERE ID = ?", (item_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return JSONResponse({"success": False, "error": "Item not found"}, status_code=404)
+
+        # Delete the item
+        cursor.execute("DELETE FROM Item_Report WHERE ID = ?", (item_id,))
+        conn.commit()
+        conn.close()
+
+        return JSONResponse({"success": True, "message": "Item deleted successfully"})
+
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+# Export the app
+item_management_app_export = item_management_app
