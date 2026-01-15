@@ -1115,6 +1115,9 @@ def test_inpainting_page():
                                  (model === currentLoadedModel ? userYRotation : 0);
                     const tilt = model.userData.tilt !== undefined ? model.userData.tilt :
                                  (model === currentLoadedModel ? modelTilt : DEFAULT_TILT);
+                    // Get per-model brightness from userData, fallback to global for current model
+                    const brightness = model.userData.brightness !== undefined ? model.userData.brightness :
+                                       (model === currentLoadedModel ? modelBrightness : 2.5);
                     return {
                         position_x: model.position.x,
                         position_y: model.position.y,
@@ -1122,7 +1125,7 @@ def test_inpainting_page():
                         scale: model.scale.x,
                         rotation_y: yRot,
                         tilt: tilt,
-                        brightness: modelBrightness
+                        brightness: brightness
                     };
                 });
 
@@ -1641,6 +1644,7 @@ def test_inpainting_page():
                     const deltaX = e.clientX - lastMouseX;
                     rotateAroundFloor(currentLoadedModel, deltaX * 0.02);
                     updateControlPositions();
+                    saveModelState();  // Live save
                     lastMouseX = e.clientX;
                 }
                 if (isDraggingScale && currentLoadedModel) {
@@ -1649,6 +1653,7 @@ def test_inpainting_page():
                     const newScale = currentLoadedModel.scale.x * scaleFactor;
                     if (newScale > 0.1 && newScale < 10) {
                         currentLoadedModel.scale.setScalar(newScale);
+                        saveModelState();  // Live save
                     }
                     lastMouseY = e.clientY;
                 }
@@ -1656,6 +1661,7 @@ def test_inpainting_page():
                     const deltaX = e.clientX - lastMouseX;
                     modelBrightness = Math.max(0.2, Math.min(2.5, modelBrightness + deltaX * 0.01));
                     applyBrightnessToModel(modelBrightness);
+                    saveModelState();  // Live save
                     lastMouseX = e.clientX;
                 }
                 if (isDraggingTilt && currentLoadedModel) {
@@ -1671,6 +1677,7 @@ def test_inpainting_page():
 
                     updateContactMarkerPositions();
                     updateControlPositions();
+                    saveModelState();  // Live save
                     lastMouseY = e.clientY;
                 }
             });
@@ -1713,6 +1720,7 @@ def test_inpainting_page():
                     const deltaX = e.touches[0].clientX - lastMouseX;
                     rotateAroundFloor(currentLoadedModel, deltaX * 0.02);
                     updateControlPositions();
+                    saveModelState();  // Live save
                     lastMouseX = e.touches[0].clientX;
                     e.preventDefault();
                 }
@@ -1722,6 +1730,7 @@ def test_inpainting_page():
                     const newScale = currentLoadedModel.scale.x * scaleFactor;
                     if (newScale > 0.1 && newScale < 10) {
                         currentLoadedModel.scale.setScalar(newScale);
+                        saveModelState();  // Live save
                     }
                     lastMouseY = e.touches[0].clientY;
                     e.preventDefault();
@@ -1730,6 +1739,7 @@ def test_inpainting_page():
                     const deltaX = e.touches[0].clientX - lastMouseX;
                     modelBrightness = Math.max(0.2, Math.min(2.5, modelBrightness + deltaX * 0.01));
                     applyBrightnessToModel(modelBrightness);
+                    saveModelState();  // Live save
                     lastMouseX = e.touches[0].clientX;
                     e.preventDefault();
                 }
@@ -1746,6 +1756,7 @@ def test_inpainting_page():
 
                     updateContactMarkerPositions();
                     updateControlPositions();
+                    saveModelState();  // Live save
                     lastMouseY = e.touches[0].clientY;
                     e.preventDefault();
                 }
@@ -2081,6 +2092,7 @@ def test_inpainting_page():
                 // Initialize per-model data in userData (start with defaults, not current model's rotation)
                 newModel.userData.yRotation = 0;
                 newModel.userData.tilt = DEFAULT_TILT;
+                newModel.userData.brightness = 2.5;  // Default brightness for new instances
                 // Assign new instance_id as max existing + 1
                 const maxInstanceId = allLoadedModels.reduce((max, m) =>
                     Math.max(max, m.userData.instanceId || 0), -1);
@@ -2094,11 +2106,12 @@ def test_inpainting_page():
                 currentLoadedModel = newModel;
                 userYRotation = newModel.userData.yRotation;
                 modelTilt = newModel.userData.tilt;
+                modelBrightness = newModel.userData.brightness;
 
                 // Apply rotation (tilt) using the same method as original model
                 applyModelRotation(newModel);
 
-                // Apply brightness using the same method as original model
+                // Apply brightness (stored in userData by applyBrightnessToModel)
                 applyBrightnessToModel(modelBrightness);
 
                 showControlButtons = true;
@@ -2507,6 +2520,9 @@ def test_inpainting_page():
         function applyBrightnessToModel(brightness) {
             if (!currentLoadedModel) return;
 
+            // Store brightness in userData for per-model persistence
+            currentLoadedModel.userData.brightness = brightness;
+
             currentLoadedModel.traverse((child) => {
                 if (child.isMesh && child.material) {
                     const materials = Array.isArray(child.material) ? child.material : [child.material];
@@ -2640,9 +2656,13 @@ def test_inpainting_page():
                 if (clickedModel) {
                     // Switch to the clicked model
                     currentLoadedModel = clickedModel;
-                    // Load per-model rotation from userData
+                    // Load per-model state from userData
                     userYRotation = clickedModel.userData.yRotation !== undefined ? clickedModel.userData.yRotation : 0;
                     modelTilt = clickedModel.userData.tilt !== undefined ? clickedModel.userData.tilt : DEFAULT_TILT;
+                    modelBrightness = clickedModel.userData.brightness !== undefined ? clickedModel.userData.brightness : 2.5;
+                    // Update modelBaseScale for the selected model
+                    modelBaseScale = clickedModel.scale.x;
+                    modelReferenceZ = clickedModel.position.z;
 
                     isDraggingModel = true;
                     modelWasClicked = true;
@@ -2671,6 +2691,7 @@ def test_inpainting_page():
 
                     updateScaleForConstantSize();
                     updateContactMarkerPositions();
+                    saveModelState();  // Live save
                 }
             });
 
@@ -2749,9 +2770,13 @@ def test_inpainting_page():
                     if (touchedModel) {
                         // Switch to the touched model
                         currentLoadedModel = touchedModel;
-                        // Load per-model rotation from userData
+                        // Load per-model state from userData
                         userYRotation = touchedModel.userData.yRotation !== undefined ? touchedModel.userData.yRotation : 0;
                         modelTilt = touchedModel.userData.tilt !== undefined ? touchedModel.userData.tilt : DEFAULT_TILT;
+                        modelBrightness = touchedModel.userData.brightness !== undefined ? touchedModel.userData.brightness : 2.5;
+                        // Update modelBaseScale for the selected model
+                        modelBaseScale = touchedModel.scale.x;
+                        modelReferenceZ = touchedModel.position.z;
 
                         isDraggingModel = true;
                         touchModelWasClicked = true;
@@ -2782,6 +2807,7 @@ def test_inpainting_page():
 
                     updateScaleForConstantSize();
                     updateContactMarkerPositions();
+                    saveModelState();  // Live save
 
                     e.preventDefault();
                 }
@@ -2908,6 +2934,7 @@ def test_inpainting_page():
                 // Initialize per-model data in userData (will be overwritten if saved state exists)
                 model.userData.yRotation = 0;
                 model.userData.tilt = DEFAULT_TILT;
+                model.userData.brightness = modelBrightness;
                 model.userData.instanceId = 0;
 
                 // Apply max brightness by default
@@ -2943,11 +2970,12 @@ def test_inpainting_page():
                             }
                             userYRotation = firstState.rotation_y || 0;
                             modelTilt = firstState.tilt !== undefined ? firstState.tilt : DEFAULT_TILT;
+                            modelBrightness = firstState.brightness !== undefined ? firstState.brightness : 2.5;
                             // Store per-model data in userData
                             model.userData.yRotation = userYRotation;
                             model.userData.tilt = modelTilt;
                             model.userData.instanceId = firstState.instance_id || 0;
-                            modelBrightness = firstState.brightness !== undefined ? firstState.brightness : 2.5;
+                            model.userData.brightness = modelBrightness;
                             applyModelRotation(model);
                             applyBrightnessToModel(modelBrightness);
 
@@ -2974,9 +3002,11 @@ def test_inpainting_page():
                                         const savedYRot = savedState.rotation_y || 0;
                                         const savedTilt = savedState.tilt !== undefined ? savedState.tilt : DEFAULT_TILT;
                                         const savedInstanceId = savedState.instance_id || 0;
+                                        const savedBrightness = savedState.brightness !== undefined ? savedState.brightness : 2.5;
                                         additionalModel.userData.yRotation = savedYRot;
                                         additionalModel.userData.tilt = savedTilt;
                                         additionalModel.userData.instanceId = savedInstanceId;
+                                        additionalModel.userData.brightness = savedBrightness;
 
                                         // Add to scene
                                         threeScene.add(additionalModel);
@@ -2992,20 +3022,23 @@ def test_inpainting_page():
                                         }
                                         allLoadedModels.splice(insertIndex, 0, additionalModel);
 
-                                        // Apply this model's saved rotation
-                                        // Temporarily set globals for applyModelRotation
+                                        // Apply this model's saved rotation and brightness
+                                        // Temporarily set globals for applyModelRotation and applyBrightnessToModel
                                         const prevModel = currentLoadedModel;
                                         const prevYRot = userYRotation;
                                         const prevTilt = modelTilt;
+                                        const prevBrightness = modelBrightness;
                                         currentLoadedModel = additionalModel;
                                         userYRotation = savedYRot;
                                         modelTilt = savedTilt;
+                                        modelBrightness = savedBrightness;
                                         applyModelRotation(additionalModel);
-                                        applyBrightnessToModel(modelBrightness);
+                                        applyBrightnessToModel(savedBrightness);
                                         // Restore globals
                                         currentLoadedModel = prevModel;
                                         userYRotation = prevYRot;
                                         modelTilt = prevTilt;
+                                        modelBrightness = prevBrightness;
 
                                         console.log('Loaded additional model instance ' + i + ' with rotation:', savedYRot, savedTilt);
                                     });
@@ -3188,6 +3221,7 @@ def test_inpainting_page():
                 // Initialize per-model data in userData
                 newModel.userData.yRotation = 0;
                 newModel.userData.tilt = DEFAULT_TILT;
+                newModel.userData.brightness = 2.5;  // Default brightness for new models
                 // Assign new instance_id
                 const maxInstanceId = allLoadedModels.reduce((max, m) =>
                     Math.max(max, m.userData.instanceId || 0), -1);
@@ -3201,11 +3235,12 @@ def test_inpainting_page():
                 currentLoadedModel = newModel;
                 userYRotation = newModel.userData.yRotation;
                 modelTilt = newModel.userData.tilt;
+                modelBrightness = newModel.userData.brightness;
 
                 // Apply rotation (tilt)
                 applyModelRotation(newModel);
 
-                // Apply brightness
+                // Apply brightness (stored in userData by applyBrightnessToModel)
                 applyBrightnessToModel(modelBrightness);
 
                 showControlButtons = true;
