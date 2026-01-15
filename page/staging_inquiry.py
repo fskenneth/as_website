@@ -654,8 +654,54 @@ def items_modal():
             ),
             # Modal Body
             Div(
-                *item_buttons,
-                cls="modal-body items-grid"
+                # Photos Section at top of Items Modal
+                Div(
+                    # Hidden file input for photo upload
+                    Input(type="file", id="items-photo-upload-input", accept="image/*", multiple=True, onchange="handleItemsPhotoUpload(event)", style="display:none"),
+                    # Camera section (mobile only)
+                    Div(
+                        Div(
+                            Video(id="items-camera-preview", autoplay=True, playsinline=True, cls="camera-preview"),
+                            Canvas(id="items-camera-canvas", cls="camera-canvas hidden"),
+                            # Photo thumbnail preview (left of shutter)
+                            Button(
+                                id="items-photo-thumbnail-preview",
+                                cls="photo-thumbnail-preview hidden",
+                                onclick="scrollToItemsPhotosCarousel()"
+                            ),
+                            # Shutter button at bottom center
+                            Button(
+                                Div(cls="shutter-inner"),
+                                cls="shutter-btn",
+                                id="items-shutter-btn",
+                                onclick="captureItemsPhoto()"
+                            ),
+                            cls="camera-preview-container"
+                        ),
+                        id="items-camera-section",
+                        cls="camera-section"
+                    ),
+                    # Photos carousel
+                    Div(
+                        Div(
+                            id="items-photos-carousel-container",
+                            cls="photos-carousel-container"
+                        ),
+                        Button("‹", cls="carousel-nav-btn carousel-prev", onclick="prevItemsPhoto()", id="items-photos-prev-btn"),
+                        Button("›", cls="carousel-nav-btn carousel-next", onclick="nextItemsPhoto()", id="items-photos-next-btn"),
+                        Div(id="items-photos-carousel-counter", cls="photos-carousel-counter"),
+                        id="items-photos-preview-grid",
+                        cls="photos-carousel-wrapper"
+                    ),
+                    id="items-photos-section",
+                    cls="items-photos-section"
+                ),
+                # Items Grid
+                Div(
+                    *item_buttons,
+                    cls="items-grid-container"
+                ),
+                cls="modal-body items-modal-body"
             ),
             # Modal Footer
             Div(
@@ -671,73 +717,6 @@ def items_modal():
         ),
         id="items-modal",
         cls="items-modal hidden"
-    )
-
-
-def photos_modal():
-    """Modal for photos - camera capture and file upload"""
-    return Div(
-        Div(
-            # Modal Header
-            Div(
-                H3("Living Room Photos", cls="modal-title", id="photos-modal-title"),
-                Button("✕", cls="modal-close-btn", onclick="closePhotosModal()"),
-                cls="modal-header"
-            ),
-            # Modal Body - camera and upload
-            Div(
-                # Camera section (mobile only)
-                Div(
-                    Div(
-                        Video(id="camera-preview", autoplay=True, playsinline=True, cls="camera-preview"),
-                        Canvas(id="camera-canvas", cls="camera-canvas hidden"),
-                        # Photo thumbnail preview (left of shutter)
-                        Button(
-                            id="photo-thumbnail-preview",
-                            cls="photo-thumbnail-preview hidden",
-                            onclick="scrollToCarousel()"
-                        ),
-                        # Shutter button at bottom center
-                        Button(
-                            Div(cls="shutter-inner"),
-                            cls="shutter-btn",
-                            id="shutter-btn",
-                            onclick="capturePhoto()"
-                        ),
-                        cls="camera-preview-container"
-                    ),
-                    id="camera-section",
-                    cls="camera-section"
-                ),
-                # Hidden file input for photo upload
-                Input(type="file", id="photo-upload-input", accept="image/*", multiple=True, onchange="handlePhotoUpload(event)", style="display:none"),
-                # Photos carousel
-                Div(
-                    Div(
-                        id="photos-carousel-container",
-                        cls="photos-carousel-container"
-                    ),
-                    Button("‹", cls="carousel-nav-btn carousel-prev", onclick="prevPhoto()", id="photos-prev-btn"),
-                    Button("›", cls="carousel-nav-btn carousel-next", onclick="nextPhoto()", id="photos-next-btn"),
-                    Div(id="photos-carousel-counter", cls="photos-carousel-counter"),
-                    id="photos-preview-grid",
-                    cls="photos-carousel-wrapper"
-                ),
-                cls="modal-body photos-content"
-            ),
-            # Modal Footer
-            Div(
-                Div(
-                    Button("Upload Photos", cls="modal-upload-btn", onclick="document.getElementById('photo-upload-input').click()"),
-                    cls="modal-footer-left"
-                ),
-                Button("Done", cls="modal-apply-btn", onclick="applyPhotos()"),
-                cls="modal-footer"
-            ),
-            cls="modal-content"
-        ),
-        id="photos-modal",
-        cls="photos-modal hidden"
     )
 
 
@@ -897,50 +876,50 @@ def property_type_selector():
             Div(
                 # Row 1: Living Room, Dining Room, Family Room
                 Div(
-                    Button(Span("Living Room", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="living-room", onclick="toggleArea(this)"),
-                    Button(Span("Dining Room", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="dining-room", onclick="toggleArea(this)"),
-                    Button(Span("Family Room", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="family-room", onclick="toggleArea(this)"),
+                    Button(Span("Living Room", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="living-room", onclick="toggleArea(this)"),
+                    Button(Span("Dining Room", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="dining-room", onclick="toggleArea(this)"),
+                    Button(Span("Family Room", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="family-room", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 2: Kitchen Only, Kitchen with Island, Breakfast Area
                 Div(
-                    Button(Span("Kitchen Only", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="kitchen-only", onclick="toggleArea(this)"),
-                    Button(Span("Kitchen Island", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="kitchen-island", onclick="toggleArea(this)"),
-                    Button(Span("Breakfast Area", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="breakfast-area", onclick="toggleArea(this)"),
+                    Button(Span("Kitchen Only", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="kitchen-only", onclick="toggleArea(this)"),
+                    Button(Span("Kitchen Island", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="kitchen-island", onclick="toggleArea(this)"),
+                    Button(Span("Breakfast Area", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="breakfast-area", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 3: Master Bedroom, 2nd Bedroom, 3rd Bedroom
                 Div(
-                    Button(Span("Master Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="master-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("2nd Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="2nd-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("3rd Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="3rd-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("Master Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="master-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("2nd Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="2nd-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("3rd Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="3rd-bedroom", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 4: 4th Bedroom, 5th Bedroom, 6th Bedroom
                 Div(
-                    Button(Span("4th Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="4th-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("5th Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="5th-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("6th Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="6th-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("4th Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="4th-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("5th Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="5th-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("6th Bedroom", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="6th-bedroom", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 5: Office, Bathrooms, Outdoor
                 Div(
-                    Button(Span("Office", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="office", onclick="toggleArea(this)"),
-                    Button(Span("Bathrooms", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="bathrooms", onclick="toggleArea(this)"),
-                    Button(Span("Outdoor", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="outdoor", onclick="toggleArea(this)"),
+                    Button(Span("Office", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="office", onclick="toggleArea(this)"),
+                    Button(Span("Bathrooms", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="bathrooms", onclick="toggleArea(this)"),
+                    Button(Span("Outdoor", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="outdoor", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 6: Basement Living, Basement Dining, Basement Office
                 Div(
-                    Button(Span("Basement Living", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-living", onclick="toggleArea(this)"),
-                    Button(Span("Basement Dining", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-dining", onclick="toggleArea(this)"),
-                    Button(Span("Basement Office", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-office", onclick="toggleArea(this)"),
+                    Button(Span("Basement Living", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-living", onclick="toggleArea(this)"),
+                    Button(Span("Basement Dining", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-dining", onclick="toggleArea(this)"),
+                    Button(Span("Basement Office", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-office", onclick="toggleArea(this)"),
                     cls="property-selector"
                 ),
                 # Row 7: Basement 1st Bedroom, Basement 2nd Bedroom
                 Div(
-                    Button(Span("Basement 1st Bed", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-1st-bedroom", onclick="toggleArea(this)"),
-                    Button(Span("Basement 2nd Bed", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'), " Photos", cls="area-action-btn-content"), cls="area-action-btn photos-action-btn", onclick="openPhotosModal(event, this)"), Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-2nd-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("Basement 1st Bed", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-1st-bedroom", onclick="toggleArea(this)"),
+                    Button(Span("Basement 2nd Bed", cls="area-name"), Span("", cls="area-price"), Div(cls="area-carousel"), Div(Span(Span(NotStr('<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'), " Items", cls="area-action-btn-content"), cls="area-action-btn", onclick="openItemsModal(event, this)"), cls="area-actions"), cls="property-btn area-btn", data_area="basement-2nd-bedroom", onclick="toggleArea(this)"),
                     Div(cls="property-btn-spacer"),
                     cls="property-selector"
                 ),
@@ -949,8 +928,6 @@ def property_type_selector():
             ),
             # Items Modal
             items_modal(),
-            # Photos Modal
-            photos_modal(),
             # Inquiry Modal
             inquiry_modal(),
             # Floating Action Buttons
@@ -1926,6 +1903,10 @@ def property_type_selector():
                 return result;
             }
 
+            let itemsCameraStream = null;
+            let currentItemsPhotoIndex = 0;
+            let itemsDragDropInitialized = false;
+
             function openItemsModal(event, element) {
                 event.stopPropagation();
 
@@ -1943,6 +1924,26 @@ def property_type_selector():
                 // Load saved items for this area
                 loadAreaItems(currentArea);
 
+                // Initialize photos array for this area if not exists
+                if (!areaPhotos[currentArea]) {
+                    areaPhotos[currentArea] = [];
+                }
+
+                // Reset carousel to first photo
+                currentItemsPhotoIndex = 0;
+
+                // Render photos in items modal
+                renderItemsPhotosGrid();
+
+                // Update items thumbnail
+                updateItemsThumbnail();
+
+                // Initialize drag and drop for desktop (camera on mobile only starts when Take Photos is clicked)
+                const isMobile = window.innerWidth <= 767;
+                if (!isMobile) {
+                    initItemsDragAndDrop();
+                }
+
                 // Show modal
                 document.getElementById('items-modal').classList.remove('hidden');
                 document.body.style.overflow = 'hidden';
@@ -1951,144 +1952,583 @@ def property_type_selector():
             function closeItemsModal() {
                 document.getElementById('items-modal').classList.add('hidden');
                 document.body.style.overflow = '';
+
+                // Stop items camera if running and hide camera section
+                stopItemsCamera();
+                const cameraSection = document.getElementById('items-camera-section');
+                if (cameraSection) {
+                    cameraSection.style.display = 'none';
+                }
+
                 currentArea = null;
             }
 
-            let currentPhotosArea = null;
-            let cameraStream = null;
-            let areaPhotos = {}; // Store photos per area
+            function startItemsCamera() {
+                const video = document.getElementById('items-camera-preview');
+                const cameraSection = document.getElementById('items-camera-section');
+                if (!video || !cameraSection) return;
 
-            function openPhotosModal(event, element) {
-                event.stopPropagation();
-                const areaBtn = element.closest('.area-btn');
-                const area = areaBtn.getAttribute('data-area');
-                currentPhotosArea = area;
+                // Hide camera section initially until camera starts
+                cameraSection.style.display = 'none';
 
-                // Get area name for title
-                const areaNames = {
-                    'living-room': 'Living Room',
-                    'dining-room': 'Dining Room',
-                    'family-room': 'Family Room',
-                    'kitchen-only': 'Kitchen Only',
-                    'kitchen-island': 'Kitchen Island',
-                    'breakfast-area': 'Breakfast Area',
-                    'master-bedroom': 'Master Bedroom',
-                    '2nd-bedroom': '2nd Bedroom',
-                    '3rd-bedroom': '3rd Bedroom',
-                    '4th-bedroom': '4th Bedroom',
-                    '5th-bedroom': '5th Bedroom',
-                    '6th-bedroom': '6th Bedroom',
-                    'office': 'Office',
-                    'bathrooms': 'Bathrooms',
-                    'outdoor': 'Outdoor',
-                    'basement-living': 'Basement Living',
-                    'basement-dining': 'Basement Dining',
-                    'basement-office': 'Basement Office',
-                    'basement-1st-bedroom': 'Basement 1st Bedroom',
-                    'basement-2nd-bedroom': 'Basement 2nd Bedroom'
-                };
-                const areaName = areaNames[area] || area;
+                navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+                    audio: false
+                }).then(stream => {
+                    itemsCameraStream = stream;
+                    video.srcObject = stream;
+                    // Show camera section only when camera successfully starts
+                    cameraSection.style.display = 'block';
+                }).catch(err => {
+                    console.log('Camera access denied:', err);
+                    // Keep camera section hidden if camera fails
+                    cameraSection.style.display = 'none';
+                });
+            }
 
-                document.getElementById('photos-modal-title').textContent = areaName + ' Photos';
-                document.getElementById('photos-modal').classList.remove('hidden');
-                document.body.style.overflow = 'hidden';
-
-                // Initialize photos array for this area if not exists
-                if (!areaPhotos[area]) {
-                    areaPhotos[area] = [];
+            function stopItemsCamera() {
+                if (itemsCameraStream) {
+                    itemsCameraStream.getTracks().forEach(track => track.stop());
+                    itemsCameraStream = null;
                 }
-
-                // Reset carousel to first photo
-                currentPhotoIndex = 0;
-
-                // Render existing photos
-                renderPhotosGrid();
-
-                // Update thumbnail
-                updateThumbnail();
-
-                // Add scroll listener to modal content to show/hide thumbnail and shutter button
-                const modalContent = document.querySelector('.photos-modal .modal-content');
-                const shutterButton = document.querySelector('.shutter-btn');
-                const thumbnail = document.getElementById('photo-thumbnail-preview');
-
-                if (modalContent) {
-                    // Remove existing listener if any
-                    modalContent.removeEventListener('scroll', handleModalScroll);
-
-                    // Add scroll listener
-                    modalContent.addEventListener('scroll', handleModalScroll);
-
-                    function handleModalScroll() {
-                        const scrollTop = modalContent.scrollTop;
-                        const cameraSection = document.querySelector('.camera-section');
-
-                        if (!cameraSection) return;
-
-                        const cameraSectionHeight = cameraSection.offsetHeight;
-
-                        // If scrolled past halfway of camera section, hide thumbnail and shutter
-                        if (scrollTop > cameraSectionHeight / 2) {
-                            if (thumbnail) thumbnail.classList.add('hidden');
-                            if (shutterButton) shutterButton.classList.add('hidden');
-                        } else {
-                            if (thumbnail && areaPhotos[currentPhotosArea] && areaPhotos[currentPhotosArea].length > 0) {
-                                thumbnail.classList.remove('hidden');
-                            }
-                            if (shutterButton) shutterButton.classList.remove('hidden');
-                        }
-                    }
-                }
-
-                // Start camera on mobile
-                if (window.innerWidth <= 767) {
-                    startCamera();
+                const video = document.getElementById('items-camera-preview');
+                if (video) {
+                    video.srcObject = null;
                 }
             }
 
-            async function closePhotosModal() {
-                stopCamera();
-                const area = currentPhotosArea;
+            // Items Modal Photo Functions
+            let itemsPhotoTouchStartX = 0;
+            let itemsPhotoTouchEndX = 0;
 
-                // Upload photos same as Done button
-                if (area) {
-                    const photos = areaPhotos[area] || [];
+            function renderItemsPhotosGrid(direction = null) {
+                const container = document.getElementById('items-photos-carousel-container');
+                const counter = document.getElementById('items-photos-carousel-counter');
+                const prevBtn = document.getElementById('items-photos-prev-btn');
+                const nextBtn = document.getElementById('items-photos-next-btn');
+                const photos = areaPhotos[currentArea] || [];
+                const isMobile = window.innerWidth <= 767;
 
-                    if (photos.length > 0) {
-                        // Separate new base64 photos from already-uploaded URLs
-                        const newPhotos = photos.filter(p => p.startsWith('data:'));
-                        const existingUrls = photos.filter(p => p.startsWith('/static/'));
+                if (photos.length === 0) {
+                    // No photos - show upload button at top of message
+                    const areaName = areaNameMap[currentArea] || currentArea;
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 20px;">
+                            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                                <button class="items-photo-upload-btn items-take-photo-btn" onclick="scrollToItemsCamera()" style="display: ${isMobile ? 'inline-flex' : 'none'};">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                                        <circle cx="12" cy="13" r="4"/>
+                                    </svg>
+                                    Take Photos
+                                </button>
+                                <button class="items-photo-upload-btn" onclick="document.getElementById('items-photo-upload-input').click()">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                        <polyline points="17 8 12 3 7 8"/>
+                                        <line x1="12" y1="3" x2="12" y2="15"/>
+                                    </svg>
+                                    Upload Photos
+                                </button>
+                            </div>
+                            <p style="color: var(--color-secondary); margin-top: 10px; font-size: 13px;">Take or upload photos from 4 different directions of the ${areaName.toLowerCase()}</p>
+                        </div>`;
+                    counter.innerHTML = '';
+                    prevBtn.style.display = 'none';
+                    nextBtn.style.display = 'none';
+                    currentItemsPhotoIndex = 0;
+                    return;
+                }
 
-                        if (newPhotos.length > 0) {
-                            try {
-                                const response = await fetch('/api/staging-photos', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ area: area, photos: newPhotos })
-                                });
+                // Reset index if out of bounds
+                if (currentItemsPhotoIndex >= photos.length) {
+                    currentItemsPhotoIndex = photos.length - 1;
+                }
+                if (currentItemsPhotoIndex < 0) {
+                    currentItemsPhotoIndex = 0;
+                }
 
-                                const result = await response.json();
+                // Show/hide nav buttons (hide on mobile)
+                if (isMobile) {
+                    prevBtn.style.display = 'none';
+                    nextBtn.style.display = 'none';
+                } else {
+                    prevBtn.style.display = photos.length > 1 ? 'flex' : 'none';
+                    nextBtn.style.display = photos.length > 1 ? 'flex' : 'none';
+                }
 
-                                if (result.success && result.urls) {
-                                    // Replace base64 with server URLs
-                                    areaPhotos[area] = [...existingUrls, ...result.urls];
+                // Build slides: prev, current, next for smooth swiping
+                const prevIndex = currentItemsPhotoIndex > 0 ? currentItemsPhotoIndex - 1 : null;
+                const nextIndex = currentItemsPhotoIndex < photos.length - 1 ? currentItemsPhotoIndex + 1 : null;
+
+                let slidesHTML = '';
+
+                // Previous slide
+                if (prevIndex !== null) {
+                    slidesHTML += `<div class="photo-carousel-slide carousel-slide-prev"><img src="${photos[prevIndex]}" alt="Photo ${prevIndex + 1}"></div>`;
+                }
+
+                // Current slide with Upload button next to rotate button
+                slidesHTML += `
+                    <div class="photo-carousel-slide carousel-slide-current" id="items-photo-slide">
+                        <img src="${photos[currentItemsPhotoIndex]}" alt="Photo ${currentItemsPhotoIndex + 1}">
+                        <button class="photo-camera-inline-btn" onclick="scrollToItemsCamera()" title="Take Photos" style="display: ${isMobile ? 'flex' : 'none'};">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                                <circle cx="12" cy="13" r="4"/>
+                            </svg>
+                        </button>
+                        <button class="photo-upload-inline-btn" onclick="document.getElementById('items-photo-upload-input').click()" title="Upload Photos">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                        </button>
+                        <button class="photo-rotate-btn" onclick="rotateItemsPhoto(${currentItemsPhotoIndex})">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                            </svg>
+                        </button>
+                        <button class="photo-delete-btn" onclick="removeItemsPhoto(${currentItemsPhotoIndex})">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                <line x1="10" y1="11" x2="10" y2="17"/>
+                                <line x1="14" y1="11" x2="14" y2="17"/>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+
+                // Next slide
+                if (nextIndex !== null) {
+                    slidesHTML += `<div class="photo-carousel-slide carousel-slide-next"><img src="${photos[nextIndex]}" alt="Photo ${nextIndex + 1}"></div>`;
+                }
+
+                container.innerHTML = `<div class="carousel-track" id="items-carousel-track">${slidesHTML}</div>`;
+
+                // Render counter: dots on both mobile and desktop
+                if (photos.length > 1) {
+                    const dots = photos.map((_, i) =>
+                        `<span class="carousel-dot ${i === currentItemsPhotoIndex ? 'active' : ''}"></span>`
+                    ).join('');
+                    counter.innerHTML = `<div class="carousel-dots">${dots}</div>`;
+                } else {
+                    counter.innerHTML = '';
+                }
+
+                // Add touch event listeners for swipe
+                if (isMobile) {
+                    const track = document.getElementById('items-carousel-track');
+                    if (track) {
+                        track.addEventListener('touchstart', handleItemsTouchStart, { passive: true });
+                        track.addEventListener('touchmove', handleItemsTouchMove, { passive: true });
+                        track.addEventListener('touchend', handleItemsTouchEnd, { passive: false });
+                    }
+                }
+            }
+
+            let itemsIsDragging = false;
+            let itemsCurrentTranslateX = 0;
+            let itemsIsAnimating = false;
+
+            function handleItemsTouchStart(e) {
+                if (itemsIsAnimating) return;
+                itemsPhotoTouchStartX = e.changedTouches[0].screenX;
+                itemsIsDragging = true;
+                itemsCurrentTranslateX = 0;
+                const track = document.getElementById('items-carousel-track');
+                if (track) {
+                    track.style.transition = 'none';
+                }
+            }
+
+            function handleItemsTouchMove(e) {
+                if (!itemsIsDragging || itemsIsAnimating) return;
+                const currentX = e.changedTouches[0].screenX;
+                itemsCurrentTranslateX = currentX - itemsPhotoTouchStartX;
+
+                const track = document.getElementById('items-carousel-track');
+                if (track) {
+                    const photos = areaPhotos[currentArea] || [];
+                    const isAtStart = currentItemsPhotoIndex === 0 && itemsCurrentTranslateX > 0;
+                    const isAtEnd = currentItemsPhotoIndex === photos.length - 1 && itemsCurrentTranslateX < 0;
+
+                    if (isAtStart || isAtEnd) {
+                        track.style.transform = `translateX(${itemsCurrentTranslateX * 0.3}px)`;
+                    } else {
+                        track.style.transform = `translateX(${itemsCurrentTranslateX}px)`;
+                    }
+                }
+            }
+
+            function handleItemsTouchEnd(e) {
+                if (!itemsIsDragging || itemsIsAnimating) return;
+                itemsIsDragging = false;
+                itemsPhotoTouchEndX = e.changedTouches[0].screenX;
+
+                const track = document.getElementById('items-carousel-track');
+                const swipeThreshold = 30;
+                const diff = itemsPhotoTouchStartX - itemsPhotoTouchEndX;
+                const photos = areaPhotos[currentArea] || [];
+                const containerWidth = document.getElementById('items-photos-carousel-container').offsetWidth;
+                const gap = 10;
+
+                if (Math.abs(diff) > swipeThreshold) {
+                    itemsIsAnimating = true;
+                    if (diff > 0 && currentItemsPhotoIndex < photos.length - 1) {
+                        if (track) {
+                            track.style.transition = 'transform 0.25s ease-out';
+                            track.style.transform = `translateX(-${containerWidth + gap}px)`;
+                            setTimeout(() => {
+                                currentItemsPhotoIndex++;
+                                renderItemsPhotosGrid();
+                                itemsIsAnimating = false;
+                            }, 250);
+                        }
+                    } else if (diff < 0 && currentItemsPhotoIndex > 0) {
+                        if (track) {
+                            track.style.transition = 'transform 0.25s ease-out';
+                            track.style.transform = `translateX(${containerWidth + gap}px)`;
+                            setTimeout(() => {
+                                currentItemsPhotoIndex--;
+                                renderItemsPhotosGrid();
+                                itemsIsAnimating = false;
+                            }, 250);
+                        }
+                    } else {
+                        if (track) {
+                            track.style.transition = 'transform 0.2s ease-out';
+                            track.style.transform = 'translateX(0)';
+                        }
+                        itemsIsAnimating = false;
+                    }
+                } else {
+                    if (track) {
+                        track.style.transition = 'transform 0.2s ease-out';
+                        track.style.transform = 'translateX(0)';
+                    }
+                }
+            }
+
+            function prevItemsPhoto() {
+                const photos = areaPhotos[currentArea] || [];
+                if (itemsIsAnimating || currentItemsPhotoIndex <= 0) return;
+
+                const track = document.getElementById('items-carousel-track');
+                const container = document.getElementById('items-photos-carousel-container');
+                if (!track || !container) return;
+
+                const containerWidth = container.offsetWidth;
+                const gap = 10;
+
+                itemsIsAnimating = true;
+                track.style.transition = 'transform 0.25s ease-out';
+                track.style.transform = `translateX(${containerWidth + gap}px)`;
+
+                setTimeout(() => {
+                    currentItemsPhotoIndex--;
+                    renderItemsPhotosGrid('prev');
+                    itemsIsAnimating = false;
+                }, 250);
+            }
+
+            function nextItemsPhoto() {
+                const photos = areaPhotos[currentArea] || [];
+                if (itemsIsAnimating || currentItemsPhotoIndex >= photos.length - 1) return;
+
+                const track = document.getElementById('items-carousel-track');
+                const container = document.getElementById('items-photos-carousel-container');
+                if (!track || !container) return;
+
+                const containerWidth = container.offsetWidth;
+                const gap = 10;
+
+                itemsIsAnimating = true;
+                track.style.transition = 'transform 0.25s ease-out';
+                track.style.transform = `translateX(-${containerWidth + gap}px)`;
+
+                setTimeout(() => {
+                    currentItemsPhotoIndex++;
+                    renderItemsPhotosGrid('next');
+                    itemsIsAnimating = false;
+                }, 250);
+            }
+
+            function captureItemsPhoto() {
+                hapticFeedback();
+                playShutterSound();
+
+                const video = document.getElementById('items-camera-preview');
+                const canvas = document.getElementById('items-camera-canvas');
+
+                if (!video || !canvas || !itemsCameraStream) return;
+
+                const ctx = canvas.getContext('2d');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0);
+
+                const photoData = canvas.toDataURL('image/jpeg', 0.8);
+
+                if (!areaPhotos[currentArea]) {
+                    areaPhotos[currentArea] = [];
+                }
+                areaPhotos[currentArea].push(photoData);
+                currentItemsPhotoIndex = areaPhotos[currentArea].length - 1;
+
+                renderItemsPhotosGrid();
+                updateItemsThumbnail();
+                updateAreaCarousel(currentArea);
+                saveStagingSession();
+            }
+
+            function handleItemsPhotoUpload(event) {
+                const files = event.target.files;
+                if (!files || files.length === 0) return;
+
+                if (!areaPhotos[currentArea]) {
+                    areaPhotos[currentArea] = [];
+                }
+
+                // Track how many files are being processed
+                let filesProcessed = 0;
+                const totalFiles = files.length;
+
+                Array.from(files).forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        // Compress the image using canvas
+                        const img = new Image();
+                        img.onload = function() {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+
+                            // Resize if image is too large (max 1920px on longest side)
+                            const maxSize = 1920;
+                            let width = img.width;
+                            let height = img.height;
+
+                            if (width > maxSize || height > maxSize) {
+                                if (width > height) {
+                                    height = Math.round(height * maxSize / width);
+                                    width = maxSize;
+                                } else {
+                                    width = Math.round(width * maxSize / height);
+                                    height = maxSize;
                                 }
-                            } catch (error) {
-                                console.error('Upload error:', error);
                             }
-                        }
-                    }
 
-                    updateAreaCarousel(area);
-                    saveStagingSession();
+                            canvas.width = width;
+                            canvas.height = height;
+                            ctx.drawImage(img, 0, 0, width, height);
+
+                            // Compress to JPEG with 0.8 quality (same as camera photos)
+                            const compressedData = canvas.toDataURL('image/jpeg', 0.8);
+
+                            areaPhotos[currentArea].push(compressedData);
+                            currentItemsPhotoIndex = areaPhotos[currentArea].length - 1;
+                            renderItemsPhotosGrid();
+                            updateItemsThumbnail();
+                            updateAreaCarousel(currentArea);
+
+                            // Only save after ALL files have been processed
+                            filesProcessed++;
+                            if (filesProcessed === totalFiles) {
+                                saveStagingSession();
+                            }
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+
+                event.target.value = '';
+            }
+
+            function initItemsDragAndDrop() {
+                const isMobile = window.innerWidth <= 767;
+                if (isMobile) return; // Only enable on desktop
+
+                // Check if already initialized to prevent duplicate event listeners
+                if (itemsDragDropInitialized) return;
+
+                const dropZone = document.getElementById('items-photos-section');
+                if (!dropZone) return;
+
+                function preventDefaults(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
                 }
 
-                document.getElementById('photos-modal').classList.add('hidden');
-                document.body.style.overflow = '';
-                currentPhotosArea = null;
-                // Clean up orphaned photos
-                await cleanupOrphanedPhotos();
+                function handleDragEnter(e) {
+                    preventDefaults(e);
+                    dropZone.classList.add('drag-over');
+                }
+
+                function handleDragOver(e) {
+                    preventDefaults(e);
+                    dropZone.classList.add('drag-over');
+                }
+
+                function handleDragLeave(e) {
+                    preventDefaults(e);
+                    dropZone.classList.remove('drag-over');
+                }
+
+                function handleDrop(e) {
+                    preventDefaults(e);
+                    dropZone.classList.remove('drag-over');
+
+                    const dt = e.dataTransfer;
+                    const files = dt.files;
+
+                    if (!files || files.length === 0) return;
+
+                    // Initialize photos array for this area if not exists
+                    if (!areaPhotos[currentArea]) {
+                        areaPhotos[currentArea] = [];
+                    }
+
+                    // Filter to only image files and track processing
+                    const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+                    if (imageFiles.length === 0) return;
+
+                    let filesProcessed = 0;
+                    const totalFiles = imageFiles.length;
+
+                    // Process files same as file input with compression
+                    imageFiles.forEach(file => {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            // Compress the image using canvas
+                            const img = new Image();
+                            img.onload = function() {
+                                const canvas = document.createElement('canvas');
+                                const ctx = canvas.getContext('2d');
+
+                                // Resize if image is too large (max 1920px on longest side)
+                                const maxSize = 1920;
+                                let width = img.width;
+                                let height = img.height;
+
+                                if (width > maxSize || height > maxSize) {
+                                    if (width > height) {
+                                        height = Math.round(height * maxSize / width);
+                                        width = maxSize;
+                                    } else {
+                                        width = Math.round(width * maxSize / height);
+                                        height = maxSize;
+                                    }
+                                }
+
+                                canvas.width = width;
+                                canvas.height = height;
+                                ctx.drawImage(img, 0, 0, width, height);
+
+                                // Compress to JPEG with 0.8 quality (same as camera photos)
+                                const compressedData = canvas.toDataURL('image/jpeg', 0.8);
+
+                                areaPhotos[currentArea].push(compressedData);
+                                currentItemsPhotoIndex = areaPhotos[currentArea].length - 1;
+                                renderItemsPhotosGrid();
+                                updateItemsThumbnail();
+                                updateAreaCarousel(currentArea);
+
+                                // Only save after ALL files have been processed
+                                filesProcessed++;
+                                if (filesProcessed === totalFiles) {
+                                    saveStagingSession();
+                                }
+                            };
+                            img.src = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                }
+
+                // Add event listeners
+                dropZone.addEventListener('dragenter', handleDragEnter, false);
+                dropZone.addEventListener('dragover', handleDragOver, false);
+                dropZone.addEventListener('dragleave', handleDragLeave, false);
+                dropZone.addEventListener('drop', handleDrop, false);
+
+                // Mark as initialized
+                itemsDragDropInitialized = true;
             }
+
+            function rotateItemsPhoto(index) {
+                hapticFeedback();
+                if (!areaPhotos[currentArea] || !areaPhotos[currentArea][index]) return;
+
+                const img = new Image();
+                img.src = areaPhotos[currentArea][index];
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    canvas.width = img.height;
+                    canvas.height = img.width;
+
+                    ctx.translate(0, canvas.height);
+                    ctx.rotate(-90 * Math.PI / 180);
+                    ctx.drawImage(img, 0, 0);
+
+                    areaPhotos[currentArea][index] = canvas.toDataURL('image/jpeg', 0.8);
+                    renderItemsPhotosGrid();
+                    updateAreaCarousel(currentArea);
+                    saveStagingSession();
+                };
+            }
+
+            function removeItemsPhoto(index) {
+                hapticFeedback();
+                if (!areaPhotos[currentArea]) return;
+
+                areaPhotos[currentArea].splice(index, 1);
+
+                if (currentItemsPhotoIndex >= areaPhotos[currentArea].length) {
+                    currentItemsPhotoIndex = Math.max(0, areaPhotos[currentArea].length - 1);
+                }
+
+                renderItemsPhotosGrid();
+                updateItemsThumbnail();
+                updateAreaCarousel(currentArea);
+                saveStagingSession();
+            }
+
+            function updateItemsThumbnail() {
+                const thumbnail = document.getElementById('items-photo-thumbnail-preview');
+                if (!thumbnail) return;
+
+                const photos = areaPhotos[currentArea] || [];
+                if (photos.length > 0) {
+                    thumbnail.style.backgroundImage = `url(${photos[photos.length - 1]})`;
+                    thumbnail.classList.remove('hidden');
+                } else {
+                    thumbnail.style.backgroundImage = '';
+                    thumbnail.classList.add('hidden');
+                }
+            }
+
+            function scrollToItemsPhotosCarousel() {
+                const carousel = document.getElementById('items-photos-preview-grid');
+                if (carousel) {
+                    carousel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+
+            function scrollToItemsCamera() {
+                const cameraSection = document.getElementById('items-camera-section');
+                if (cameraSection) {
+                    // Show the camera section first
+                    cameraSection.style.display = 'block';
+                    cameraSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    startItemsCamera();
+                }
+            }
+
+            let areaPhotos = {}; // Store photos per area
 
             async function cleanupOrphanedPhotos() {
                 // Collect all valid photo URLs from all areas
@@ -2111,419 +2551,6 @@ def property_type_selector():
                 } catch (e) {
                     console.warn('Cleanup error:', e);
                 }
-            }
-
-            async function startCamera() {
-                try {
-                    // Use back camera with 4:3 aspect ratio
-                    const constraints = {
-                        video: {
-                            facingMode: 'environment',
-                            width: { ideal: 1600 },
-                            height: { ideal: 1200 },
-                            aspectRatio: { ideal: 4/3 }
-                        }
-                    };
-
-                    cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
-                    const video = document.getElementById('camera-preview');
-                    video.srcObject = cameraStream;
-
-                    // Always set zoom to 1x if supported
-                    const track = cameraStream.getVideoTracks()[0];
-                    const capabilities = track.getCapabilities();
-
-                    if (capabilities.zoom) {
-                        // Set zoom to 1x (or minimum if 1x not available)
-                        const targetZoom = Math.max(1, capabilities.zoom.min);
-                        await track.applyConstraints({ advanced: [{ zoom: targetZoom }] });
-                    }
-                } catch (err) {
-                    console.error('Camera error:', err);
-                    // Hide camera section if camera not available
-                    document.getElementById('camera-section').style.display = 'none';
-                }
-            }
-
-            function stopCamera() {
-                if (cameraStream) {
-                    cameraStream.getTracks().forEach(track => track.stop());
-                    cameraStream = null;
-                }
-            }
-
-
-            async function capturePhoto() {
-                hapticFeedback();
-                playShutterSound();
-                const video = document.getElementById('camera-preview');
-                const canvas = document.getElementById('camera-canvas');
-                const ctx = canvas.getContext('2d');
-
-                // Just capture as-is - let user rotate if needed
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                ctx.drawImage(video, 0, 0);
-
-                // Get image data as base64
-                const imageData = canvas.toDataURL('image/jpeg', 0.8);
-
-                // Add to area photos
-                if (!areaPhotos[currentPhotosArea]) {
-                    areaPhotos[currentPhotosArea] = [];
-                }
-                areaPhotos[currentPhotosArea].push(imageData);
-
-                // Jump to the last photo (the one just taken)
-                currentPhotoIndex = areaPhotos[currentPhotosArea].length - 1;
-
-                // Render updated grid
-                renderPhotosGrid();
-
-                // Update thumbnail
-                updateThumbnail();
-            }
-
-            function handlePhotoUpload(event) {
-                const files = event.target.files;
-                if (!files || files.length === 0) return;
-
-                // Initialize photos array for this area if not exists
-                if (!areaPhotos[currentPhotosArea]) {
-                    areaPhotos[currentPhotosArea] = [];
-                }
-
-                Array.from(files).forEach(file => {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        areaPhotos[currentPhotosArea].push(e.target.result);
-                        // Jump to the last photo (the one just uploaded)
-                        currentPhotoIndex = areaPhotos[currentPhotosArea].length - 1;
-                        renderPhotosGrid();
-                        updateThumbnail();
-                    };
-                    reader.readAsDataURL(file);
-                });
-
-                // Reset input so same file can be selected again
-                event.target.value = '';
-            }
-
-            let currentPhotoIndex = 0;
-            let touchStartX = 0;
-            let touchEndX = 0;
-            let slideDirection = null;
-
-            function renderPhotosGrid(direction = null) {
-                const container = document.getElementById('photos-carousel-container');
-                const counter = document.getElementById('photos-carousel-counter');
-                const prevBtn = document.getElementById('photos-prev-btn');
-                const nextBtn = document.getElementById('photos-next-btn');
-                const photos = areaPhotos[currentPhotosArea] || [];
-                const isMobile = window.innerWidth <= 767;
-
-                if (photos.length === 0) {
-                    container.innerHTML = `<p style="color: var(--color-secondary); text-align: center; padding: 40px 20px;">Take or upload photos from 4 different directions of the ${currentPhotosArea.toLowerCase().replace(/-/g, ' ')}</p>`;
-                    counter.innerHTML = '';
-                    prevBtn.style.display = 'none';
-                    nextBtn.style.display = 'none';
-                    currentPhotoIndex = 0;
-                    return;
-                }
-
-                // Reset index if out of bounds
-                if (currentPhotoIndex >= photos.length) {
-                    currentPhotoIndex = photos.length - 1;
-                }
-                if (currentPhotoIndex < 0) {
-                    currentPhotoIndex = 0;
-                }
-
-                // Show/hide nav buttons (hide on mobile)
-                if (isMobile) {
-                    prevBtn.style.display = 'none';
-                    nextBtn.style.display = 'none';
-                } else {
-                    prevBtn.style.display = photos.length > 1 ? 'flex' : 'none';
-                    nextBtn.style.display = photos.length > 1 ? 'flex' : 'none';
-                }
-
-                // Build slides: prev, current, next for smooth swiping
-                const prevIndex = currentPhotoIndex > 0 ? currentPhotoIndex - 1 : null;
-                const nextIndex = currentPhotoIndex < photos.length - 1 ? currentPhotoIndex + 1 : null;
-
-                let slidesHTML = '';
-
-                // Previous slide
-                if (prevIndex !== null) {
-                    slidesHTML += `<div class="photo-carousel-slide carousel-slide-prev"><img src="${photos[prevIndex]}" alt="Photo ${prevIndex + 1}"></div>`;
-                }
-
-                // Current slide
-                slidesHTML += `
-                    <div class="photo-carousel-slide carousel-slide-current" id="photo-slide">
-                        <img src="${photos[currentPhotoIndex]}" alt="Photo ${currentPhotoIndex + 1}">
-                        <button class="photo-rotate-btn" onclick="rotatePhoto(${currentPhotoIndex})">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-                            </svg>
-                        </button>
-                        <button class="photo-delete-btn" onclick="removePhoto(${currentPhotoIndex})">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                                <line x1="10" y1="11" x2="10" y2="17"/>
-                                <line x1="14" y1="11" x2="14" y2="17"/>
-                            </svg>
-                        </button>
-                    </div>
-                `;
-
-                // Next slide
-                if (nextIndex !== null) {
-                    slidesHTML += `<div class="photo-carousel-slide carousel-slide-next"><img src="${photos[nextIndex]}" alt="Photo ${nextIndex + 1}"></div>`;
-                }
-
-                container.innerHTML = `<div class="carousel-track" id="carousel-track">${slidesHTML}</div>`;
-
-                // Render counter: dots on both mobile and desktop
-                if (photos.length > 1) {
-                    const dots = photos.map((_, i) =>
-                        `<span class="carousel-dot ${i === currentPhotoIndex ? 'active' : ''}"></span>`
-                    ).join('');
-                    counter.innerHTML = `<div class="carousel-dots">${dots}</div>`;
-                } else {
-                    counter.innerHTML = '';
-                }
-
-                // Add touch event listeners for swipe
-                if (isMobile) {
-                    const track = document.getElementById('carousel-track');
-                    if (track) {
-                        track.addEventListener('touchstart', handleTouchStart, { passive: true });
-                        track.addEventListener('touchmove', handleTouchMove, { passive: true });
-                        track.addEventListener('touchend', handleTouchEnd, { passive: false });
-                    }
-                }
-            }
-
-            let isDragging = false;
-            let currentTranslateX = 0;
-            let isAnimating = false;
-
-            function handleTouchStart(e) {
-                if (isAnimating) return;
-                touchStartX = e.changedTouches[0].screenX;
-                isDragging = true;
-                currentTranslateX = 0;
-                const track = document.getElementById('carousel-track');
-                if (track) {
-                    track.style.transition = 'none';
-                }
-            }
-
-            function handleTouchMove(e) {
-                if (!isDragging || isAnimating) return;
-                const currentX = e.changedTouches[0].screenX;
-                currentTranslateX = currentX - touchStartX;
-
-                const track = document.getElementById('carousel-track');
-                if (track) {
-                    const photos = areaPhotos[currentPhotosArea] || [];
-                    const isAtStart = currentPhotoIndex === 0 && currentTranslateX > 0;
-                    const isAtEnd = currentPhotoIndex === photos.length - 1 && currentTranslateX < 0;
-
-                    if (isAtStart || isAtEnd) {
-                        // Apply resistance at edges
-                        track.style.transform = `translateX(${currentTranslateX * 0.3}px)`;
-                    } else {
-                        track.style.transform = `translateX(${currentTranslateX}px)`;
-                    }
-                }
-            }
-
-            function handleTouchEnd(e) {
-                if (!isDragging || isAnimating) return;
-                isDragging = false;
-                touchEndX = e.changedTouches[0].screenX;
-
-                const track = document.getElementById('carousel-track');
-                const swipeThreshold = 30; // Reduced threshold for easier swiping
-                const diff = touchStartX - touchEndX;
-                const photos = areaPhotos[currentPhotosArea] || [];
-                const containerWidth = document.getElementById('photos-carousel-container').offsetWidth;
-
-                const gap = 10; // Gap between slides
-                // Always move exactly one photo, regardless of swipe distance
-                if (Math.abs(diff) > swipeThreshold) {
-                    isAnimating = true;
-                    if (diff > 0 && currentPhotoIndex < photos.length - 1) {
-                        // Swipe left - move to next photo only
-                        if (track) {
-                            track.style.transition = 'transform 0.25s ease-out';
-                            track.style.transform = `translateX(-${containerWidth + gap}px)`;
-                            setTimeout(() => {
-                                currentPhotoIndex++;
-                                renderPhotosGrid();
-                                isAnimating = false;
-                            }, 250);
-                        }
-                    } else if (diff < 0 && currentPhotoIndex > 0) {
-                        // Swipe right - move to prev photo only
-                        if (track) {
-                            track.style.transition = 'transform 0.25s ease-out';
-                            track.style.transform = `translateX(${containerWidth + gap}px)`;
-                            setTimeout(() => {
-                                currentPhotoIndex--;
-                                renderPhotosGrid();
-                                isAnimating = false;
-                            }, 250);
-                        }
-                    } else {
-                        // Snap back at edges
-                        if (track) {
-                            track.style.transition = 'transform 0.25s ease-out';
-                            track.style.transform = 'translateX(0)';
-                        }
-                        isAnimating = false;
-                    }
-                } else {
-                    // Snap back if not enough swipe
-                    if (track) {
-                        track.style.transition = 'transform 0.25s ease-out';
-                        track.style.transform = 'translateX(0)';
-                    }
-                    isAnimating = false;
-                }
-            }
-
-            function prevPhoto(direction = 'right') {
-                const photos = areaPhotos[currentPhotosArea] || [];
-                if (photos.length > 0 && !isAnimating) {
-                    isAnimating = true;
-                    const track = document.getElementById('carousel-track');
-                    const containerWidth = document.getElementById('photos-carousel-container').offsetWidth;
-                    const gap = 10;
-
-                    if (track) {
-                        track.style.transition = 'transform 0.25s ease-out';
-                        track.style.transform = `translateX(${containerWidth + gap}px)`;
-                        setTimeout(() => {
-                            currentPhotoIndex = (currentPhotoIndex - 1 + photos.length) % photos.length;
-                            renderPhotosGrid();
-                            isAnimating = false;
-                        }, 250);
-                    }
-                }
-            }
-
-            function nextPhoto(direction = 'left') {
-                const photos = areaPhotos[currentPhotosArea] || [];
-                if (photos.length > 0 && !isAnimating) {
-                    isAnimating = true;
-                    const track = document.getElementById('carousel-track');
-                    const containerWidth = document.getElementById('photos-carousel-container').offsetWidth;
-                    const gap = 10;
-
-                    if (track) {
-                        track.style.transition = 'transform 0.25s ease-out';
-                        track.style.transform = `translateX(-${containerWidth + gap}px)`;
-                        setTimeout(() => {
-                            currentPhotoIndex = (currentPhotoIndex + 1) % photos.length;
-                            renderPhotosGrid();
-                            isAnimating = false;
-                        }, 250);
-                    }
-                }
-            }
-
-            function removePhoto(index) {
-                hapticFeedback();
-                playDeleteSound();
-                if (areaPhotos[currentPhotosArea]) {
-                    areaPhotos[currentPhotosArea].splice(index, 1);
-                    renderPhotosGrid();
-                    // Also update the carousel
-                    updateAreaCarousel(currentPhotosArea);
-                    // Save changes to server
-                    saveStagingSession();
-                }
-            }
-
-            function rotatePhoto(index) {
-                hapticFeedback();
-                if (!areaPhotos[currentPhotosArea] || !areaPhotos[currentPhotosArea][index]) return;
-
-                const imageData = areaPhotos[currentPhotosArea][index];
-                const img = new Image();
-
-                img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-
-                    // Rotate 90 degrees counter-clockwise - swap dimensions
-                    canvas.width = img.height;
-                    canvas.height = img.width;
-
-                    // Rotate 90 degrees counter-clockwise
-                    ctx.translate(0, canvas.height);
-                    ctx.rotate(-90 * Math.PI / 180);
-                    ctx.drawImage(img, 0, 0);
-
-                    // Replace the photo with rotated version
-                    areaPhotos[currentPhotosArea][index] = canvas.toDataURL('image/jpeg', 0.8);
-
-                    // Re-render to show the rotated photo
-                    renderPhotosGrid();
-                    updateAreaCarousel(currentPhotosArea);
-                    // Don't update thumbnail here - let scroll position control visibility
-                    saveStagingSession();
-                };
-
-                img.src = imageData;
-            }
-
-            function updateThumbnail() {
-                const photos = areaPhotos[currentPhotosArea] || [];
-                const thumbnail = document.getElementById('photo-thumbnail-preview');
-
-                if (!thumbnail) return;
-
-                if (photos.length > 0) {
-                    // Show thumbnail with last photo
-                    const lastPhoto = photos[photos.length - 1];
-                    thumbnail.style.backgroundImage = `url(${lastPhoto})`;
-                    thumbnail.classList.remove('hidden');
-                } else {
-                    // Hide thumbnail if no photos
-                    thumbnail.classList.add('hidden');
-                }
-            }
-
-            function scrollToCarousel() {
-                hapticFeedback();
-                const modalContent = document.querySelector('.photos-modal .modal-content');
-                if (modalContent) {
-                    // Scroll to bottom to show carousel
-                    modalContent.scrollTo({ top: modalContent.scrollHeight, behavior: 'smooth' });
-                }
-            }
-
-            function clearPhotos() {
-                if (currentPhotosArea && areaPhotos[currentPhotosArea]) {
-                    areaPhotos[currentPhotosArea] = [];
-                    renderPhotosGrid();
-                    // Hide thumbnail
-                    updateThumbnail();
-                    // Also update the carousel to remove photos
-                    updateAreaCarousel(currentPhotosArea);
-                    // Save changes to server
-                    saveStagingSession();
-                }
-            }
-
-            async function applyPhotos() {
-                // closePhotosModal handles upload, carousel update, save session, and cleanup
-                await closePhotosModal();
             }
 
             // Track current index for each area carousel
@@ -2613,11 +2640,12 @@ def property_type_selector():
 
                 // Add touch event listeners for swipe
                 const track = carousel.querySelector('.area-carousel-track');
+                let isAnimating = false;
+                let isDragging = false;
+
                 if (track) {
-                    let isAnimating = false;
                     let touchStartX = 0;
                     let currentTranslateX = 0;
-                    let isDragging = false;
 
                     function handleTouchStart(e) {
                         if (isAnimating) return;
@@ -2679,10 +2707,18 @@ def property_type_selector():
                                 isAnimating = false;
                             }
                         } else {
-                            // Snap back if not enough swipe
+                            // Snap back if not enough swipe - this is a tap!
                             track.style.transition = 'transform 0.25s ease-out';
                             track.style.transform = 'translateX(0)';
                             isAnimating = false;
+
+                            // Open items modal on tap (small movement)
+                            if (Math.abs(diff) < 10) {
+                                const itemsBtn = areaBtn.querySelector('.area-action-btn');
+                                if (itemsBtn) {
+                                    openItemsModal(e, itemsBtn);
+                                }
+                            }
                         }
                     }
 
@@ -2693,12 +2729,12 @@ def property_type_selector():
 
                     // Mouse events (for desktop/testing)
                     track.addEventListener('mousedown', (e) => {
-                        e.preventDefault();
                         handleTouchStart(e);
                     });
 
                     track.addEventListener('mousemove', (e) => {
                         if (isDragging) {
+                            e.preventDefault(); // Prevent text selection during drag
                             handleTouchMove(e);
                         }
                     });
@@ -2751,13 +2787,13 @@ def property_type_selector():
                     };
                 }
 
-                // Add click listener to open photos modal
+                // Add click listener to open items modal
                 carousel.onclick = function(e) {
                     if (!isDragging) {
                         e.stopPropagation();
-                        const photosBtn = areaBtn.querySelector('.photos-action-btn');
-                        if (photosBtn) {
-                            openPhotosModal(e, photosBtn);
+                        const itemsBtn = areaBtn.querySelector('.area-action-btn');
+                        if (itemsBtn) {
+                            openItemsModal(e, itemsBtn);
                         }
                     }
                 };
@@ -3113,8 +3149,21 @@ def property_type_selector():
                 }
             }
 
+            // Add touch handlers to Items buttons for mobile
+            function initItemsButtonTouchHandlers() {
+                document.querySelectorAll('.area-action-btn').forEach(btn => {
+                    btn.addEventListener('touchend', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openItemsModal(e, this);
+                    }, { passive: false });
+                });
+            }
+
             // Restore session data on page load
             document.addEventListener('DOMContentLoaded', async function() {
+                // Initialize touch handlers for Items buttons
+                initItemsButtonTouchHandlers();
                 // First, try to load from server if logged in
                 await loadExistingStagingFromServer();
                 // Then restore from session storage
@@ -3456,7 +3505,7 @@ def get_property_selector_styles():
     .area-carousel-arrow {
         display: none;
         position: absolute;
-        top: 50%;
+        top: 45%;
         transform: translateY(-50%);
         width: 36px;
         height: 36px;
@@ -3476,6 +3525,11 @@ def get_property_selector_styles():
         background: rgba(0, 0, 0, 0.7);
     }
 
+    .area-btn:hover .area-carousel-arrow,
+    .area-carousel:hover .area-carousel-arrow {
+        display: flex;
+    }
+
     .area-carousel-prev {
         left: 8px;
     }
@@ -3484,12 +3538,7 @@ def get_property_selector_styles():
         right: 8px;
     }
 
-    /* Hide Photos button when carousel has photos */
-    .area-carousel.has-photos + .area-actions .photos-action-btn {
-        display: none;
-    }
-
-    /* Items button full width when Photos is hidden */
+    /* Items button full width when carousel has photos */
     .area-carousel.has-photos + .area-actions {
         display: flex;
     }
@@ -3510,6 +3559,7 @@ def get_property_selector_styles():
         left: 0;
         right: 0;
         box-sizing: border-box;
+        z-index: 10;
     }
 
     .area-btn.selected .area-actions {
@@ -3530,6 +3580,9 @@ def get_property_selector_styles():
         display: flex;
         align-items: center;
         justify-content: center;
+        -webkit-tap-highlight-color: rgba(76, 175, 80, 0.3);
+        user-select: none;
+        -webkit-user-select: none;
     }
 
     .area-action-btn-content {
@@ -3559,6 +3612,7 @@ def get_property_selector_styles():
         right: 0;
         box-sizing: border-box;
         align-items: stretch;
+        z-index: 10;
     }
 
     [data-theme="light"] .area-action-btn {
@@ -3606,32 +3660,6 @@ def get_property_selector_styles():
         display: none;
     }
 
-    /* Photos Modal */
-    .photos-modal {
-        position: fixed;
-        top: 70px;
-        left: 0;
-        right: 0;
-        bottom: 80px;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 1000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 15px;
-    }
-
-    .photos-modal.hidden {
-        display: none;
-    }
-
-    .photos-content {
-        min-height: 200px;
-        display: flex;
-        flex-direction: column;
-        gap: 60px;
-    }
-
     /* Camera Section - hidden on desktop */
     .camera-section {
         display: none;
@@ -3639,137 +3667,12 @@ def get_property_selector_styles():
 
     @media (max-width: 767px) {
         .camera-section {
-            display: block;
+            display: none;
             scroll-snap-align: start;
             scroll-snap-stop: always;
         }
         .upload-section {
             display: none !important;
-        }
-        .photos-modal .modal-header {
-            border-bottom: none;
-        }
-
-        /* Full-screen photo modal on mobile */
-        .photos-modal {
-            top: 0;
-            bottom: 0;
-            padding: 0;
-            z-index: 10000;
-            background: var(--bg-primary);
-        }
-
-        .photos-modal .modal-content {
-            max-width: 100%;
-            height: 100%;
-            border-radius: 0;
-            border: none;
-            box-shadow: none;
-            background: transparent;
-            position: relative;
-            overflow-y: auto;
-            scroll-snap-type: y mandatory;
-            scroll-behavior: smooth;
-        }
-
-        .photos-modal .modal-header {
-            padding: 15px;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            border-bottom: none;
-        }
-
-        [data-theme="light"] .photos-modal .modal-header {
-            background: rgba(255, 255, 255, 0.5);
-            backdrop-filter: blur(12px) saturate(120%);
-            -webkit-backdrop-filter: blur(12px) saturate(120%);
-        }
-
-        [data-theme="dark"] .photos-modal .modal-header {
-            background: rgba(26, 26, 26, 0.5);
-            backdrop-filter: blur(12px) saturate(120%);
-            -webkit-backdrop-filter: blur(12px) saturate(120%);
-        }
-
-        .photos-modal .modal-body {
-            flex: none;
-            padding: 0 15px 80px 15px;
-            background: var(--bg-primary);
-            overflow: visible;
-            min-height: min-content;
-        }
-
-        .photos-modal .modal-footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: transparent;
-            border-top: none;
-            padding: 12px 15px;
-            z-index: 10;
-            align-items: center;
-        }
-
-        .photos-modal .modal-apply-btn {
-            padding: 0 28px;
-            border-radius: 30px;
-            font-size: 14px;
-            font-weight: 700;
-            height: 45px;
-            border: none;
-            backdrop-filter: blur(20px) saturate(150%);
-            -webkit-backdrop-filter: blur(20px) saturate(150%);
-            transition: all 0.3s ease;
-        }
-
-        [data-theme="light"] .photos-modal .modal-apply-btn {
-            background: rgba(0, 0, 0, 0.06);
-            color: #000000;
-            border: 2px solid rgba(0, 0, 0, 0.2);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 8px 40px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-        }
-
-        [data-theme="light"] .photos-modal .modal-apply-btn:active {
-            background: rgba(0, 0, 0, 0.15);
-            transform: scale(0.98);
-        }
-
-        [data-theme="dark"] .photos-modal .modal-apply-btn {
-            background: rgba(255, 255, 255, 0.12);
-            color: #ffffff;
-            border: 2px solid rgba(255, 255, 255, 0.35);
-            box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15), 0 8px 40px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-        }
-
-        [data-theme="dark"] .photos-modal .modal-apply-btn:active {
-            background: rgba(255, 255, 255, 0.3);
-            transform: scale(0.98);
-        }
-
-        .photos-modal .modal-upload-btn {
-            padding: 0 28px;
-            border-radius: 30px;
-            font-size: 14px;
-            font-weight: 700;
-            height: 45px;
-            backdrop-filter: blur(20px) saturate(150%);
-            -webkit-backdrop-filter: blur(20px) saturate(150%);
-        }
-
-        [data-theme="light"] .photos-modal .modal-upload-btn {
-            background: rgba(0, 0, 0, 0.06) !important;
-            border: 2px solid rgba(0, 0, 0, 0.2);
-            color: #000000;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 8px 40px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-        }
-
-        [data-theme="dark"] .photos-modal .modal-upload-btn {
-            background: rgba(255, 255, 255, 0.12) !important;
-            border: 2px solid rgba(255, 255, 255, 0.35);
-            color: #ffffff;
-            box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15), 0 8px 40px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1);
         }
 
         /* Disable focus/hover effects on mobile buttons */
@@ -3886,6 +3789,39 @@ def get_property_selector_styles():
         }
 
         .items-modal .items-grid {
+            padding: 8px;
+            padding-bottom: 80px;
+        }
+
+        /* Items Modal Photos Section - Mobile */
+        .items-modal .items-photos-section {
+            padding: 0;
+            border-bottom: none;
+        }
+
+        .items-modal .items-photos-section .camera-section {
+            display: none;
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
+        }
+
+        .items-modal .items-photos-section .photos-carousel-wrapper {
+            width: calc(100% + 30px);
+            margin-left: -15px;
+            margin-right: -15px;
+            padding: 0;
+            scroll-snap-align: start;
+        }
+
+        .items-modal .items-photos-section .photos-carousel-container {
+            width: 100%;
+            min-height: 200px;
+        }
+
+        .items-modal .items-grid-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
             padding: 8px;
             padding-bottom: 80px;
         }
@@ -4282,7 +4218,7 @@ def get_property_selector_styles():
 
     .modal-content {
         background: var(--bg-secondary);
-        border: 1px solid var(--border-color);
+        border: 0px;
         border-radius: 16px;
         width: 100%;
         max-width: 600px;
@@ -4357,6 +4293,199 @@ def get_property_selector_styles():
         grid-template-columns: repeat(3, 1fr);
         gap: 6px;
         padding: 6px;
+    }
+
+    /* Items Modal Photos Section */
+    .items-modal-body {
+        display: block;
+        padding: 0 !important;
+        overflow-y: auto;
+    }
+
+    .items-photos-section {
+        padding: 0;
+        border-bottom: none;
+        transition: all 0.3s ease;
+    }
+
+    /* Drag and drop visual feedback - Desktop only */
+    @media (min-width: 768px) {
+        .items-photos-section {
+            margin-left: -1px;
+            margin-right: -1px;
+            width: calc(100% + 2px);
+        }
+
+        .items-photos-section.drag-over {
+            background: rgba(76, 175, 80, 0.1);
+            border: 2px dashed #4CAF50;
+            border-radius: 8px;
+            margin-left: 0;
+            margin-right: 0;
+            width: 100%;
+        }
+
+        .items-photos-section.drag-over .photos-carousel-container::after {
+            content: 'Drop images here';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            font-weight: 600;
+            color: #4CAF50;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 30px;
+            border-radius: 8px;
+            pointer-events: none;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Desktop: Ensure photos fill full width with no padding */
+        .items-photos-section .photos-carousel-wrapper {
+            width: 100%;
+            margin-left: 0px;
+            margin-right: 0px;
+            padding: 0;
+        }
+
+        .items-photos-section .photos-carousel-container {
+            width: 100%;
+        }
+
+        .items-photos-section .carousel-track {
+            width: 100%;
+        }
+
+        .items-photos-section .photo-carousel-slide {
+            width: 100%;
+            min-width: 100%;
+        }
+
+        .items-photos-section .photo-carousel-slide img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+    }
+
+    .items-photos-section .photos-carousel-wrapper {
+        position: relative;
+        width: 100%;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .items-photos-section .photos-carousel-container {
+        width: 100%;
+        min-height: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .items-photos-section .photo-carousel-slide {
+        aspect-ratio: 4/3;
+        width: 100%;
+    }
+
+    .items-photos-section .photo-carousel-slide img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .items-grid-container {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        padding: 6px;
+    }
+
+    /* Upload button when no photos */
+    .items-photo-upload-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 20px;
+        background: var(--color-primary);
+        color: white;
+        border: none;
+        border-radius: 25px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .items-photo-upload-btn:hover {
+        opacity: 0.9;
+        transform: scale(1.02);
+    }
+
+    .items-photo-upload-btn svg {
+        stroke: white;
+    }
+
+    /* Camera button inline - positioned to the left of upload button (mobile only) */
+    .photo-camera-inline-btn {
+        position: absolute;
+        top: 12px;
+        right: 156px;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: rgba(59, 130, 246, 0.9);
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        z-index: 5;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .photo-camera-inline-btn svg {
+        width: 18px;
+        height: 18px;
+        stroke: white;
+    }
+
+    .photo-camera-inline-btn:hover {
+        background: rgba(37, 99, 235, 1);
+        transform: scale(1.1);
+    }
+
+    /* Upload button inline with rotate button - positioned to the left of rotate */
+    .photo-upload-inline-btn {
+        position: absolute;
+        top: 12px;
+        right: 108px;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: rgba(34, 197, 94, 0.9);
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        z-index: 5;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .photo-upload-inline-btn svg {
+        width: 18px;
+        height: 18px;
+        stroke: white;
+    }
+
+    .photo-upload-inline-btn:hover {
+        background: rgba(22, 163, 74, 1);
+        transform: scale(1.1);
     }
 
     .item-btn {
