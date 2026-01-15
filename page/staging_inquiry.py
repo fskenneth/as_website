@@ -4403,6 +4403,17 @@ def get_property_selector_styles():
         padding: 6px;
     }
 
+    /* Desktop: wider items modal with 6 columns */
+    @media (min-width: 768px) {
+        .items-modal .modal-content {
+            max-width: 800px;
+        }
+
+        .items-modal .items-grid-container {
+            grid-template-columns: repeat(6, 1fr);
+        }
+    }
+
     /* Upload button when no photos */
     .items-photo-upload-btn {
         display: inline-flex;
