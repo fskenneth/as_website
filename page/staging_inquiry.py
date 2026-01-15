@@ -633,8 +633,7 @@ def items_modal():
                         Button("+", cls="qty-btn qty-plus", onclick=f"incrementItem('{item_id}')"),
                         cls="item-qty-controls"
                     ),
-                    cls="item-btn-content",
-                    onclick=f"toggleItem('{item_id}')"
+                    cls="item-btn-content"
                 ),
                 cls="item-btn",
                 data_item=item_id,
@@ -2048,14 +2047,9 @@ def property_type_selector():
                     currentItemsPhotoIndex = 0;
                 }
 
-                // Show/hide nav buttons (hide on mobile)
-                if (isMobile) {
-                    prevBtn.style.display = 'none';
-                    nextBtn.style.display = 'none';
-                } else {
-                    prevBtn.style.display = photos.length > 1 ? 'flex' : 'none';
-                    nextBtn.style.display = photos.length > 1 ? 'flex' : 'none';
-                }
+                // Show/hide nav buttons
+                prevBtn.style.display = photos.length > 1 ? 'flex' : 'none';
+                nextBtn.style.display = photos.length > 1 ? 'flex' : 'none';
 
                 // Build slides: prev, current, next for smooth swiping
                 const prevIndex = currentItemsPhotoIndex > 0 ? currentItemsPhotoIndex - 1 : null;
@@ -3644,23 +3638,177 @@ def get_property_selector_styles():
     /* Items Modal */
     .items-modal {
         position: fixed;
-        top: 70px;
+        top: 0;
         left: 0;
         right: 0;
-        bottom: 80px;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 1000;
+        bottom: 0;
+        background: var(--bg-primary);
+        z-index: 10000;
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 15px;
+        padding: 0;
     }
 
     .items-modal.hidden {
         display: none;
     }
 
-    /* Camera Section - hidden on desktop */
+    .items-modal .modal-content {
+        max-width: 800px;
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+        border: none;
+        box-shadow: none;
+        background: var(--bg-primary);
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .items-modal .modal-header {
+        padding: 15px;
+        flex-shrink: 0;
+        z-index: 10;
+        border-bottom: none;
+    }
+
+    [data-theme="light"] .items-modal .modal-header {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(12px) saturate(120%);
+        -webkit-backdrop-filter: blur(12px) saturate(120%);
+    }
+
+    [data-theme="dark"] .items-modal .modal-header {
+        background: rgba(26, 26, 26, 0.9);
+        backdrop-filter: blur(12px) saturate(120%);
+        -webkit-backdrop-filter: blur(12px) saturate(120%);
+    }
+
+    .items-modal .modal-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 0;
+        background: var(--bg-primary);
+        overflow: hidden;
+    }
+
+    .items-modal .items-photos-section {
+        flex-shrink: 0;
+        padding: 0;
+    }
+
+    .items-modal .items-photos-section .camera-section {
+        display: none;
+    }
+
+    .items-modal .items-photos-section .photos-carousel-wrapper {
+        width: 100%;
+        margin-left: 0;
+        margin-right: 0;
+        padding: 0;
+    }
+
+    .items-modal .items-photos-section .photos-carousel-container {
+        width: 100%;
+        min-height: 150px;
+    }
+
+    @media (min-width: 768px) {
+        .items-modal .items-photos-section {
+            padding: 0 15px;
+        }
+    }
+
+    .items-modal .items-grid-container {
+        flex: 1;
+        overflow-y: auto;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        padding: 8px;
+        padding-bottom: 80px;
+    }
+
+    .items-modal .modal-footer {
+        position: fixed;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 100%;
+        max-width: 800px;
+        background: transparent;
+        border-top: none;
+        padding: 12px 15px;
+        z-index: 10;
+        align-items: center;
+    }
+
+    .items-modal .modal-apply-btn {
+        padding: 0 28px;
+        border-radius: 30px;
+        font-size: 14px;
+        font-weight: 700;
+        height: 45px;
+        border: none;
+        backdrop-filter: blur(20px) saturate(150%);
+        -webkit-backdrop-filter: blur(20px) saturate(150%);
+        transition: all 0.3s ease;
+    }
+
+    [data-theme="light"] .items-modal .modal-apply-btn {
+        background: rgba(0, 0, 0, 0.06);
+        color: #000000;
+        border: 2px solid rgba(0, 0, 0, 0.2);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 8px 40px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+
+    [data-theme="light"] .items-modal .modal-apply-btn:active {
+        background: rgba(0, 0, 0, 0.15);
+        transform: scale(0.98);
+    }
+
+    [data-theme="dark"] .items-modal .modal-apply-btn {
+        background: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+        box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15), 0 8px 40px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+
+    [data-theme="dark"] .items-modal .modal-apply-btn:active {
+        background: rgba(255, 255, 255, 0.3);
+        transform: scale(0.98);
+    }
+
+    .items-modal .modal-reset-btn,
+    .items-modal .modal-clear-btn {
+        padding: 0 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        height: 36px;
+        backdrop-filter: blur(20px) saturate(150%);
+        -webkit-backdrop-filter: blur(20px) saturate(150%);
+    }
+
+    [data-theme="light"] .items-modal .modal-reset-btn,
+    [data-theme="light"] .items-modal .modal-clear-btn {
+        background: rgba(0, 0, 0, 0.04);
+        border: 1px solid rgba(0, 0, 0, 0.15);
+        color: rgba(0, 0, 0, 0.6);
+    }
+
+    [data-theme="dark"] .items-modal .modal-reset-btn,
+    [data-theme="dark"] .items-modal .modal-clear-btn {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: rgba(255, 255, 255, 0.6);
+    }
+
+    /* Camera Section - hidden by default */
     .camera-section {
         display: none;
     }
@@ -3712,191 +3860,9 @@ def get_property_selector_styles():
             cursor: grabbing;
         }
 
-        .photo-rotate-btn {
-            width: 32px;
-            height: 32px;
-            right: 52px;
-        }
-
-        .photo-rotate-btn svg {
-            width: 16px;
-            height: 16px;
-        }
-
-        .photo-delete-btn {
-            width: 32px;
-            height: 32px;
-        }
-
-        .photo-delete-btn svg {
-            width: 18px;
-            height: 18px;
-        }
-
         .photos-carousel-counter {
             margin-top: 16px;
             padding: 0 15px;
-        }
-
-        /* Full-screen items modal on mobile */
-        .items-modal {
-            top: 0;
-            bottom: 0;
-            padding: 0;
-            z-index: 10000;
-            background: var(--bg-primary);
-        }
-
-        .items-modal .modal-content {
-            max-width: 100%;
-            height: 100%;
-            border-radius: 0;
-            border: none;
-            box-shadow: none;
-            background: transparent;
-            position: relative;
-        }
-
-        .items-modal .modal-content {
-            overflow-y: auto;
-        }
-
-        .items-modal .modal-header {
-            padding: 15px;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            border-bottom: none;
-        }
-
-        [data-theme="light"] .items-modal .modal-header {
-            background: rgba(255, 255, 255, 0.5);
-            backdrop-filter: blur(12px) saturate(120%);
-            -webkit-backdrop-filter: blur(12px) saturate(120%);
-        }
-
-        [data-theme="dark"] .items-modal .modal-header {
-            background: rgba(26, 26, 26, 0.5);
-            backdrop-filter: blur(12px) saturate(120%);
-            -webkit-backdrop-filter: blur(12px) saturate(120%);
-        }
-
-        .items-modal .modal-body {
-            flex: none;
-            padding: 0;
-            background: var(--bg-primary);
-            overflow: visible;
-        }
-
-        .items-modal .items-grid {
-            padding: 8px;
-            padding-bottom: 80px;
-        }
-
-        /* Items Modal Photos Section - Mobile */
-        .items-modal .items-photos-section {
-            padding: 0;
-            border-bottom: none;
-        }
-
-        .items-modal .items-photos-section .camera-section {
-            display: none;
-            scroll-snap-align: start;
-            scroll-snap-stop: always;
-        }
-
-        .items-modal .items-photos-section .photos-carousel-wrapper {
-            width: calc(100% + 30px);
-            margin-left: -15px;
-            margin-right: -15px;
-            padding: 0;
-            scroll-snap-align: start;
-        }
-
-        .items-modal .items-photos-section .photos-carousel-container {
-            width: 100%;
-            min-height: 200px;
-        }
-
-        .items-modal .items-grid-container {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
-            padding: 8px;
-            padding-bottom: 80px;
-        }
-
-        .items-modal .modal-footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: transparent;
-            border-top: none;
-            padding: 12px 15px;
-            z-index: 10;
-            align-items: center;
-        }
-
-        .items-modal .modal-apply-btn {
-            padding: 0 28px;
-            border-radius: 30px;
-            font-size: 14px;
-            font-weight: 700;
-            height: 45px;
-            border: none;
-            backdrop-filter: blur(20px) saturate(150%);
-            -webkit-backdrop-filter: blur(20px) saturate(150%);
-            transition: all 0.3s ease;
-        }
-
-        [data-theme="light"] .items-modal .modal-apply-btn {
-            background: rgba(0, 0, 0, 0.06);
-            color: #000000;
-            border: 2px solid rgba(0, 0, 0, 0.2);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 8px 40px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-        }
-
-        [data-theme="light"] .items-modal .modal-apply-btn:active {
-            background: rgba(0, 0, 0, 0.15);
-            transform: scale(0.98);
-        }
-
-        [data-theme="dark"] .items-modal .modal-apply-btn {
-            background: rgba(255, 255, 255, 0.12);
-            color: #ffffff;
-            border: 2px solid rgba(255, 255, 255, 0.35);
-            box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15), 0 8px 40px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-        }
-
-        [data-theme="dark"] .items-modal .modal-apply-btn:active {
-            background: rgba(255, 255, 255, 0.3);
-            transform: scale(0.98);
-        }
-
-        .items-modal .modal-reset-btn,
-        .items-modal .modal-clear-btn {
-            padding: 0 16px;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: 600;
-            height: 36px;
-            backdrop-filter: blur(20px) saturate(150%);
-            -webkit-backdrop-filter: blur(20px) saturate(150%);
-        }
-
-        [data-theme="light"] .items-modal .modal-reset-btn,
-        [data-theme="light"] .items-modal .modal-clear-btn {
-            background: rgba(0, 0, 0, 0.04);
-            border: 1px solid rgba(0, 0, 0, 0.15);
-            color: rgba(0, 0, 0, 0.6);
-        }
-
-        [data-theme="dark"] .items-modal .modal-reset-btn,
-        [data-theme="dark"] .items-modal .modal-clear-btn {
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: rgba(255, 255, 255, 0.6);
         }
     }
 
@@ -4106,7 +4072,7 @@ def get_property_selector_styles():
     .photo-rotate-btn {
         position: absolute;
         top: 12px;
-        right: 60px;
+        right: 56px;
         width: 36px;
         height: 36px;
         background: rgba(59, 130, 246, 0.9);
@@ -4119,6 +4085,11 @@ def get_property_selector_styles():
         justify-content: center;
         transition: all 0.2s ease;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .photo-rotate-btn svg {
+        width: 18px;
+        height: 18px;
     }
 
     .photo-rotate-btn:hover {
@@ -4142,6 +4113,11 @@ def get_property_selector_styles():
         justify-content: center;
         transition: all 0.2s ease;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .photo-delete-btn svg {
+        width: 18px;
+        height: 18px;
     }
 
     .photo-delete-btn:hover {
@@ -4403,14 +4379,10 @@ def get_property_selector_styles():
         padding: 6px;
     }
 
-    /* Desktop: wider items modal with 6 columns */
+    /* Desktop: 4 columns for items grid */
     @media (min-width: 768px) {
-        .items-modal .modal-content {
-            max-width: 800px;
-        }
-
         .items-modal .items-grid-container {
-            grid-template-columns: repeat(6, 1fr);
+            grid-template-columns: repeat(4, 1fr);
         }
     }
 
@@ -4443,7 +4415,7 @@ def get_property_selector_styles():
     .photo-camera-inline-btn {
         position: absolute;
         top: 12px;
-        right: 156px;
+        right: 144px;
         width: 36px;
         height: 36px;
         border-radius: 50%;
@@ -4473,7 +4445,7 @@ def get_property_selector_styles():
     .photo-upload-inline-btn {
         position: absolute;
         top: 12px;
-        right: 108px;
+        right: 100px;
         width: 36px;
         height: 36px;
         border-radius: 50%;
