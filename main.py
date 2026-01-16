@@ -36,6 +36,7 @@ from tools.zoho_sync.zoho_api import zoho_api
 from tools.zoho_sync.image_downloader import image_downloader
 from starlette.staticfiles import StaticFiles
 from starlette.responses import Response, JSONResponse, RedirectResponse
+import sqlite3
 from tools.instagram import get_cached_posts
 from tools.google_reviews import fetch_google_reviews
 from tools.email_service import send_inquiry_emails
@@ -496,6 +497,72 @@ def remove_staging(request: Request, staging_id: int):
     if result.get('success'):
         return JSONResponse({'success': True})
     return JSONResponse({'success': False, 'error': result.get('error', 'Delete failed')}, status_code=400)
+
+
+@rt('/api/inventory-items')
+def get_inventory_items(item_type: str = ""):
+    """Get inventory items filtered by type"""
+    import os
+    try:
+        # Connect directly to the zoho_sync database
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "zoho_sync.db")
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        query = """
+            SELECT Item_Name, Item_Type, Item_Image, Resized_Image, Item_Color, Item_Style, Model_3D
+            FROM Item_Report
+            WHERE Item_Name IS NOT NULL AND Item_Name != ''
+        """
+        params = []
+
+        if item_type:
+            query += " AND Item_Type = ?"
+            params.append(item_type)
+
+        query += " ORDER BY Item_Name"
+
+        cursor.execute(query, params)
+        items = cursor.fetchall()
+        conn.close()
+
+        # Group by item name and get unique images
+        items_data = {}
+        for item in items:
+            name = item['Item_Name']
+            # Get image URL (prefer resized, then original)
+            image_url = None
+            if item['Resized_Image'] and item['Resized_Image'] != 'blank.png' and item['Resized_Image'].startswith('http'):
+                image_url = item['Resized_Image']
+            elif item['Item_Image'] and item['Item_Image'] != 'blank.png' and item['Item_Image'].startswith('http'):
+                image_url = item['Item_Image']
+
+            # Get 3D model filename
+            model_3d = item['Model_3D'] if item['Model_3D'] else None
+
+            if name not in items_data:
+                items_data[name] = {
+                    'name': name,
+                    'type': item['Item_Type'],
+                    'images': [],
+                    'model_3d': model_3d
+                }
+            elif model_3d and not items_data[name].get('model_3d'):
+                # Update model_3d if this record has one and previous didn't
+                items_data[name]['model_3d'] = model_3d
+
+            # Add unique images only (with their model_3d info)
+            if image_url and image_url not in [img['url'] if isinstance(img, dict) else img for img in items_data[name]['images']]:
+                items_data[name]['images'].append({
+                    'url': image_url,
+                    'model_3d': model_3d
+                })
+
+        return JSONResponse({'success': True, 'items': list(items_data.values())})
+    except Exception as e:
+        print(f"Error getting inventory items: {e}")
+        return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
 
 
 @rt('/api/staging-photos', methods=['POST'])

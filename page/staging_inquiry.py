@@ -633,11 +633,13 @@ def items_modal():
                         Button("+", cls="qty-btn qty-plus", onclick=f"incrementItem('{item_id}')"),
                         cls="item-qty-controls"
                     ),
-                    cls="item-btn-content"
+                    cls="item-btn-content",
+                    onclick=f"openItemSelectModal('{name}')"
                 ),
                 cls="item-btn",
                 data_item=item_id,
-                data_price=str(price)
+                data_price=str(price),
+                data_name=name
             )
         )
 
@@ -716,6 +718,31 @@ def items_modal():
         ),
         id="items-modal",
         cls="items-modal hidden"
+    )
+
+
+def item_select_modal():
+    """Modal for selecting specific item images from inventory"""
+    return Div(
+        Div(
+            # Modal Header
+            Div(
+                H3("Select Item", cls="modal-title", id="item-select-modal-title"),
+                Button("✕", cls="modal-close-btn", onclick="closeItemSelectModal()"),
+                cls="modal-header"
+            ),
+            # Modal Body - Grid of item images
+            Div(
+                Div(
+                    id="item-select-grid",
+                    cls="item-select-grid"
+                ),
+                cls="modal-body item-select-modal-body"
+            ),
+            cls="modal-content"
+        ),
+        id="item-select-modal",
+        cls="items-modal item-select-modal hidden"
     )
 
 
@@ -927,6 +954,8 @@ def property_type_selector():
             ),
             # Items Modal
             items_modal(),
+            # Item Select Modal
+            item_select_modal(),
             # Inquiry Modal
             inquiry_modal(),
             # Floating Action Buttons
@@ -1106,6 +1135,7 @@ def property_type_selector():
                     selectedAreas: selectedAreas,
                     areaItemsData: typeof areaItemsData !== 'undefined' ? areaItemsData : {},
                     areaPhotos: typeof areaPhotos !== 'undefined' ? areaPhotos : {},
+                    areaSelectedItems: typeof areaSelectedItems !== 'undefined' ? areaSelectedItems : {},
                     totalFee: totalFee,
                     timestamp: Date.now()
                 };
@@ -1137,6 +1167,7 @@ def property_type_selector():
                         selected_areas: JSON.stringify(sessionData.selectedAreas || []),
                         selected_items: JSON.stringify(sessionData.areaItemsData || {}),
                         area_photos: JSON.stringify(sessionData.areaPhotos || {}),
+                        area_selected_items: JSON.stringify(sessionData.areaSelectedItems || {}),
                         total_fee: sessionData.totalFee || ''
                     };
 
@@ -1179,12 +1210,14 @@ def property_type_selector():
                         const serverPhotos = staging.area_photos ? JSON.parse(staging.area_photos) : {};
 
                         // Always replace sessionStorage with fresh server data to ensure sync across devices
+                        const serverSelectedItems = staging.area_selected_items ? JSON.parse(staging.area_selected_items) : {};
                         const serverSessionData = {
                             propertyType: staging.property_type,
                             propertySize: staging.property_size,
                             selectedAreas: staging.selected_areas ? JSON.parse(staging.selected_areas) : [],
                             areaItemsData: staging.selected_items ? JSON.parse(staging.selected_items) : {},
                             areaPhotos: serverPhotos,
+                            areaSelectedItems: serverSelectedItems,
                             totalFee: staging.total_fee,
                             timestamp: Date.now()
                         };
@@ -1260,6 +1293,11 @@ def property_type_selector():
                                             updateAreaCarousel(area);
                                         }
                                     });
+                                }
+
+                                // Restore selected items (images) per area
+                                if (data.areaSelectedItems && typeof areaSelectedItems !== 'undefined') {
+                                    Object.assign(areaSelectedItems, data.areaSelectedItems);
                                 }
 
                                 // Mark restore as complete - allow saving now
@@ -1591,6 +1629,7 @@ def property_type_selector():
             // Items Modal Functions
             let currentArea = null;
             const areaItemsData = {}; // Store selected items per area
+            const areaSelectedItems = {}; // Store selected item details (image, name, model_3d) per area
 
             // Area name mapping for modal title
             const areaNameMap = {
@@ -1960,6 +1999,154 @@ def property_type_selector():
                 }
 
                 currentArea = null;
+            }
+
+            // Item Select Modal Functions
+            let currentItemType = null;
+
+            async function openItemSelectModal(itemName) {
+                currentItemType = itemName;
+                const modal = document.getElementById('item-select-modal');
+                const grid = document.getElementById('item-select-grid');
+                const title = document.getElementById('item-select-modal-title');
+
+                if (!modal || !grid) return;
+
+                // Update title
+                if (title) {
+                    title.textContent = 'Select ' + itemName;
+                }
+
+                // Clear grid and show loading
+                grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">Loading...</div>';
+
+                // Show modal
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+
+                try {
+                    // Fetch items from API
+                    const response = await fetch('/api/inventory-items?item_type=' + encodeURIComponent(itemName));
+                    const data = await response.json();
+
+                    if (data.success && data.items && data.items.length > 0) {
+                        grid.innerHTML = '';
+
+                        // Flatten all images from all items
+                        const allImages = [];
+                        data.items.forEach(item => {
+                            if (item.images && item.images.length > 0) {
+                                item.images.forEach(imageObj => {
+                                    // Handle both old format (string) and new format (object)
+                                    const url = typeof imageObj === 'string' ? imageObj : imageObj.url;
+                                    const model3d = typeof imageObj === 'object' ? imageObj.model_3d : null;
+                                    allImages.push({
+                                        name: item.name,
+                                        url: url,
+                                        model_3d: model3d
+                                    });
+                                });
+                            }
+                        });
+
+                        if (allImages.length === 0) {
+                            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">No images found for ' + itemName + '</div>';
+                            return;
+                        }
+
+                        // Create cards for each image
+                        allImages.forEach((imageData, index) => {
+                            const card = document.createElement('div');
+                            card.className = 'item-select-card';
+                            card.onclick = () => selectItemImage(imageData.url, imageData.name, imageData.model_3d);
+
+                            const img = document.createElement('img');
+                            img.src = imageData.url;
+                            img.alt = imageData.name;
+                            img.loading = 'lazy';
+
+                            // Add 3D icon if item has a 3D model
+                            if (imageData.model_3d) {
+                                const icon3d = document.createElement('div');
+                                icon3d.className = 'item-3d-icon';
+                                icon3d.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>';
+                                card.appendChild(icon3d);
+                            }
+
+                            const nameLabel = document.createElement('div');
+                            nameLabel.className = 'item-select-name';
+                            nameLabel.textContent = imageData.name;
+
+                            card.appendChild(img);
+                            card.appendChild(nameLabel);
+                            grid.appendChild(card);
+                        });
+                    } else {
+                        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">No items found for ' + itemName + '</div>';
+                    }
+                } catch (error) {
+                    console.error('Error fetching items:', error);
+                    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">Error loading items</div>';
+                }
+            }
+
+            function closeItemSelectModal() {
+                const modal = document.getElementById('item-select-modal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                }
+                // Don't restore body overflow since items modal is still open
+                currentItemType = null;
+            }
+
+            function selectItemImage(imageUrl, itemName, model3d) {
+                if (!currentItemType || !currentArea) return;
+
+                // Find the item button for the current item type
+                const itemBtn = document.querySelector(`.item-btn[data-name="${currentItemType}"]`);
+                if (itemBtn) {
+                    // Replace the icon with the selected image - full width of item box
+                    const emojiDiv = itemBtn.querySelector('.item-emoji');
+                    if (emojiDiv) {
+                        let imgHtml = `<img src="${imageUrl}" alt="${itemName}">`;
+                        // Add 3D icon if item has a 3D model
+                        if (model3d) {
+                            imgHtml += `<div class="item-3d-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>`;
+                        }
+                        emojiDiv.innerHTML = imgHtml;
+                    }
+
+                    // Add class to item button to indicate it has a selected image
+                    itemBtn.classList.add('has-selected-image');
+
+                    // Replace the item name with the selected item name
+                    const nameSpan = itemBtn.querySelector('.item-name');
+                    if (nameSpan) {
+                        nameSpan.textContent = itemName;
+                    }
+
+                    // Store the selected image URL and 3D model on the button for later use
+                    itemBtn.dataset.selectedImage = imageUrl;
+                    itemBtn.dataset.selectedName = itemName;
+                    if (model3d) {
+                        itemBtn.dataset.model3d = model3d;
+                    }
+
+                    // Save to areaSelectedItems for persistence
+                    if (!areaSelectedItems[currentArea]) {
+                        areaSelectedItems[currentArea] = {};
+                    }
+                    areaSelectedItems[currentArea][currentItemType] = {
+                        imageUrl: imageUrl,
+                        itemName: itemName,
+                        model3d: model3d || null
+                    };
+
+                    // Save to session storage
+                    saveStagingSession();
+                }
+
+                closeItemSelectModal();
             }
 
             function startItemsCamera() {
@@ -2800,9 +2987,13 @@ def property_type_selector():
                     itemsToLoad = getDefaultItems(area) || {};
                 }
 
+                // Get saved selected items for this area
+                const savedSelectedItems = areaSelectedItems[area] || {};
+
                 // Reset all items first
                 document.querySelectorAll('.item-btn').forEach(btn => {
                     const itemId = btn.getAttribute('data-item');
+                    const itemName = btn.getAttribute('data-name');
                     const qty = itemsToLoad[itemId] || 0;
                     const qtySpan = document.getElementById('qty-' + itemId);
 
@@ -2815,6 +3006,33 @@ def property_type_selector():
                         btn.classList.add('selected');
                     } else {
                         btn.classList.remove('selected');
+                    }
+
+                    // Restore selected item image if exists
+                    const selectedItem = savedSelectedItems[itemName];
+                    if (selectedItem && selectedItem.imageUrl) {
+                        const emojiDiv = btn.querySelector('.item-emoji');
+                        if (emojiDiv) {
+                            let imgHtml = `<img src="${selectedItem.imageUrl}" alt="${selectedItem.itemName}">`;
+                            if (selectedItem.model3d) {
+                                imgHtml += `<div class="item-3d-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>`;
+                            }
+                            emojiDiv.innerHTML = imgHtml;
+                        }
+                        btn.classList.add('has-selected-image');
+
+                        // Update name span
+                        const nameSpan = btn.querySelector('.item-name');
+                        if (nameSpan) {
+                            nameSpan.textContent = selectedItem.itemName;
+                        }
+
+                        // Store on button
+                        btn.dataset.selectedImage = selectedItem.imageUrl;
+                        btn.dataset.selectedName = selectedItem.itemName;
+                        if (selectedItem.model3d) {
+                            btn.dataset.model3d = selectedItem.model3d;
+                        }
                     }
 
                     // Update total price display
@@ -3733,6 +3951,104 @@ def get_property_selector_styles():
         padding-bottom: 80px;
     }
 
+    /* Item Select Modal */
+    .item-select-modal .modal-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+    }
+
+    .item-select-modal .modal-footer {
+        display: none !important;
+    }
+
+    .item-select-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+    }
+
+    @media (min-width: 768px) {
+        .item-select-grid {
+            grid-template-columns: repeat(4, 1fr);
+        }
+    }
+
+    .item-select-card {
+        aspect-ratio: 1;
+        border-radius: 8px;
+        overflow: hidden;
+        cursor: pointer;
+        position: relative;
+        background: #ffffff;
+        border: 2px solid transparent;
+        transition: all 0.2s ease;
+    }
+
+    .item-select-card:hover {
+        border-color: var(--accent-color);
+    }
+
+    .item-select-card.selected {
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 2px var(--accent-color);
+    }
+
+    .item-select-card img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    .item-select-card .item-select-name {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 4px 6px;
+        background: rgba(255, 255, 255, 0.9);
+        color: #000000;
+        font-size: 10px;
+        font-weight: 500;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .item-3d-icon {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 28px;
+        height: 28px;
+        background: rgba(0, 0, 0, 0.7);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        z-index: 2;
+    }
+
+    .item-3d-icon svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* 3D icon in item button */
+    .item-btn .item-3d-icon {
+        top: 4px;
+        right: 4px;
+        width: 24px;
+        height: 24px;
+    }
+
+    .item-btn .item-3d-icon svg {
+        width: 14px;
+        height: 14px;
+    }
+
     .items-modal .modal-footer {
         position: fixed;
         bottom: 0;
@@ -4472,6 +4788,7 @@ def get_property_selector_styles():
     }
 
     .item-btn {
+        position: relative;
         background: var(--bg-secondary);
         border: 2px solid var(--border-color);
         border-radius: 10px;
@@ -4491,6 +4808,47 @@ def get_property_selector_styles():
 
     [data-theme="dark"] .item-btn.selected {
         border-color: #fff;
+    }
+
+    .item-btn.has-selected-image {
+        padding: 0;
+        overflow: visible;
+    }
+
+    .item-btn.has-selected-image .item-btn-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .item-btn.has-selected-image .item-emoji {
+        width: 100% !important;
+        height: auto !important;
+        aspect-ratio: 1;
+        flex-shrink: 0;
+        display: block;
+    }
+
+    .item-btn.has-selected-image .item-emoji img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        border-radius: 8px 8px 0 0;
+        background: #fff;
+        display: block;
+    }
+
+    .item-btn.has-selected-image .item-name {
+        padding-top: 4px;
+    }
+
+    .item-btn.has-selected-image .item-unit-price,
+    .item-btn.has-selected-image .item-total-price {
+        display: block;
+    }
+
+    .item-btn.has-selected-image .item-qty-controls {
+        padding: 4px 0;
     }
 
     .item-btn-content {
