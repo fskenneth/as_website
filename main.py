@@ -704,7 +704,7 @@ async def save_staging_models(request: Request):
 
     try:
         data = await request.json()
-        staging_id = data.get('stagingId')
+        staging_id = data.get('stagingId') or 0  # Use 0 instead of NULL
         area = data.get('area')
         photo_index = data.get('photoIndex')
         background_image = data.get('backgroundImage', '')[:100]  # First 100 chars as identifier
@@ -713,11 +713,11 @@ async def save_staging_models(request: Request):
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Delete existing models for this background
+        # Delete existing models for this background (match on background_image only for flexibility)
         cursor.execute("""
             DELETE FROM design_models
-            WHERE staging_id = ? AND background_image = ?
-        """, (staging_id, background_image))
+            WHERE background_image = ?
+        """, (background_image,))
 
         # Insert new model states
         for model in models:
@@ -759,13 +759,14 @@ def get_staging_models(staging_id: int = 0, background_image: str = ""):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        # Match on background_image only for flexibility (staging_id may be 0 or NULL)
         cursor.execute("""
             SELECT model_url, instance_id, position_x, position_y, position_z,
                    scale, rotation_y, tilt, brightness
             FROM design_models
-            WHERE staging_id = ? AND background_image = ?
+            WHERE background_image = ?
             ORDER BY instance_id
-        """, (staging_id, background_image[:100]))
+        """, (background_image[:100],))
 
         models = []
         for row in cursor.fetchall():

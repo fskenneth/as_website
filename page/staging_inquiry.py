@@ -2466,9 +2466,22 @@ def property_type_selector():
             }
 
             let isDraggingModel = false;
-            let modelDragStartX = 0;
-            let modelDragStartY = 0;
+            let modelDragOffsetX = 0; // Offset from click point to model center in world coords
+            let modelDragOffsetY = 0;
             let didDragModel = false; // Track if we actually moved
+
+            // Convert screen coordinates to world coordinates for orthographic camera
+            function screenToWorld(clientX, clientY, canvas) {
+                const rect = canvas.getBoundingClientRect();
+                const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
+                const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+                // For orthographic camera, convert NDC to world coordinates
+                const worldX = (ndcX * (threeCamera.right - threeCamera.left) / 2) + threeCamera.position.x;
+                const worldY = (ndcY * (threeCamera.top - threeCamera.bottom) / 2) + threeCamera.position.y;
+
+                return { x: worldX, y: worldY };
+            }
 
             function showModelControls(show) {
                 const overlay = current3DViewerContainer?.querySelector('.model-control-overlay');
@@ -2494,26 +2507,36 @@ def property_type_selector():
                     cachedModelHeight = box.max.y - box.min.y;
                 }
 
-                // Position above model: center + half height + padding
-                const topY = currentLoadedModel.position.y + (cachedModelHeight / 2) + 0.3;
-                const topPos = new THREE.Vector3(
+                // Position below model: center - half height - padding
+                const bottomY = currentLoadedModel.position.y - (cachedModelHeight / 2) - 0.3;
+                const bottomPos = new THREE.Vector3(
                     currentLoadedModel.position.x,
-                    topY,
+                    bottomY,
                     currentLoadedModel.position.z
                 );
 
                 // Project to screen coordinates
-                topPos.project(threeCamera);
+                bottomPos.project(threeCamera);
 
                 const canvas = current3DViewerContainer.querySelector('canvas');
                 if (!canvas) return;
 
                 const rect = canvas.getBoundingClientRect();
-                const screenX = ((topPos.x + 1) / 2) * rect.width;
-                const screenY = ((-topPos.y + 1) / 2) * rect.height;
+                const screenX = ((bottomPos.x + 1) / 2) * rect.width;
+                const screenY = ((-bottomPos.y + 1) / 2) * rect.height;
 
-                overlay.style.left = screenX + 'px';
-                overlay.style.top = Math.max(5, screenY - 20) + 'px';
+                // Ensure controls don't go off the edges of the container
+                // 6 buttons at ~40px each + gaps = ~280px total width
+                const overlayWidth = Math.max(overlay.offsetWidth, 280);
+                const halfWidth = overlayWidth / 2;
+                const minLeft = halfWidth + 10; // Add padding from edge
+                const maxLeft = rect.width - halfWidth - 10;
+                const clampedX = Math.max(minLeft, Math.min(maxLeft, screenX));
+
+                overlay.style.left = clampedX + 'px';
+                // Ensure controls don't go off the bottom of the container
+                const maxBottom = rect.height - 50; // Leave space for the control buttons
+                overlay.style.top = Math.min(maxBottom, screenY + 10) + 'px';
                 overlay.style.transform = 'translateX(-50%)';
             }
 
@@ -2547,8 +2570,12 @@ def property_type_selector():
                         // Select clicked model
                         currentLoadedModel = clickedModel;
                         isDraggingModel = true;
-                        modelDragStartX = e.clientX;
-                        modelDragStartY = e.clientY;
+
+                        // Calculate offset from click point to model center
+                        const worldPos = screenToWorld(e.clientX, e.clientY, canvas);
+                        modelDragOffsetX = currentLoadedModel.position.x - worldPos.x;
+                        modelDragOffsetY = currentLoadedModel.position.y - worldPos.y;
+
                         canvas.style.cursor = 'grabbing';
                         showModelControls(true);
                     } else {
@@ -2561,18 +2588,20 @@ def property_type_selector():
                 canvas.addEventListener('mousemove', (e) => {
                     if (!isDraggingModel || !currentLoadedModel) return;
 
-                    const deltaX = (e.clientX - modelDragStartX) * 0.005;
-                    const deltaY = (modelDragStartY - e.clientY) * 0.005;
+                    // Convert current mouse position to world coordinates
+                    const worldPos = screenToWorld(e.clientX, e.clientY, canvas);
 
-                    if (Math.abs(deltaX) > 0.001 || Math.abs(deltaY) > 0.001) {
+                    // Calculate new position maintaining the original offset
+                    const newX = worldPos.x + modelDragOffsetX;
+                    const newY = worldPos.y + modelDragOffsetY;
+
+                    if (Math.abs(newX - currentLoadedModel.position.x) > 0.001 ||
+                        Math.abs(newY - currentLoadedModel.position.y) > 0.001) {
                         didDragModel = true;
                     }
 
-                    currentLoadedModel.position.x += deltaX;
-                    currentLoadedModel.position.y += deltaY;
-
-                    modelDragStartX = e.clientX;
-                    modelDragStartY = e.clientY;
+                    currentLoadedModel.position.x = newX;
+                    currentLoadedModel.position.y = newY;
                 });
 
                 canvas.addEventListener('mouseup', () => {
@@ -2606,8 +2635,12 @@ def property_type_selector():
                     if (clickedModel) {
                         currentLoadedModel = clickedModel;
                         isDraggingModel = true;
-                        modelDragStartX = touch.clientX;
-                        modelDragStartY = touch.clientY;
+
+                        // Calculate offset from touch point to model center
+                        const worldPos = screenToWorld(touch.clientX, touch.clientY, canvas);
+                        modelDragOffsetX = currentLoadedModel.position.x - worldPos.x;
+                        modelDragOffsetY = currentLoadedModel.position.y - worldPos.y;
+
                         showModelControls(true);
                     } else {
                         currentLoadedModel = null;
@@ -2618,18 +2651,20 @@ def property_type_selector():
                 canvas.addEventListener('touchmove', (e) => {
                     if (!isDraggingModel || !currentLoadedModel || e.touches.length !== 1) return;
 
-                    const deltaX = (e.touches[0].clientX - modelDragStartX) * 0.005;
-                    const deltaY = (modelDragStartY - e.touches[0].clientY) * 0.005;
+                    // Convert current touch position to world coordinates
+                    const worldPos = screenToWorld(e.touches[0].clientX, e.touches[0].clientY, canvas);
 
-                    if (Math.abs(deltaX) > 0.001 || Math.abs(deltaY) > 0.001) {
+                    // Calculate new position maintaining the original offset
+                    const newX = worldPos.x + modelDragOffsetX;
+                    const newY = worldPos.y + modelDragOffsetY;
+
+                    if (Math.abs(newX - currentLoadedModel.position.x) > 0.001 ||
+                        Math.abs(newY - currentLoadedModel.position.y) > 0.001) {
                         didDragModel = true;
                     }
 
-                    currentLoadedModel.position.x += deltaX;
-                    currentLoadedModel.position.y += deltaY;
-
-                    modelDragStartX = e.touches[0].clientX;
-                    modelDragStartY = e.touches[0].clientY;
+                    currentLoadedModel.position.x = newX;
+                    currentLoadedModel.position.y = newY;
                 }, { passive: true });
 
                 canvas.addEventListener('touchend', () => {
@@ -2831,43 +2866,79 @@ def property_type_selector():
                 const btnDuplicate = overlay.querySelector('#btn-duplicate');
                 const btnDelete = overlay.querySelector('#btn-delete');
 
-                // Brightness control
+                // Brightness control - mouse
                 btnBrightness.addEventListener('mousedown', (e) => {
                     isDraggingBrightness = true;
                     lastMouseX = e.clientX;
                     e.preventDefault();
                 });
+                // Brightness control - touch
+                btnBrightness.addEventListener('touchstart', (e) => {
+                    isDraggingBrightness = true;
+                    lastMouseX = e.touches[0].clientX;
+                    e.preventDefault();
+                }, { passive: false });
 
-                // Rotate control
+                // Rotate control - mouse
                 btnRotate.addEventListener('mousedown', (e) => {
                     isDraggingRotate = true;
                     lastMouseX = e.clientX;
                     e.preventDefault();
                 });
+                // Rotate control - touch
+                btnRotate.addEventListener('touchstart', (e) => {
+                    isDraggingRotate = true;
+                    lastMouseX = e.touches[0].clientX;
+                    e.preventDefault();
+                }, { passive: false });
 
-                // Scale control
+                // Scale control - mouse
                 btnScale.addEventListener('mousedown', (e) => {
                     isDraggingScale = true;
                     lastMouseY = e.clientY;
                     e.preventDefault();
                 });
+                // Scale control - touch
+                btnScale.addEventListener('touchstart', (e) => {
+                    isDraggingScale = true;
+                    lastMouseY = e.touches[0].clientY;
+                    e.preventDefault();
+                }, { passive: false });
 
-                // Tilt control
+                // Tilt control - mouse
                 btnTilt.addEventListener('mousedown', (e) => {
                     isDraggingTilt = true;
                     lastMouseY = e.clientY;
                     e.preventDefault();
                 });
+                // Tilt control - touch
+                btnTilt.addEventListener('touchstart', (e) => {
+                    isDraggingTilt = true;
+                    lastMouseY = e.touches[0].clientY;
+                    e.preventDefault();
+                }, { passive: false });
 
-                // Duplicate
+                // Duplicate - click and touch
                 btnDuplicate.addEventListener('click', () => {
                     if (currentLoadedModel) {
                         duplicateCurrentModel();
                     }
                 });
+                btnDuplicate.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    if (currentLoadedModel) {
+                        duplicateCurrentModel();
+                    }
+                });
 
-                // Delete
+                // Delete - click and touch
                 btnDelete.addEventListener('click', () => {
+                    if (currentLoadedModel) {
+                        deleteCurrentModel();
+                    }
+                });
+                btnDelete.addEventListener('touchend', (e) => {
+                    e.preventDefault();
                     if (currentLoadedModel) {
                         deleteCurrentModel();
                     }
@@ -2876,6 +2947,10 @@ def property_type_selector():
                 // Mouse move and up handlers (document level)
                 document.addEventListener('mousemove', handleModelControlMouseMove);
                 document.addEventListener('mouseup', handleModelControlMouseUp);
+
+                // Touch move and end handlers (document level)
+                document.addEventListener('touchmove', handleModelControlTouchMove, { passive: false });
+                document.addEventListener('touchend', handleModelControlTouchEnd);
             }
 
             function handleModelControlMouseMove(e) {
@@ -2919,6 +2994,64 @@ def property_type_selector():
             }
 
             function handleModelControlMouseUp() {
+                const wasScaling = isDraggingScale;
+                isDraggingBrightness = false;
+                isDraggingRotate = false;
+                isDraggingScale = false;
+                isDraggingTilt = false;
+                // Recalculate bar position if we were scaling
+                if (wasScaling) {
+                    updateControlOverlayPosition(true);
+                }
+                // Save state after control ends
+                saveModelStates();
+            }
+
+            function handleModelControlTouchMove(e) {
+                if (!currentLoadedModel) return;
+                if (!isDraggingBrightness && !isDraggingRotate && !isDraggingScale && !isDraggingTilt) return;
+
+                const touch = e.touches[0];
+
+                if (isDraggingBrightness) {
+                    const delta = (touch.clientX - lastMouseX) * 0.01;
+                    lastMouseX = touch.clientX;
+                    const newBrightness = Math.max(0, Math.min(2.5, (currentLoadedModel.userData.brightness || 2.5) + delta));
+                    currentLoadedModel.userData.brightness = newBrightness;
+                    updateModelBrightness(currentLoadedModel, newBrightness);
+                    e.preventDefault();
+                }
+
+                if (isDraggingRotate) {
+                    const delta = (touch.clientX - lastMouseX) * 0.02;
+                    lastMouseX = touch.clientX;
+                    currentLoadedModel.userData.yRotation = (currentLoadedModel.userData.yRotation || 0) + delta;
+                    currentLoadedModel.rotation.y = currentLoadedModel.userData.yRotation;
+                    e.preventDefault();
+                }
+
+                if (isDraggingScale) {
+                    const delta = (lastMouseY - touch.clientY) * 0.005;
+                    lastMouseY = touch.clientY;
+                    const baseScale = currentLoadedModel.userData.baseScale || 1;
+                    const currentScale = currentLoadedModel.scale.x;
+                    const newScale = Math.max(baseScale * 0.2, Math.min(baseScale * 3, currentScale + delta));
+                    currentLoadedModel.scale.setScalar(newScale);
+                    e.preventDefault();
+                }
+
+                if (isDraggingTilt) {
+                    const delta = (touch.clientY - lastMouseY) * 0.005;
+                    lastMouseY = touch.clientY;
+                    const currentTilt = currentLoadedModel.userData.tilt ?? DEFAULT_TILT;
+                    const newTilt = Math.max(0, Math.min(0.7, currentTilt + delta));
+                    currentLoadedModel.userData.tilt = newTilt;
+                    currentLoadedModel.rotation.x = newTilt;
+                    e.preventDefault();
+                }
+            }
+
+            function handleModelControlTouchEnd() {
                 const wasScaling = isDraggingScale;
                 isDraggingBrightness = false;
                 isDraggingRotate = false;
@@ -3033,7 +3166,7 @@ def property_type_selector():
                             stagingId: stagingId,
                             area: currentArea,
                             photoIndex: current3DPhotoIndex,
-                            backgroundImage: backgroundImage.substring(0, 100), // Use first 100 chars as identifier
+                            backgroundImage: `${currentArea}_photo_${current3DPhotoIndex}`, // Use area + index as unique key
                             models: modelStates
                         })
                     });
@@ -3047,11 +3180,12 @@ def property_type_selector():
                 const photos = areaPhotos[currentArea] || [];
                 if (photos.length === 0 || photoIndex < 0 || photoIndex >= photos.length) return;
 
-                const backgroundImage = photos[photoIndex].substring(0, 100);
+                // Use area + index as unique key
+                const backgroundKey = `${currentArea}_photo_${photoIndex}`;
                 const stagingId = window.stagingId || 0;
 
                 try {
-                    const response = await fetch(`/api/get-staging-models?staging_id=${stagingId}&background_image=${encodeURIComponent(backgroundImage)}`);
+                    const response = await fetch(`/api/get-staging-models?staging_id=${stagingId}&background_image=${encodeURIComponent(backgroundKey)}`);
                     const data = await response.json();
 
                     if (data.success && data.models && data.models.length > 0) {
@@ -3147,6 +3281,9 @@ def property_type_selector():
                     }
                 }
                 animate();
+
+                // Add mouse handlers for model position dragging
+                setupModelDragHandlers(threeRenderer.domElement);
             }
 
             async function loadGLTFModelFromSaved(modelData) {
@@ -3237,8 +3374,12 @@ def property_type_selector():
                 const photos = areaPhotos[currentArea] || [];
                 const isMobile = window.innerWidth <= 767;
 
-                // Exit 3D mode before rebuilding carousel (if switching photos)
+                // Save and exit 3D mode before rebuilding carousel (if switching photos)
                 if (current3DPhotoIndex !== null && current3DPhotoIndex !== currentItemsPhotoIndex) {
+                    // Save current models before switching
+                    if (allLoadedModels.length > 0) {
+                        saveModelStates();
+                    }
                     exitPhoto3DMode();
                 }
 
@@ -3365,6 +3506,27 @@ def property_type_selector():
 
             function handleItemsTouchStart(e) {
                 if (itemsIsAnimating) return;
+
+                // Don't start carousel swipe if touching control buttons
+                const target = e.target;
+                const isOnControlBtn = target.closest('.model-control-btn') || target.closest('.model-control-overlay');
+
+                if (isOnControlBtn) {
+                    itemsIsDragging = false;
+                    return;
+                }
+
+                // If touching canvas, check if touching a model
+                if (target.tagName === 'CANVAS' && allLoadedModels.length > 0) {
+                    const touch = e.changedTouches[0];
+                    const clickedModel = getClickedModel(touch.clientX, touch.clientY, target);
+                    if (clickedModel) {
+                        // Touching a model - don't swipe carousel
+                        itemsIsDragging = false;
+                        return;
+                    }
+                }
+
                 itemsPhotoTouchStartX = e.changedTouches[0].screenX;
                 itemsIsDragging = true;
                 itemsCurrentTranslateX = 0;
@@ -5539,6 +5701,7 @@ def get_property_selector_styles():
         cursor: pointer;
         display: flex;
         align-items: center;
+        z-index: 25;
         justify-content: center;
         transition: all 0.2s ease;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -5570,6 +5733,7 @@ def get_property_selector_styles():
         justify-content: center;
         transition: all 0.2s ease;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        z-index: 25;
     }
 
     .photo-delete-btn svg {
@@ -5885,7 +6049,7 @@ def get_property_selector_styles():
         align-items: center;
         justify-content: center;
         transition: all 0.2s ease;
-        z-index: 5;
+        z-index: 25;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
 
@@ -5915,7 +6079,7 @@ def get_property_selector_styles():
         align-items: center;
         justify-content: center;
         transition: all 0.2s ease;
-        z-index: 5;
+        z-index: 25;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
 
