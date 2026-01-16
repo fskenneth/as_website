@@ -3376,6 +3376,11 @@ def property_type_selector():
                 const photos = areaPhotos[currentArea] || [];
                 if (photos.length === 0 || photoIndex < 0 || photoIndex >= photos.length) return;
 
+                // Don't reload if already loaded for this photo
+                if (current3DPhotoIndex === photoIndex && allLoadedModels.length > 0) {
+                    return;
+                }
+
                 // Use area + index as unique key
                 const backgroundKey = `${currentArea}_photo_${photoIndex}`;
                 const stagingId = window.stagingId || 0;
@@ -3422,10 +3427,12 @@ def property_type_selector():
                 const width = containerRect.width;
                 const height = containerRect.height;
 
-                // Clear existing 3D scene
+                // Clear existing 3D scene and models array
                 if (threeRenderer) {
                     container.querySelector('canvas')?.remove();
                 }
+                allLoadedModels = [];
+                currentLoadedModel = null;
 
                 const imgEl = container.querySelector('img');
                 if (imgEl) imgEl.style.display = 'none';
@@ -3685,8 +3692,6 @@ def property_type_selector():
                         <button class="photo-delete-btn" onclick="removeItemsPhoto(${currentItemsPhotoIndex})">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                                <line x1="10" y1="11" x2="10" y2="17"/>
-                                <line x1="14" y1="11" x2="14" y2="17"/>
                             </svg>
                         </button>
                     </div>
@@ -5950,7 +5955,7 @@ def get_property_selector_styles():
         right: 12px;
         width: 36px;
         height: 36px;
-        background: rgba(220, 38, 38, 0.9);
+        background: rgba(220, 38, 38, 0.6);
         color: white;
         border: none;
         border-radius: 50%;
@@ -5970,7 +5975,7 @@ def get_property_selector_styles():
     }
 
     .photo-delete-btn:hover {
-        background: rgba(185, 28, 28, 1);
+        background: rgba(220, 38, 38, 0.8);
         transform: scale(1.1);
     }
 
