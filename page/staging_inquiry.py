@@ -4311,10 +4311,11 @@ def property_type_selector():
                 saveStagingSession();
             }
 
-            // Close modal on backdrop click
+            // Close modal on backdrop click (mobile only - desktop should not close on backdrop click)
             document.addEventListener('click', function(event) {
                 const modal = document.getElementById('items-modal');
-                if (event.target === modal) {
+                const isMobile = window.innerWidth < 768;
+                if (event.target === modal && isMobile) {
                     closeItemsModal();
                 }
             });
@@ -5050,6 +5051,34 @@ def get_property_selector_styles():
     @media (min-width: 768px) {
         .items-modal .items-photos-section {
             padding: 0 15px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* Desktop: Full screen modal */
+        .items-modal .modal-content {
+            max-width: 100%;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* Desktop: Constrain modal body content to 800px */
+        .items-modal .modal-body {
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .items-modal .modal-header {
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .items-modal .modal-footer {
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
         }
     }
 
@@ -5807,10 +5836,12 @@ def get_property_selector_styles():
         padding: 6px;
     }
 
-    /* Desktop: 4 columns for items grid */
+    /* Desktop: 6 columns for items grid (full screen modal) */
     @media (min-width: 768px) {
         .items-modal .items-grid-container {
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(6, 1fr);
+            padding: 15px;
+            gap: 10px;
         }
     }
 

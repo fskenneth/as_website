@@ -124,6 +124,13 @@ def get_shared_styles():
         }
     }
 
+    /* Page wrapper - center content with max width */
+    .page-wrapper {
+        width: 100%;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
     /* Navigation Styles - iOS Glass Effect */
     .navbar {
         position: fixed;
