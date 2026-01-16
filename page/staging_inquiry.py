@@ -2336,6 +2336,83 @@ def property_type_selector():
             let modelBrightness = 2.5;
             let modelTilt = 0.1745; // ~10 degrees default tilt
             const DEFAULT_TILT = 0.1745;
+            const SIDE_ROTATION_ANGLE = Math.PI / 2.5; // ~72 degrees for more noticeable angled facing
+
+            // Get position zone: 'left', 'center', or 'right'
+            function getPositionZone(worldX) {
+                if (!threeCamera) return 'center';
+
+                const halfWidth = (threeCamera.right - threeCamera.left) / 2;
+                const leftBound = -halfWidth;
+                const totalWidth = halfWidth * 2;
+                const positionPercent = (worldX - leftBound) / totalWidth;
+
+                if (positionPercent < 0.25) return 'left';
+                if (positionPercent > 0.75) return 'right';
+                return 'center';
+            }
+
+            // Get rotation for a specific zone
+            function getRotationForZone(zone, frontRotation) {
+                if (zone === 'left') {
+                    return frontRotation + SIDE_ROTATION_ANGLE; // Face right (toward center)
+                } else if (zone === 'right') {
+                    return frontRotation - SIDE_ROTATION_ANGLE; // Face left (toward center)
+                }
+                return frontRotation; // Center - face front
+            }
+
+            // Calculate rotation based on horizontal position (for initial drop)
+            function getPositionBasedRotation(worldX, frontRotation) {
+                const zone = getPositionZone(worldX);
+                return getRotationForZone(zone, frontRotation);
+            }
+
+            // Animate rotation smoothly
+            function animateRotation(model, targetRotation, duration = 300) {
+                if (!model) return;
+
+                const startRotation = model.rotation.y;
+                const startTime = performance.now();
+
+                function animate() {
+                    const elapsed = performance.now() - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+
+                    // Ease-out cubic for smooth deceleration
+                    const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+                    model.rotation.y = startRotation + (targetRotation - startRotation) * easeProgress;
+
+                    if (progress < 1) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        model.rotation.y = targetRotation;
+                        model.userData.yRotation = targetRotation;
+                    }
+                }
+
+                requestAnimationFrame(animate);
+            }
+
+            // Update rotation only when crossing zone boundaries
+            function updateRotationIfZoneChanged(model, newX) {
+                if (!model || !model.userData) return;
+
+                const frontRotation = model.userData.frontRotation ?? -Math.PI/2;
+                const currentZone = model.userData.positionZone || 'center';
+                const newZone = getPositionZone(newX);
+
+                // Only update rotation when crossing zone boundaries
+                if (newZone !== currentZone) {
+                    const newRotation = getRotationForZone(newZone, frontRotation);
+                    // Animate the rotation smoothly
+                    animateRotation(model, newRotation, 250);
+                    model.userData.yRotation = newRotation;
+                    model.userData.positionZone = newZone;
+                }
+            }
+
             let isDraggingRotate = false;
             let isDraggingScale = false;
             let isDraggingBrightness = false;
@@ -2345,6 +2422,11 @@ def property_type_selector():
             let current3DPhotoIndex = null;
             let current3DViewerContainer = null;
             let animationFrameId = null;
+
+            // Background brightness drag state
+            let isDraggingBgBrightness = false;
+            let bgBrightnessLastX = 0;
+            let bgBrightnessValue = 1.0; // 1.0 = normal, 0 = dark, 2 = bright
 
             function loadScript(src) {
                 return new Promise((resolve, reject) => {
@@ -2432,6 +2514,10 @@ def property_type_selector():
                 threeRenderer.domElement.style.left = '0';
                 threeRenderer.domElement.style.width = '100%';
                 threeRenderer.domElement.style.height = '100%';
+                // Apply saved brightness to canvas
+                if (bgBrightnessValue !== 1.0) {
+                    threeRenderer.domElement.style.filter = `brightness(${bgBrightnessValue})`;
+                }
                 container.appendChild(threeRenderer.domElement);
 
                 // Lights
@@ -2602,6 +2688,9 @@ def property_type_selector():
 
                     currentLoadedModel.position.x = newX;
                     currentLoadedModel.position.y = newY;
+
+                    // Update rotation only when crossing zone boundaries (keep tilt, size, brightness)
+                    updateRotationIfZoneChanged(currentLoadedModel, newX);
                 });
 
                 canvas.addEventListener('mouseup', () => {
@@ -2665,6 +2754,9 @@ def property_type_selector():
 
                     currentLoadedModel.position.x = newX;
                     currentLoadedModel.position.y = newY;
+
+                    // Update rotation only when crossing zone boundaries (keep tilt, size, brightness)
+                    updateRotationIfZoneChanged(currentLoadedModel, newX);
                 }, { passive: true });
 
                 canvas.addEventListener('touchend', () => {
@@ -2757,7 +2849,10 @@ def property_type_selector():
                     // Apply front rotation so model faces the user
                     // frontRotation defines the model's default facing direction (default: -90° to face camera)
                     const frontRotation = itemData.frontRotation ?? -Math.PI/2;
-                    model.rotation.y = frontRotation;
+                    // Get initial zone and rotation based on drop position
+                    const initialZone = getPositionZone(worldX);
+                    const initialRotation = getRotationForZone(initialZone, frontRotation);
+                    model.rotation.y = initialRotation;
 
                     // Apply default tilt
                     model.rotation.x = DEFAULT_TILT;
@@ -2771,7 +2866,8 @@ def property_type_selector():
                         depth: itemData.depth,
                         height: itemData.height,
                         frontRotation: frontRotation,
-                        yRotation: frontRotation, // Start from front rotation
+                        yRotation: initialRotation, // Start from position-based rotation
+                        positionZone: initialZone, // Track current zone for rotation changes
                         tilt: DEFAULT_TILT,
                         brightness: 2.5,
                         baseScale: targetScale,
@@ -3065,6 +3161,106 @@ def property_type_selector():
                 saveModelStates();
             }
 
+            // Background brightness handlers
+            function applyBackgroundBrightness(brightness) {
+                // Apply brightness filter to the background image
+                const photoSlide = document.getElementById('items-photo-slide');
+                if (photoSlide) {
+                    const img = photoSlide.querySelector('img');
+                    if (img) {
+                        img.style.filter = `brightness(${brightness})`;
+                    }
+                    // Apply same brightness to the 3D canvas if present
+                    const canvas = photoSlide.querySelector('canvas');
+                    if (canvas) {
+                        canvas.style.filter = `brightness(${brightness})`;
+                    }
+                }
+            }
+
+            function setupBackgroundBrightnessHandlers() {
+                const bgBrightnessBtn = document.getElementById('bg-brightness-btn');
+                if (!bgBrightnessBtn) return;
+
+                // Mouse events
+                bgBrightnessBtn.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    isDraggingBgBrightness = true;
+                    bgBrightnessLastX = e.clientX;
+                    bgBrightnessBtn.style.cursor = 'grabbing';
+                    document.addEventListener('mousemove', handleBgBrightnessMouseMove);
+                    document.addEventListener('mouseup', handleBgBrightnessMouseUp);
+                });
+
+                // Touch events
+                bgBrightnessBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    isDraggingBgBrightness = true;
+                    bgBrightnessLastX = e.touches[0].clientX;
+                    document.addEventListener('touchmove', handleBgBrightnessTouchMove, { passive: false });
+                    document.addEventListener('touchend', handleBgBrightnessTouchEnd);
+                });
+            }
+
+            function handleBgBrightnessMouseMove(e) {
+                if (!isDraggingBgBrightness) return;
+                const delta = (e.clientX - bgBrightnessLastX) * 0.01;
+                bgBrightnessLastX = e.clientX;
+                bgBrightnessValue = Math.max(0.2, Math.min(4.0, bgBrightnessValue + delta));
+                applyBackgroundBrightness(bgBrightnessValue);
+            }
+
+            function handleBgBrightnessMouseUp() {
+                isDraggingBgBrightness = false;
+                const bgBrightnessBtn = document.getElementById('bg-brightness-btn');
+                if (bgBrightnessBtn) {
+                    bgBrightnessBtn.style.cursor = 'grab';
+                }
+                document.removeEventListener('mousemove', handleBgBrightnessMouseMove);
+                document.removeEventListener('mouseup', handleBgBrightnessMouseUp);
+                // Save brightness to localStorage
+                saveBackgroundBrightness();
+            }
+
+            function handleBgBrightnessTouchMove(e) {
+                if (!isDraggingBgBrightness) return;
+                e.preventDefault();
+                const touch = e.touches[0];
+                const delta = (touch.clientX - bgBrightnessLastX) * 0.01;
+                bgBrightnessLastX = touch.clientX;
+                bgBrightnessValue = Math.max(0.2, Math.min(4.0, bgBrightnessValue + delta));
+                applyBackgroundBrightness(bgBrightnessValue);
+            }
+
+            function handleBgBrightnessTouchEnd() {
+                isDraggingBgBrightness = false;
+                document.removeEventListener('touchmove', handleBgBrightnessTouchMove);
+                document.removeEventListener('touchend', handleBgBrightnessTouchEnd);
+                // Save brightness to localStorage
+                saveBackgroundBrightness();
+            }
+
+            function saveBackgroundBrightness() {
+                if (!currentArea || currentItemsPhotoIndex === null) return;
+                const key = `bgBrightness_${currentArea}_photo_${currentItemsPhotoIndex}`;
+                localStorage.setItem(key, bgBrightnessValue.toString());
+            }
+
+            function getBackgroundBrightness() {
+                if (!currentArea) return 1.0;
+                const photoIndex = currentItemsPhotoIndex || 0;
+                const key = `bgBrightness_${currentArea}_photo_${photoIndex}`;
+                const saved = localStorage.getItem(key);
+                if (saved !== null) {
+                    bgBrightnessValue = parseFloat(saved);
+                    return bgBrightnessValue;
+                }
+                bgBrightnessValue = 1.0;
+                return 1.0;
+            }
+
             function duplicateCurrentModel() {
                 if (!currentLoadedModel || !threeScene) return;
 
@@ -3261,6 +3457,10 @@ def property_type_selector():
                 threeRenderer.domElement.style.left = '0';
                 threeRenderer.domElement.style.width = '100%';
                 threeRenderer.domElement.style.height = '100%';
+                // Apply saved brightness to canvas
+                if (bgBrightnessValue !== 1.0) {
+                    threeRenderer.domElement.style.filter = `brightness(${bgBrightnessValue})`;
+                }
                 container.appendChild(threeRenderer.domElement);
 
                 const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -3306,9 +3506,15 @@ def property_type_selector():
                         model.rotation.y = modelData.rotationY || 0;
                         model.rotation.x = modelData.tilt ?? DEFAULT_TILT;
 
+                        // Calculate current zone based on position
+                        const posX = modelData.positionX || 0;
+                        const currentZone = getPositionZone(posX);
+
                         model.userData = {
                             model3d: modelData.modelUrl,
+                            frontRotation: -Math.PI/2, // Default front rotation
                             yRotation: modelData.rotationY || 0,
+                            positionZone: currentZone, // Track zone for rotation changes
                             tilt: modelData.tilt ?? DEFAULT_TILT,
                             brightness: modelData.brightness || 2.5,
                             baseScale: modelData.scale || 1,
@@ -3426,6 +3632,10 @@ def property_type_selector():
                 prevBtn.style.display = photos.length > 1 ? 'flex' : 'none';
                 nextBtn.style.display = photos.length > 1 ? 'flex' : 'none';
 
+                // Get saved brightness for this photo BEFORE building HTML
+                const savedBrightness = getBackgroundBrightness();
+                const brightnessStyle = savedBrightness !== 1.0 ? `filter: brightness(${savedBrightness});` : '';
+
                 // Build slides: prev, current, next for smooth swiping
                 const prevIndex = currentItemsPhotoIndex > 0 ? currentItemsPhotoIndex - 1 : null;
                 const nextIndex = currentItemsPhotoIndex < photos.length - 1 ? currentItemsPhotoIndex + 1 : null;
@@ -3440,7 +3650,7 @@ def property_type_selector():
                 // Current slide with Upload button next to rotate button
                 slidesHTML += `
                     <div class="photo-carousel-slide carousel-slide-current" id="items-photo-slide">
-                        <img src="${photos[currentItemsPhotoIndex]}" alt="Photo ${currentItemsPhotoIndex + 1}">
+                        <img src="${photos[currentItemsPhotoIndex]}" alt="Photo ${currentItemsPhotoIndex + 1}" style="${brightnessStyle}">
                         <button class="photo-camera-inline-btn" onclick="scrollToItemsCamera()" title="Take Photos" style="display: ${isMobile ? 'flex' : 'none'};">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -3452,6 +3662,19 @@ def property_type_selector():
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                                 <polyline points="17 8 12 3 7 8"/>
                                 <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                        </button>
+                        <button class="photo-brightness-btn" id="bg-brightness-btn" title="Brightness - Drag left/right">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="5"/>
+                                <line x1="12" y1="1" x2="12" y2="3"/>
+                                <line x1="12" y1="21" x2="12" y2="23"/>
+                                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                                <line x1="1" y1="12" x2="3" y2="12"/>
+                                <line x1="21" y1="12" x2="23" y2="12"/>
+                                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
                             </svg>
                         </button>
                         <button class="photo-rotate-btn" onclick="rotateItemsPhoto(${currentItemsPhotoIndex})">
@@ -3498,6 +3721,9 @@ def property_type_selector():
 
                 // Try to load saved 3D models for this photo
                 loadSavedModelsForPhoto(currentItemsPhotoIndex);
+
+                // Setup background brightness drag handlers
+                setupBackgroundBrightnessHandlers();
             }
 
             let itemsIsDragging = false;
@@ -5694,7 +5920,7 @@ def get_property_selector_styles():
         right: 56px;
         width: 36px;
         height: 36px;
-        background: rgba(59, 130, 246, 0.9);
+        background: rgba(0, 0, 0, 0.5);
         color: white;
         border: none;
         border-radius: 50%;
@@ -5710,10 +5936,11 @@ def get_property_selector_styles():
     .photo-rotate-btn svg {
         width: 18px;
         height: 18px;
+        stroke: white;
     }
 
     .photo-rotate-btn:hover {
-        background: rgba(37, 99, 235, 1);
+        background: rgba(0, 0, 0, 0.7);
         transform: scale(1.1);
     }
 
@@ -5739,6 +5966,7 @@ def get_property_selector_styles():
     .photo-delete-btn svg {
         width: 18px;
         height: 18px;
+        stroke: white;
     }
 
     .photo-delete-btn:hover {
@@ -6038,11 +6266,11 @@ def get_property_selector_styles():
     .photo-camera-inline-btn {
         position: absolute;
         top: 12px;
-        right: 144px;
+        right: 188px;
         width: 36px;
         height: 36px;
         border-radius: 50%;
-        background: rgba(59, 130, 246, 0.9);
+        background: rgba(0, 0, 0, 0.5);
         border: none;
         cursor: pointer;
         display: flex;
@@ -6060,7 +6288,7 @@ def get_property_selector_styles():
     }
 
     .photo-camera-inline-btn:hover {
-        background: rgba(37, 99, 235, 1);
+        background: rgba(0, 0, 0, 0.7);
         transform: scale(1.1);
     }
 
@@ -6068,11 +6296,11 @@ def get_property_selector_styles():
     .photo-upload-inline-btn {
         position: absolute;
         top: 12px;
-        right: 100px;
+        right: 144px;
         width: 36px;
         height: 36px;
         border-radius: 50%;
-        background: rgba(34, 197, 94, 0.9);
+        background: rgba(0, 0, 0, 0.5);
         border: none;
         cursor: pointer;
         display: flex;
@@ -6090,8 +6318,42 @@ def get_property_selector_styles():
     }
 
     .photo-upload-inline-btn:hover {
-        background: rgba(22, 163, 74, 1);
+        background: rgba(0, 0, 0, 0.7);
         transform: scale(1.1);
+    }
+
+    .photo-brightness-btn {
+        position: absolute;
+        top: 12px;
+        right: 100px;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.5);
+        border: none;
+        cursor: grab;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        z-index: 25;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .photo-brightness-btn svg {
+        width: 18px;
+        height: 18px;
+        stroke: white;
+    }
+
+    .photo-brightness-btn:hover {
+        background: rgba(0, 0, 0, 0.7);
+        transform: scale(1.1);
+    }
+
+    .photo-brightness-btn:active {
+        cursor: grabbing;
+        background: rgba(0, 0, 0, 0.8);
     }
 
     .item-btn {
