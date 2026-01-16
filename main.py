@@ -511,7 +511,8 @@ def get_inventory_items(item_type: str = ""):
         cursor = conn.cursor()
 
         query = """
-            SELECT Item_Name, Item_Type, Item_Image, Resized_Image, Item_Color, Item_Style, Model_3D
+            SELECT Item_Name, Item_Type, Item_Image, Resized_Image, Item_Color, Item_Style, Model_3D,
+                   Item_Width, Item_Depth, Item_Height
             FROM Item_Report
             WHERE Item_Name IS NOT NULL AND Item_Name != ''
         """
@@ -541,22 +542,45 @@ def get_inventory_items(item_type: str = ""):
             # Get 3D model filename
             model_3d = item['Model_3D'] if item['Model_3D'] else None
 
+            # Get dimensions (convert to float, default to 0)
+            def parse_dimension(val):
+                if val:
+                    try:
+                        return float(val)
+                    except:
+                        return 0
+                return 0
+
+            width = parse_dimension(item['Item_Width'])
+            depth = parse_dimension(item['Item_Depth'])
+            height = parse_dimension(item['Item_Height'])
+
             if name not in items_data:
                 items_data[name] = {
                     'name': name,
                     'type': item['Item_Type'],
                     'images': [],
-                    'model_3d': model_3d
+                    'model_3d': model_3d,
+                    'width': width,
+                    'depth': depth,
+                    'height': height
                 }
             elif model_3d and not items_data[name].get('model_3d'):
                 # Update model_3d if this record has one and previous didn't
                 items_data[name]['model_3d'] = model_3d
+                items_data[name]['width'] = width
+                items_data[name]['depth'] = depth
+                items_data[name]['height'] = height
 
-            # Add unique images only (with their model_3d info)
+            # Add unique images only (with their model_3d info and dimensions)
             if image_url and image_url not in [img['url'] if isinstance(img, dict) else img for img in items_data[name]['images']]:
                 items_data[name]['images'].append({
                     'url': image_url,
-                    'model_3d': model_3d
+                    'model_3d': model_3d,
+                    'width': width,
+                    'depth': depth,
+                    'height': height,
+                    'front_rotation': None  # Default to null, frontend uses Math.PI (180°) as default
                 })
 
         return JSONResponse({'success': True, 'items': list(items_data.values())})
@@ -670,6 +694,98 @@ async def cleanup_staging_photos(request: Request):
 
     except Exception as e:
         print(f"Cleanup error: {e}")
+        return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+
+
+@rt('/api/save-staging-models', methods=['POST'])
+async def save_staging_models(request: Request):
+    """Save 3D model states for a staging photo"""
+    from tools.user_db import get_db_connection
+
+    try:
+        data = await request.json()
+        staging_id = data.get('stagingId')
+        area = data.get('area')
+        photo_index = data.get('photoIndex')
+        background_image = data.get('backgroundImage', '')[:100]  # First 100 chars as identifier
+        models = data.get('models', [])
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Delete existing models for this background
+        cursor.execute("""
+            DELETE FROM design_models
+            WHERE staging_id = ? AND background_image = ?
+        """, (staging_id, background_image))
+
+        # Insert new model states
+        for model in models:
+            cursor.execute("""
+                INSERT INTO design_models (
+                    staging_id, background_image, model_url, instance_id,
+                    position_x, position_y, position_z, scale, rotation_y, tilt, brightness
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                staging_id,
+                background_image,
+                model.get('modelUrl', ''),
+                model.get('instanceId', 0),
+                model.get('positionX', 0),
+                model.get('positionY', 0),
+                model.get('positionZ', 0),
+                model.get('scale', 1),
+                model.get('rotationY', 0),
+                model.get('tilt', 0.1745),
+                model.get('brightness', 2.5)
+            ))
+
+        conn.commit()
+        conn.close()
+        return JSONResponse({'success': True})
+
+    except Exception as e:
+        print(f"Error saving staging models: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+
+
+@rt('/api/get-staging-models')
+def get_staging_models(staging_id: int = 0, background_image: str = ""):
+    """Get 3D model states for a staging photo"""
+    from tools.user_db import get_db_connection
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT model_url, instance_id, position_x, position_y, position_z,
+                   scale, rotation_y, tilt, brightness
+            FROM design_models
+            WHERE staging_id = ? AND background_image = ?
+            ORDER BY instance_id
+        """, (staging_id, background_image[:100]))
+
+        models = []
+        for row in cursor.fetchall():
+            models.append({
+                'modelUrl': row[0],
+                'instanceId': row[1],
+                'positionX': row[2],
+                'positionY': row[3],
+                'positionZ': row[4],
+                'scale': row[5],
+                'rotationY': row[6],
+                'tilt': row[7],
+                'brightness': row[8]
+            })
+
+        conn.close()
+        return JSONResponse({'success': True, 'models': models})
+
+    except Exception as e:
+        print(f"Error getting staging models: {e}")
         return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
 
 

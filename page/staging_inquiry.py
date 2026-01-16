@@ -2040,10 +2040,16 @@ def property_type_selector():
                                     // Handle both old format (string) and new format (object)
                                     const url = typeof imageObj === 'string' ? imageObj : imageObj.url;
                                     const model3d = typeof imageObj === 'object' ? imageObj.model_3d : null;
+                                    const width = typeof imageObj === 'object' ? (imageObj.width || 0) : 0;
+                                    const depth = typeof imageObj === 'object' ? (imageObj.depth || 0) : 0;
+                                    const height = typeof imageObj === 'object' ? (imageObj.height || 0) : 0;
                                     allImages.push({
                                         name: item.name,
                                         url: url,
-                                        model_3d: model3d
+                                        model_3d: model3d,
+                                        width: width,
+                                        depth: depth,
+                                        height: height
                                     });
                                 });
                             }
@@ -2058,7 +2064,7 @@ def property_type_selector():
                         allImages.forEach((imageData, index) => {
                             const card = document.createElement('div');
                             card.className = 'item-select-card';
-                            card.onclick = () => selectItemImage(imageData.url, imageData.name, imageData.model_3d);
+                            card.onclick = () => selectItemImage(imageData.url, imageData.name, imageData.model_3d, imageData.width, imageData.depth, imageData.height, imageData.front_rotation);
 
                             const img = document.createElement('img');
                             img.src = imageData.url;
@@ -2099,7 +2105,7 @@ def property_type_selector():
                 currentItemType = null;
             }
 
-            function selectItemImage(imageUrl, itemName, model3d) {
+            function selectItemImage(imageUrl, itemName, model3d, width = 0, depth = 0, height = 0, frontRotation = null) {
                 if (!currentItemType || !currentArea) return;
 
                 // Find the item button for the current item type
@@ -2125,12 +2131,21 @@ def property_type_selector():
                         nameSpan.textContent = itemName;
                     }
 
-                    // Store the selected image URL and 3D model on the button for later use
+                    // Store the selected image URL, 3D model, and dimensions on the button for later use
                     itemBtn.dataset.selectedImage = imageUrl;
                     itemBtn.dataset.selectedName = itemName;
                     if (model3d) {
                         itemBtn.dataset.model3d = model3d;
+                        // Make draggable if has 3D model
+                        itemBtn.draggable = true;
+                    } else {
+                        itemBtn.draggable = false;
+                        delete itemBtn.dataset.model3d;
                     }
+                    itemBtn.dataset.width = width;
+                    itemBtn.dataset.depth = depth;
+                    itemBtn.dataset.height = height;
+                    itemBtn.dataset.frontRotation = frontRotation ?? -Math.PI/2; // Default to -90° to face camera
 
                     // Save to areaSelectedItems for persistence
                     if (!areaSelectedItems[currentArea]) {
@@ -2139,7 +2154,11 @@ def property_type_selector():
                     areaSelectedItems[currentArea][currentItemType] = {
                         imageUrl: imageUrl,
                         itemName: itemName,
-                        model3d: model3d || null
+                        model3d: model3d || null,
+                        width: width,
+                        depth: depth,
+                        height: height,
+                        frontRotation: frontRotation ?? -Math.PI/2
                     };
 
                     // Save to session storage
@@ -2147,6 +2166,1029 @@ def property_type_selector():
                 }
 
                 closeItemSelectModal();
+            }
+
+            // Drag event handlers for items with 3D models
+            let touchDragData = null;
+            let touchDragClone = null;
+            let touchDragSource = null;
+
+            function setupItemDragHandlers() {
+                // Desktop: Use event delegation on the document for drag events
+                document.addEventListener('dragstart', function(e) {
+                    const itemBtn = e.target.closest('.item-btn');
+                    if (itemBtn && itemBtn.dataset.model3d && itemBtn.classList.contains('has-selected-image')) {
+                        e.dataTransfer.effectAllowed = 'copy';
+                        e.dataTransfer.setData('application/x-item-3d', JSON.stringify({
+                            imageUrl: itemBtn.dataset.selectedImage,
+                            itemName: itemBtn.dataset.selectedName,
+                            model3d: itemBtn.dataset.model3d,
+                            width: parseFloat(itemBtn.dataset.width) || 0,
+                            depth: parseFloat(itemBtn.dataset.depth) || 0,
+                            height: parseFloat(itemBtn.dataset.height) || 0,
+                            frontRotation: parseFloat(itemBtn.dataset.frontRotation) || -Math.PI/2
+                        }));
+                        itemBtn.classList.add('dragging');
+                    }
+                });
+
+                document.addEventListener('dragend', function(e) {
+                    const itemBtn = e.target.closest('.item-btn');
+                    if (itemBtn) {
+                        itemBtn.classList.remove('dragging');
+                    }
+                });
+
+                // Mobile: Touch-based drag for items with 3D models
+                document.addEventListener('touchstart', function(e) {
+                    const itemBtn = e.target.closest('.item-btn');
+                    if (itemBtn && itemBtn.dataset.model3d && itemBtn.classList.contains('has-selected-image')) {
+                        // Prevent default to avoid context menu and text selection
+                        e.preventDefault();
+
+                        const touch = e.touches[0];
+                        touchDragSource = itemBtn;
+                        touchDragData = {
+                            imageUrl: itemBtn.dataset.selectedImage,
+                            itemName: itemBtn.dataset.selectedName,
+                            model3d: itemBtn.dataset.model3d,
+                            width: parseFloat(itemBtn.dataset.width) || 0,
+                            depth: parseFloat(itemBtn.dataset.depth) || 0,
+                            height: parseFloat(itemBtn.dataset.height) || 0,
+                            frontRotation: parseFloat(itemBtn.dataset.frontRotation) || -Math.PI/2
+                        };
+
+                        // Create visual drag clone
+                        const img = itemBtn.querySelector('.item-emoji img');
+                        if (img) {
+                            touchDragClone = document.createElement('div');
+                            touchDragClone.className = 'touch-drag-clone';
+                            touchDragClone.innerHTML = `<img src="${img.src}" alt="Dragging">`;
+                            touchDragClone.style.cssText = `
+                                position: fixed;
+                                left: ${touch.clientX - 40}px;
+                                top: ${touch.clientY - 40}px;
+                                width: 80px;
+                                height: 80px;
+                                z-index: 10000;
+                                pointer-events: none;
+                                opacity: 0.8;
+                                border-radius: 8px;
+                                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                                background: white;
+                            `;
+                            touchDragClone.querySelector('img').style.cssText = `
+                                width: 100%;
+                                height: 100%;
+                                object-fit: contain;
+                                border-radius: 8px;
+                            `;
+                            document.body.appendChild(touchDragClone);
+                        }
+
+                        itemBtn.classList.add('dragging');
+
+                        // Show drop zone hint
+                        const dropZone = document.querySelector('.items-photos-section');
+                        if (dropZone) dropZone.classList.add('drag-over-3d');
+                    }
+                }, { passive: false });
+
+                document.addEventListener('touchmove', function(e) {
+                    if (touchDragClone && touchDragData) {
+                        const touch = e.touches[0];
+                        touchDragClone.style.left = (touch.clientX - 40) + 'px';
+                        touchDragClone.style.top = (touch.clientY - 40) + 'px';
+                    }
+                }, { passive: true });
+
+                document.addEventListener('touchend', async function(e) {
+                    if (touchDragData && touchDragClone) {
+                        const touch = e.changedTouches[0];
+
+                        // Remove drag clone
+                        touchDragClone.remove();
+                        touchDragClone = null;
+
+                        // Remove dragging class
+                        if (touchDragSource) {
+                            touchDragSource.classList.remove('dragging');
+                        }
+
+                        // Remove drop zone hint
+                        const dropZone = document.querySelector('.items-photos-section');
+                        if (dropZone) dropZone.classList.remove('drag-over-3d');
+
+                        // Check if dropped on photo carousel
+                        const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+                        const carouselContainer = dropTarget?.closest('.photos-carousel-container') ||
+                                                   dropTarget?.closest('.items-photos-section');
+
+                        if (carouselContainer) {
+                            // Check if we have a photo to use as background
+                            const photos = areaPhotos[currentArea] || [];
+                            if (photos.length === 0) {
+                                alert('Please add a photo first before dropping 3D models.');
+                            } else {
+                                // Get drop position relative to carousel container
+                                const container = document.getElementById('items-photos-carousel-container');
+                                const rect = container ? container.getBoundingClientRect() : null;
+                                let dropX = 0, dropY = 0;
+                                if (rect) {
+                                    // Convert to normalized coordinates (-1 to 1)
+                                    dropX = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+                                    dropY = -(((touch.clientY - rect.top) / rect.height) * 2 - 1);
+                                }
+
+                                // Initialize or add to 3D scene
+                                if (current3DPhotoIndex !== currentItemsPhotoIndex) {
+                                    await initPhoto3DScene(currentItemsPhotoIndex, touchDragData, dropX, dropY);
+                                } else {
+                                    await loadGLTFModelOnPhoto(touchDragData, dropX, dropY);
+                                }
+                            }
+                        }
+
+                        touchDragData = null;
+                        touchDragSource = null;
+                    }
+                });
+
+                // Prevent context menu on item buttons with 3D models
+                document.addEventListener('contextmenu', function(e) {
+                    const itemBtn = e.target.closest('.item-btn');
+                    if (itemBtn && itemBtn.dataset.model3d) {
+                        e.preventDefault();
+                    }
+                });
+            }
+
+            // Initialize drag handlers when DOM is ready
+            document.addEventListener('DOMContentLoaded', setupItemDragHandlers);
+
+            // ===== 3D VIEWER INTEGRATION =====
+            let threeJsLoaded = false;
+            let threeScene = null;
+            let threeCamera = null;
+            let threeRenderer = null;
+            let currentLoadedModel = null;
+            let allLoadedModels = [];
+            let modelBrightness = 2.5;
+            let modelTilt = 0.1745; // ~10 degrees default tilt
+            const DEFAULT_TILT = 0.1745;
+            let isDraggingRotate = false;
+            let isDraggingScale = false;
+            let isDraggingBrightness = false;
+            let isDraggingTilt = false;
+            let lastMouseX = 0;
+            let lastMouseY = 0;
+            let current3DPhotoIndex = null;
+            let current3DViewerContainer = null;
+            let animationFrameId = null;
+
+            function loadScript(src) {
+                return new Promise((resolve, reject) => {
+                    // Check if already loaded
+                    if (document.querySelector(`script[src="${src}"]`)) {
+                        resolve();
+                        return;
+                    }
+                    const script = document.createElement('script');
+                    script.src = src;
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.head.appendChild(script);
+                });
+            }
+
+            async function loadThreeJS() {
+                if (threeJsLoaded) return;
+                await loadScript('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js');
+                await loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js');
+                threeJsLoaded = true;
+            }
+
+            async function initPhoto3DScene(photoIndex, itemData, dropX = 0, dropY = 0) {
+                // Load Three.js if not loaded
+                await loadThreeJS();
+
+                const container = document.getElementById('items-photo-slide');
+                if (!container) return;
+
+                // Store current 3D photo
+                current3DPhotoIndex = photoIndex;
+                current3DViewerContainer = container;
+
+                // Get the photo as background
+                const photos = areaPhotos[currentArea] || [];
+                const photoSrc = photos[photoIndex];
+                if (!photoSrc) return;
+
+                // Get container dimensions
+                const containerRect = container.getBoundingClientRect();
+                const width = containerRect.width;
+                const height = containerRect.height;
+
+                // Clear existing 3D scene if any
+                if (threeRenderer) {
+                    container.querySelector('canvas')?.remove();
+                }
+
+                // Hide the img element
+                const imgEl = container.querySelector('img');
+                if (imgEl) imgEl.style.display = 'none';
+
+                // Create scene
+                threeScene = new THREE.Scene();
+
+                // Load photo as background texture
+                const textureLoader = new THREE.TextureLoader();
+                textureLoader.load(photoSrc, (bgTexture) => {
+                    threeScene.background = bgTexture;
+                }, undefined, (error) => {
+                    console.error('Error loading background:', error);
+                    threeScene.background = new THREE.Color(0x333333);
+                });
+
+                // Camera - orthographic
+                const aspect = width / height;
+                const frustumSize = 5;
+                threeCamera = new THREE.OrthographicCamera(
+                    frustumSize * aspect / -2,
+                    frustumSize * aspect / 2,
+                    frustumSize / 2,
+                    frustumSize / -2,
+                    0.1, 1000
+                );
+                threeCamera.position.set(0, 0, 10);
+                threeCamera.lookAt(0, 0, 0);
+
+                // Renderer
+                threeRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                threeRenderer.setSize(width, height);
+                threeRenderer.setPixelRatio(window.devicePixelRatio);
+                threeRenderer.domElement.style.position = 'absolute';
+                threeRenderer.domElement.style.top = '0';
+                threeRenderer.domElement.style.left = '0';
+                threeRenderer.domElement.style.width = '100%';
+                threeRenderer.domElement.style.height = '100%';
+                container.appendChild(threeRenderer.domElement);
+
+                // Lights
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                threeScene.add(ambientLight);
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(5, 10, 7);
+                threeScene.add(directionalLight);
+
+                // Mark container as 3D mode
+                container.classList.add('photo-3d-mode');
+
+                // Load the dropped model at drop position
+                await loadGLTFModelOnPhoto(itemData, dropX, dropY);
+
+                // Add control overlay
+                addModelControlOverlay(container);
+
+                // Start animation loop
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                function animate() {
+                    animationFrameId = requestAnimationFrame(animate);
+                    if (threeRenderer && threeScene && threeCamera) {
+                        threeRenderer.render(threeScene, threeCamera);
+                        updateControlOverlayPosition();
+                    }
+                }
+                animate();
+
+                // Add mouse handlers for model position dragging
+                setupModelDragHandlers(threeRenderer.domElement);
+            }
+
+            let isDraggingModel = false;
+            let modelDragStartX = 0;
+            let modelDragStartY = 0;
+            let didDragModel = false; // Track if we actually moved
+
+            function showModelControls(show) {
+                const overlay = current3DViewerContainer?.querySelector('.model-control-overlay');
+                if (overlay) {
+                    overlay.style.display = show ? 'flex' : 'none';
+                    if (show && currentLoadedModel) {
+                        cachedModelHeight = 0; // Reset cache when showing controls for potentially different model
+                        updateControlOverlayPosition(true);
+                    }
+                }
+            }
+
+            let cachedModelHeight = 0; // Cache height to avoid recalc on rotate/tilt
+
+            function updateControlOverlayPosition(recalcHeight = false) {
+                if (!currentLoadedModel || !threeCamera || !current3DViewerContainer) return;
+                const overlay = current3DViewerContainer.querySelector('.model-control-overlay');
+                if (!overlay || overlay.style.display === 'none') return;
+
+                // Recalculate height when scaling or first time
+                if (recalcHeight || cachedModelHeight === 0) {
+                    const box = new THREE.Box3().setFromObject(currentLoadedModel);
+                    cachedModelHeight = box.max.y - box.min.y;
+                }
+
+                // Position above model: center + half height + padding
+                const topY = currentLoadedModel.position.y + (cachedModelHeight / 2) + 0.3;
+                const topPos = new THREE.Vector3(
+                    currentLoadedModel.position.x,
+                    topY,
+                    currentLoadedModel.position.z
+                );
+
+                // Project to screen coordinates
+                topPos.project(threeCamera);
+
+                const canvas = current3DViewerContainer.querySelector('canvas');
+                if (!canvas) return;
+
+                const rect = canvas.getBoundingClientRect();
+                const screenX = ((topPos.x + 1) / 2) * rect.width;
+                const screenY = ((-topPos.y + 1) / 2) * rect.height;
+
+                overlay.style.left = screenX + 'px';
+                overlay.style.top = Math.max(5, screenY - 20) + 'px';
+                overlay.style.transform = 'translateX(-50%)';
+            }
+
+            function getClickedModel(clientX, clientY, canvas) {
+                if (!threeCamera || allLoadedModels.length === 0) return null;
+
+                const rect = canvas.getBoundingClientRect();
+                const mouse = new THREE.Vector2();
+                mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+                const raycaster = new THREE.Raycaster();
+                raycaster.setFromCamera(mouse, threeCamera);
+
+                // Check all models
+                for (const model of allLoadedModels) {
+                    const intersects = raycaster.intersectObject(model, true);
+                    if (intersects.length > 0) {
+                        return model;
+                    }
+                }
+                return null;
+            }
+
+            function setupModelDragHandlers(canvas) {
+                canvas.addEventListener('mousedown', (e) => {
+                    didDragModel = false;
+                    const clickedModel = getClickedModel(e.clientX, e.clientY, canvas);
+
+                    if (clickedModel) {
+                        // Select clicked model
+                        currentLoadedModel = clickedModel;
+                        isDraggingModel = true;
+                        modelDragStartX = e.clientX;
+                        modelDragStartY = e.clientY;
+                        canvas.style.cursor = 'grabbing';
+                        showModelControls(true);
+                    } else {
+                        // Clicked on background - deselect and hide controls
+                        currentLoadedModel = null;
+                        showModelControls(false);
+                    }
+                });
+
+                canvas.addEventListener('mousemove', (e) => {
+                    if (!isDraggingModel || !currentLoadedModel) return;
+
+                    const deltaX = (e.clientX - modelDragStartX) * 0.005;
+                    const deltaY = (modelDragStartY - e.clientY) * 0.005;
+
+                    if (Math.abs(deltaX) > 0.001 || Math.abs(deltaY) > 0.001) {
+                        didDragModel = true;
+                    }
+
+                    currentLoadedModel.position.x += deltaX;
+                    currentLoadedModel.position.y += deltaY;
+
+                    modelDragStartX = e.clientX;
+                    modelDragStartY = e.clientY;
+                });
+
+                canvas.addEventListener('mouseup', () => {
+                    if (isDraggingModel) {
+                        isDraggingModel = false;
+                        canvas.style.cursor = currentLoadedModel ? 'grab' : 'default';
+                        if (didDragModel) {
+                            saveModelStates();
+                        }
+                    }
+                });
+
+                canvas.addEventListener('mouseleave', () => {
+                    if (isDraggingModel) {
+                        isDraggingModel = false;
+                        canvas.style.cursor = currentLoadedModel ? 'grab' : 'default';
+                        if (didDragModel) {
+                            saveModelStates();
+                        }
+                    }
+                });
+
+                // Touch support for mobile
+                canvas.addEventListener('touchstart', (e) => {
+                    if (e.touches.length !== 1) return;
+                    didDragModel = false;
+
+                    const touch = e.touches[0];
+                    const clickedModel = getClickedModel(touch.clientX, touch.clientY, canvas);
+
+                    if (clickedModel) {
+                        currentLoadedModel = clickedModel;
+                        isDraggingModel = true;
+                        modelDragStartX = touch.clientX;
+                        modelDragStartY = touch.clientY;
+                        showModelControls(true);
+                    } else {
+                        currentLoadedModel = null;
+                        showModelControls(false);
+                    }
+                }, { passive: true });
+
+                canvas.addEventListener('touchmove', (e) => {
+                    if (!isDraggingModel || !currentLoadedModel || e.touches.length !== 1) return;
+
+                    const deltaX = (e.touches[0].clientX - modelDragStartX) * 0.005;
+                    const deltaY = (modelDragStartY - e.touches[0].clientY) * 0.005;
+
+                    if (Math.abs(deltaX) > 0.001 || Math.abs(deltaY) > 0.001) {
+                        didDragModel = true;
+                    }
+
+                    currentLoadedModel.position.x += deltaX;
+                    currentLoadedModel.position.y += deltaY;
+
+                    modelDragStartX = e.touches[0].clientX;
+                    modelDragStartY = e.touches[0].clientY;
+                }, { passive: true });
+
+                canvas.addEventListener('touchend', () => {
+                    if (isDraggingModel) {
+                        isDraggingModel = false;
+                        if (didDragModel) {
+                            saveModelStates();
+                        }
+                    }
+                });
+
+                // Allow drag and drop to work on canvas when in 3D mode
+                canvas.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.dataTransfer.dropEffect = 'copy';
+                    // Show visual feedback on the container
+                    const container = canvas.parentElement;
+                    if (container) container.classList.add('drag-over-3d');
+                });
+
+                canvas.addEventListener('dragleave', (e) => {
+                    const container = canvas.parentElement;
+                    if (container) container.classList.remove('drag-over-3d');
+                });
+
+                canvas.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation(); // Prevent parent drop zone from also handling
+
+                    // Remove visual feedback
+                    const container = canvas.parentElement;
+                    if (container) container.classList.remove('drag-over-3d');
+
+                    const itemDataStr = e.dataTransfer.getData('application/x-item-3d');
+                    if (itemDataStr) {
+                        const itemData = JSON.parse(itemDataStr);
+                        // Calculate drop position
+                        const rect = canvas.getBoundingClientRect();
+                        const dropX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                        const dropY = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+                        // Add model to existing scene
+                        await loadGLTFModelOnPhoto(itemData, dropX, dropY);
+                    }
+                });
+
+                canvas.style.cursor = 'default';
+            }
+
+            async function loadGLTFModelOnPhoto(itemData, dropX = 0, dropY = 0) {
+                if (!threeScene) return;
+
+                const modelUrl = '/static/models/' + itemData.model3d;
+                const loader = new THREE.GLTFLoader();
+
+                loader.load(modelUrl, (gltf) => {
+                    const model = gltf.scene;
+
+                    // Center and scale model based on item dimensions
+                    const box = new THREE.Box3().setFromObject(model);
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxModelDim = Math.max(size.x, size.y, size.z);
+
+                    // Use item dimensions for scaling (dimensions are in inches)
+                    // Width is typically the largest dimension for furniture
+                    const itemWidth = itemData.width || 0;
+                    const itemDepth = itemData.depth || 0;
+                    const itemHeight = itemData.height || 0;
+                    const maxItemDim = Math.max(itemWidth, itemDepth, itemHeight);
+
+                    let targetScale = 1.5 / maxModelDim; // Default scale
+                    if (maxItemDim > 0) {
+                        // Scale based on item's largest dimension
+                        // Reference: 48 inches = 1.2 units in scene (good size for a chair)
+                        // So scale factor = (itemDim / 48) * (1.2 / maxModelDim)
+                        targetScale = (maxItemDim / 48) * (1.2 / maxModelDim);
+                    }
+
+                    model.scale.setScalar(targetScale);
+
+                    // Calculate world position from normalized drop coordinates
+                    // frustumSize = 5, aspect = container width/height
+                    const container = threeRenderer.domElement.parentElement;
+                    const aspect = container.offsetWidth / container.offsetHeight;
+                    const frustumSize = 5;
+                    const worldX = dropX * (frustumSize * aspect / 2);
+                    const worldY = dropY * (frustumSize / 2);
+                    model.position.set(worldX, worldY, 0);
+
+                    // Apply front rotation so model faces the user
+                    // frontRotation defines the model's default facing direction (default: -90° to face camera)
+                    const frontRotation = itemData.frontRotation ?? -Math.PI/2;
+                    model.rotation.y = frontRotation;
+
+                    // Apply default tilt
+                    model.rotation.x = DEFAULT_TILT;
+
+                    // Store item data
+                    model.userData = {
+                        itemName: itemData.itemName,
+                        model3d: itemData.model3d,
+                        imageUrl: itemData.imageUrl,
+                        width: itemData.width,
+                        depth: itemData.depth,
+                        height: itemData.height,
+                        frontRotation: frontRotation,
+                        yRotation: frontRotation, // Start from front rotation
+                        tilt: DEFAULT_TILT,
+                        brightness: 2.5,
+                        baseScale: targetScale,
+                        instanceId: allLoadedModels.length
+                    };
+
+                    currentLoadedModel = model;
+                    threeScene.add(model);
+                    allLoadedModels.push(model);
+
+                    // Update brightness
+                    updateModelBrightness(model, 2.5);
+
+                    // Show controls for the newly dropped model
+                    showModelControls(true);
+
+                    console.log('Loaded 3D model:', itemData.model3d);
+                }, undefined, (error) => {
+                    console.error('Error loading model:', error);
+                });
+            }
+
+            function updateModelBrightness(model, brightness) {
+                if (!model) return;
+                model.traverse((child) => {
+                    if (child.isMesh && child.material) {
+                        const materials = Array.isArray(child.material) ? child.material : [child.material];
+                        materials.forEach(mat => {
+                            if (mat.color) {
+                                const intensity = 0.3 + (brightness / 2.5) * 0.7;
+                                mat.color.setScalar(intensity);
+                            }
+                        });
+                    }
+                });
+            }
+
+            function addModelControlOverlay(container) {
+                // Remove existing overlay
+                container.querySelector('.model-control-overlay')?.remove();
+
+                const overlay = document.createElement('div');
+                overlay.className = 'model-control-overlay';
+                overlay.style.display = 'none'; // Hidden until a model is clicked
+                overlay.innerHTML = `
+                    <div class="model-control-group">
+                        <button class="model-control-btn" id="btn-brightness" title="Brightness - Drag left/right">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="5"/>
+                                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                            </svg>
+                        </button>
+                        <button class="model-control-btn" id="btn-rotate" title="Rotate - Drag left/right">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                            </svg>
+                        </button>
+                        <button class="model-control-btn" id="btn-tilt" title="Tilt - Drag up/down">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2v20M8 6l4-4 4 4M8 18l4 4 4-4"/>
+                            </svg>
+                        </button>
+                        <button class="model-control-btn" id="btn-scale" title="Scale - Drag up/down">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                            </svg>
+                        </button>
+                        <button class="model-control-btn" id="btn-duplicate" title="Duplicate model">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                            </svg>
+                        </button>
+                        <button class="model-control-btn model-control-danger" id="btn-delete" title="Delete model">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(overlay);
+
+                // Add event listeners for controls
+                setupModelControlListeners(overlay);
+            }
+
+            function setupModelControlListeners(overlay) {
+                const btnBrightness = overlay.querySelector('#btn-brightness');
+                const btnRotate = overlay.querySelector('#btn-rotate');
+                const btnScale = overlay.querySelector('#btn-scale');
+                const btnTilt = overlay.querySelector('#btn-tilt');
+                const btnDuplicate = overlay.querySelector('#btn-duplicate');
+                const btnDelete = overlay.querySelector('#btn-delete');
+
+                // Brightness control
+                btnBrightness.addEventListener('mousedown', (e) => {
+                    isDraggingBrightness = true;
+                    lastMouseX = e.clientX;
+                    e.preventDefault();
+                });
+
+                // Rotate control
+                btnRotate.addEventListener('mousedown', (e) => {
+                    isDraggingRotate = true;
+                    lastMouseX = e.clientX;
+                    e.preventDefault();
+                });
+
+                // Scale control
+                btnScale.addEventListener('mousedown', (e) => {
+                    isDraggingScale = true;
+                    lastMouseY = e.clientY;
+                    e.preventDefault();
+                });
+
+                // Tilt control
+                btnTilt.addEventListener('mousedown', (e) => {
+                    isDraggingTilt = true;
+                    lastMouseY = e.clientY;
+                    e.preventDefault();
+                });
+
+                // Duplicate
+                btnDuplicate.addEventListener('click', () => {
+                    if (currentLoadedModel) {
+                        duplicateCurrentModel();
+                    }
+                });
+
+                // Delete
+                btnDelete.addEventListener('click', () => {
+                    if (currentLoadedModel) {
+                        deleteCurrentModel();
+                    }
+                });
+
+                // Mouse move and up handlers (document level)
+                document.addEventListener('mousemove', handleModelControlMouseMove);
+                document.addEventListener('mouseup', handleModelControlMouseUp);
+            }
+
+            function handleModelControlMouseMove(e) {
+                if (!currentLoadedModel) return;
+
+                if (isDraggingBrightness) {
+                    const delta = (e.clientX - lastMouseX) * 0.01;
+                    lastMouseX = e.clientX;
+                    const newBrightness = Math.max(0, Math.min(2.5, (currentLoadedModel.userData.brightness || 2.5) + delta));
+                    currentLoadedModel.userData.brightness = newBrightness;
+                    updateModelBrightness(currentLoadedModel, newBrightness);
+                }
+
+                if (isDraggingRotate) {
+                    const delta = (e.clientX - lastMouseX) * 0.02;
+                    lastMouseX = e.clientX;
+                    currentLoadedModel.userData.yRotation = (currentLoadedModel.userData.yRotation || 0) + delta;
+                    currentLoadedModel.rotation.y = currentLoadedModel.userData.yRotation;
+                }
+
+                if (isDraggingScale) {
+                    const delta = (lastMouseY - e.clientY) * 0.005;
+                    lastMouseY = e.clientY;
+                    const baseScale = currentLoadedModel.userData.baseScale || 1;
+                    const currentScale = currentLoadedModel.scale.x;
+                    const newScale = Math.max(baseScale * 0.2, Math.min(baseScale * 3, currentScale + delta));
+                    currentLoadedModel.scale.setScalar(newScale);
+                }
+
+                if (isDraggingTilt) {
+                    // Drag down = tilt down (positive rotation.x), drag up = tilt up toward flat (0)
+                    const delta = (e.clientY - lastMouseY) * 0.005;
+                    lastMouseY = e.clientY;
+                    // Min 0 (flat, facing user), Max 0.7 (tilted down)
+                    // Use ?? instead of || to handle 0 correctly (0 is valid, not falsy)
+                    const currentTilt = currentLoadedModel.userData.tilt ?? DEFAULT_TILT;
+                    const newTilt = Math.max(0, Math.min(0.7, currentTilt + delta));
+                    currentLoadedModel.userData.tilt = newTilt;
+                    currentLoadedModel.rotation.x = newTilt;
+                }
+            }
+
+            function handleModelControlMouseUp() {
+                const wasScaling = isDraggingScale;
+                isDraggingBrightness = false;
+                isDraggingRotate = false;
+                isDraggingScale = false;
+                isDraggingTilt = false;
+                // Recalculate bar position if we were scaling
+                if (wasScaling) {
+                    updateControlOverlayPosition(true);
+                }
+                // Save state after control ends
+                saveModelStates();
+            }
+
+            function duplicateCurrentModel() {
+                if (!currentLoadedModel || !threeScene) return;
+
+                const userData = currentLoadedModel.userData;
+                const newModel = currentLoadedModel.clone();
+
+                // Offset position slightly
+                newModel.position.x += 0.3;
+                newModel.position.y += 0.1;
+
+                // Copy and update userData
+                newModel.userData = { ...userData, instanceId: allLoadedModels.length };
+
+                threeScene.add(newModel);
+                allLoadedModels.push(newModel);
+                currentLoadedModel = newModel;
+
+                saveModelStates();
+            }
+
+            function deleteCurrentModel() {
+                if (!currentLoadedModel || !threeScene) return;
+
+                threeScene.remove(currentLoadedModel);
+                const idx = allLoadedModels.indexOf(currentLoadedModel);
+                if (idx > -1) allLoadedModels.splice(idx, 1);
+
+                currentLoadedModel = allLoadedModels.length > 0 ? allLoadedModels[allLoadedModels.length - 1] : null;
+
+                // If no models left, remove 3D mode
+                if (allLoadedModels.length === 0) {
+                    exitPhoto3DMode();
+                }
+
+                saveModelStates();
+            }
+
+            function exitPhoto3DMode() {
+                const container = current3DViewerContainer;
+                if (!container) return;
+
+                // Cancel animation loop
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                }
+
+                // Remove canvas and overlay
+                container.querySelector('canvas')?.remove();
+                container.querySelector('.model-control-overlay')?.remove();
+                container.classList.remove('photo-3d-mode');
+
+                // Show the img element again
+                const imgEl = container.querySelector('img');
+                if (imgEl) imgEl.style.display = '';
+
+                // Clear 3D state
+                threeScene = null;
+                threeCamera = null;
+                threeRenderer = null;
+                currentLoadedModel = null;
+                allLoadedModels = [];
+                current3DPhotoIndex = null;
+                current3DViewerContainer = null;
+            }
+
+            async function saveModelStates() {
+                // Save model states to database
+                if (!currentArea || current3DPhotoIndex === null) return;
+
+                const photos = areaPhotos[currentArea] || [];
+                const backgroundImage = photos[current3DPhotoIndex];
+                if (!backgroundImage) return;
+
+                const modelStates = allLoadedModels.map((model, idx) => ({
+                    instanceId: idx,
+                    modelUrl: model.userData.model3d,
+                    itemName: model.userData.itemName,
+                    positionX: model.position.x,
+                    positionY: model.position.y,
+                    positionZ: model.position.z,
+                    scale: model.scale.x,
+                    rotationY: model.userData.yRotation || 0,
+                    tilt: model.userData.tilt ?? DEFAULT_TILT,
+                    brightness: model.userData.brightness || 2.5,
+                    width: model.userData.width || 0,
+                    depth: model.userData.depth || 0,
+                    height: model.userData.height || 0
+                }));
+
+                // Get staging_id from the page if available
+                const stagingId = window.stagingId || null;
+
+                try {
+                    await fetch('/api/save-staging-models', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            stagingId: stagingId,
+                            area: currentArea,
+                            photoIndex: current3DPhotoIndex,
+                            backgroundImage: backgroundImage.substring(0, 100), // Use first 100 chars as identifier
+                            models: modelStates
+                        })
+                    });
+                } catch (error) {
+                    console.error('Error saving model states:', error);
+                }
+            }
+
+            // Load saved models from database for current photo
+            async function loadSavedModelsForPhoto(photoIndex) {
+                const photos = areaPhotos[currentArea] || [];
+                if (photos.length === 0 || photoIndex < 0 || photoIndex >= photos.length) return;
+
+                const backgroundImage = photos[photoIndex].substring(0, 100);
+                const stagingId = window.stagingId || 0;
+
+                try {
+                    const response = await fetch(`/api/get-staging-models?staging_id=${stagingId}&background_image=${encodeURIComponent(backgroundImage)}`);
+                    const data = await response.json();
+
+                    if (data.success && data.models && data.models.length > 0) {
+                        // Load Three.js if not loaded
+                        await loadThreeJS();
+
+                        // Initialize 3D scene if not already done
+                        const container = document.getElementById('items-photo-slide');
+                        if (!container) return;
+
+                        // Create scene with first model
+                        const firstModel = data.models[0];
+                        await initPhoto3DSceneForRestore(photoIndex, container);
+
+                        // Load all models
+                        for (const modelData of data.models) {
+                            await loadGLTFModelFromSaved(modelData);
+                        }
+
+                        // Clear selection - user must click to select a model
+                        currentLoadedModel = null;
+                        showModelControls(false);
+                    }
+                } catch (error) {
+                    console.error('Error loading saved models:', error);
+                }
+            }
+
+            async function initPhoto3DSceneForRestore(photoIndex, container) {
+                current3DPhotoIndex = photoIndex;
+                current3DViewerContainer = container;
+
+                const photos = areaPhotos[currentArea] || [];
+                const photoSrc = photos[photoIndex];
+                if (!photoSrc) return;
+
+                const containerRect = container.getBoundingClientRect();
+                const width = containerRect.width;
+                const height = containerRect.height;
+
+                // Clear existing 3D scene
+                if (threeRenderer) {
+                    container.querySelector('canvas')?.remove();
+                }
+
+                const imgEl = container.querySelector('img');
+                if (imgEl) imgEl.style.display = 'none';
+
+                threeScene = new THREE.Scene();
+
+                const textureLoader = new THREE.TextureLoader();
+                textureLoader.load(photoSrc, (bgTexture) => {
+                    threeScene.background = bgTexture;
+                });
+
+                const aspect = width / height;
+                const frustumSize = 5;
+                threeCamera = new THREE.OrthographicCamera(
+                    frustumSize * aspect / -2,
+                    frustumSize * aspect / 2,
+                    frustumSize / 2,
+                    frustumSize / -2,
+                    0.1, 1000
+                );
+                threeCamera.position.set(0, 0, 10);
+                threeCamera.lookAt(0, 0, 0);
+
+                threeRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                threeRenderer.setSize(width, height);
+                threeRenderer.setPixelRatio(window.devicePixelRatio);
+                threeRenderer.domElement.style.position = 'absolute';
+                threeRenderer.domElement.style.top = '0';
+                threeRenderer.domElement.style.left = '0';
+                threeRenderer.domElement.style.width = '100%';
+                threeRenderer.domElement.style.height = '100%';
+                container.appendChild(threeRenderer.domElement);
+
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                threeScene.add(ambientLight);
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(5, 10, 7);
+                threeScene.add(directionalLight);
+
+                container.classList.add('photo-3d-mode');
+                addModelControlOverlay(container);
+
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                function animate() {
+                    animationFrameId = requestAnimationFrame(animate);
+                    if (threeRenderer && threeScene && threeCamera) {
+                        threeRenderer.render(threeScene, threeCamera);
+                        updateControlOverlayPosition();
+                    }
+                }
+                animate();
+            }
+
+            async function loadGLTFModelFromSaved(modelData) {
+                if (!threeScene) return;
+
+                const modelUrl = '/static/models/' + modelData.modelUrl;
+                const loader = new THREE.GLTFLoader();
+
+                return new Promise((resolve) => {
+                    loader.load(modelUrl, (gltf) => {
+                        const model = gltf.scene;
+
+                        // Apply saved state
+                        model.position.set(
+                            modelData.positionX || 0,
+                            modelData.positionY || -0.5,
+                            modelData.positionZ || 0
+                        );
+                        model.scale.setScalar(modelData.scale || 1);
+                        model.rotation.y = modelData.rotationY || 0;
+                        model.rotation.x = modelData.tilt ?? DEFAULT_TILT;
+
+                        model.userData = {
+                            model3d: modelData.modelUrl,
+                            yRotation: modelData.rotationY || 0,
+                            tilt: modelData.tilt ?? DEFAULT_TILT,
+                            brightness: modelData.brightness || 2.5,
+                            baseScale: modelData.scale || 1,
+                            instanceId: allLoadedModels.length
+                        };
+
+                        currentLoadedModel = model;
+                        threeScene.add(model);
+                        allLoadedModels.push(model);
+
+                        updateModelBrightness(model, modelData.brightness || 2.5);
+                        resolve();
+                    }, undefined, (error) => {
+                        console.error('Error loading saved model:', error);
+                        resolve();
+                    });
+                });
             }
 
             function startItemsCamera() {
@@ -2194,6 +3236,11 @@ def property_type_selector():
                 const nextBtn = document.getElementById('items-photos-next-btn');
                 const photos = areaPhotos[currentArea] || [];
                 const isMobile = window.innerWidth <= 767;
+
+                // Exit 3D mode before rebuilding carousel (if switching photos)
+                if (current3DPhotoIndex !== null && current3DPhotoIndex !== currentItemsPhotoIndex) {
+                    exitPhoto3DMode();
+                }
 
                 if (photos.length === 0) {
                     // No photos - show upload button at top of message
@@ -2307,6 +3354,9 @@ def property_type_selector():
                         track.addEventListener('touchend', handleItemsTouchEnd, { passive: false });
                     }
                 }
+
+                // Try to load saved 3D models for this photo
+                loadSavedModelsForPhoto(currentItemsPhotoIndex);
             }
 
             let itemsIsDragging = false;
@@ -2544,26 +3594,72 @@ def property_type_selector():
 
                 function handleDragEnter(e) {
                     preventDefaults(e);
-                    dropZone.classList.add('drag-over');
+                    // Check if it's a 3D item drag (don't show file drop zone)
+                    if (e.dataTransfer.types.includes('application/x-item-3d')) {
+                        dropZone.classList.add('drag-over-3d');
+                    } else {
+                        dropZone.classList.add('drag-over');
+                    }
                 }
 
                 function handleDragOver(e) {
                     preventDefaults(e);
-                    dropZone.classList.add('drag-over');
+                    // Check if it's a 3D item drag
+                    if (e.dataTransfer.types.includes('application/x-item-3d')) {
+                        dropZone.classList.add('drag-over-3d');
+                        e.dataTransfer.dropEffect = 'copy';
+                    } else {
+                        dropZone.classList.add('drag-over');
+                    }
                 }
 
                 function handleDragLeave(e) {
                     preventDefaults(e);
                     dropZone.classList.remove('drag-over');
+                    dropZone.classList.remove('drag-over-3d');
                 }
 
-                function handleDrop(e) {
+                async function handleDrop(e) {
                     preventDefaults(e);
                     dropZone.classList.remove('drag-over');
+                    dropZone.classList.remove('drag-over-3d');
 
                     const dt = e.dataTransfer;
-                    const files = dt.files;
 
+                    // Check if it's a 3D item drop
+                    const itemDataStr = dt.getData('application/x-item-3d');
+                    if (itemDataStr) {
+                        const itemData = JSON.parse(itemDataStr);
+
+                        // Check if we have a photo to use as background
+                        const photos = areaPhotos[currentArea] || [];
+                        if (photos.length === 0) {
+                            alert('Please add a photo first before dropping 3D models.');
+                            return;
+                        }
+
+                        // Get drop position relative to carousel container
+                        const container = document.getElementById('items-photos-carousel-container');
+                        const rect = container ? container.getBoundingClientRect() : null;
+                        let dropX = 0, dropY = 0;
+                        if (rect) {
+                            // Convert to normalized coordinates (-1 to 1)
+                            dropX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                            dropY = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+                        }
+
+                        // Initialize or add to 3D scene
+                        if (current3DPhotoIndex !== currentItemsPhotoIndex) {
+                            await initPhoto3DScene(currentItemsPhotoIndex, itemData, dropX, dropY);
+                        } else {
+                            // Add another model to existing scene
+                            await loadGLTFModelOnPhoto(itemData, dropX, dropY);
+                        }
+                        return;
+                    }
+
+                    // Handle file drops
+                    const files = dt.files;
                     if (!files || files.length === 0) return;
 
                     // Initialize photos array for this area if not exists
@@ -3032,7 +4128,23 @@ def property_type_selector():
                         btn.dataset.selectedName = selectedItem.itemName;
                         if (selectedItem.model3d) {
                             btn.dataset.model3d = selectedItem.model3d;
+                            btn.draggable = true;
+                        } else {
+                            btn.draggable = false;
                         }
+                        // Store dimensions and front rotation
+                        btn.dataset.width = selectedItem.width || 0;
+                        btn.dataset.depth = selectedItem.depth || 0;
+                        btn.dataset.height = selectedItem.height || 0;
+                        btn.dataset.frontRotation = selectedItem.frontRotation ?? -Math.PI/2;
+                    } else {
+                        // Reset draggable, dimensions and frontRotation if no selected item
+                        btn.draggable = false;
+                        delete btn.dataset.model3d;
+                        btn.dataset.width = 0;
+                        btn.dataset.depth = 0;
+                        btn.dataset.height = 0;
+                        btn.dataset.frontRotation = -Math.PI/2;
                     }
 
                     // Update total price display
@@ -4810,6 +5922,19 @@ def get_property_selector_styles():
         border-color: #fff;
     }
 
+    .item-btn[draggable="true"] {
+        cursor: grab;
+    }
+
+    .item-btn[draggable="true"]:active {
+        cursor: grabbing;
+    }
+
+    .item-btn.dragging {
+        opacity: 0.5;
+        transform: scale(0.95);
+    }
+
     .item-btn.has-selected-image {
         padding: 0;
         overflow: visible;
@@ -5539,6 +6664,111 @@ def get_property_selector_styles():
             outline: none !important;
             box-shadow: none !important;
             -webkit-tap-highlight-color: transparent;
+        }
+    }
+
+    /* 3D Model Viewer Styles */
+    .photo-carousel-slide.photo-3d-mode {
+        position: relative;
+    }
+
+    .photo-carousel-slide.photo-3d-mode img {
+        display: none;
+    }
+
+    .photos-carousel-container.drag-over-3d,
+    .items-photos-section.drag-over-3d .photos-carousel-container {
+        outline: 3px dashed #4CAF50;
+        outline-offset: -3px;
+        background: rgba(76, 175, 80, 0.1);
+    }
+
+    .items-photos-section.drag-over-3d .photos-carousel-container::after {
+        content: 'Drop 3D model here';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 18px;
+        font-weight: 600;
+        color: #4CAF50;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 15px 30px;
+        border-radius: 8px;
+        z-index: 10;
+    }
+
+    .model-control-overlay {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 20;
+    }
+
+    .model-control-group {
+        display: flex;
+        gap: 8px;
+        background: transparent;
+        padding: 4px;
+    }
+
+    .model-control-btn {
+        width: 36px;
+        height: 36px;
+        background: rgba(0, 0, 0, 0.5);
+        border: none;
+        border-radius: 50%;
+        color: white;
+        cursor: grab;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+
+    .model-control-btn:hover {
+        background: rgba(0, 0, 0, 0.7);
+        transform: scale(1.1);
+    }
+
+    .model-control-btn:active {
+        cursor: grabbing;
+        background: rgba(0, 0, 0, 0.8);
+    }
+
+    .model-control-btn.model-control-danger {
+        background: rgba(220, 38, 38, 0.6);
+    }
+
+    .model-control-btn.model-control-danger:hover {
+        background: rgba(220, 38, 38, 0.8);
+    }
+
+    .model-control-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Mobile adjustments for 3D controls */
+    @media (max-width: 767px) {
+        .model-control-group {
+            gap: 4px;
+            padding: 6px 8px;
+        }
+
+        .model-control-btn {
+            width: 36px;
+            height: 36px;
+        }
+
+        .model-control-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .model-control-overlay {
+            top: 5px;
         }
     }
     """
