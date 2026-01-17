@@ -2075,7 +2075,7 @@ def property_type_selector():
                             if (imageData.model_3d) {
                                 const icon3d = document.createElement('div');
                                 icon3d.className = 'item-3d-icon';
-                                icon3d.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>';
+                                icon3d.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>';
                                 card.appendChild(icon3d);
                             }
 
@@ -2117,7 +2117,7 @@ def property_type_selector():
                         let imgHtml = `<img src="${imageUrl}" alt="${itemName}">`;
                         // Add 3D icon if item has a 3D model
                         if (model3d) {
-                            imgHtml += `<div class="item-3d-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>`;
+                            imgHtml += `<div class="item-3d-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>`;
                         }
                         emojiDiv.innerHTML = imgHtml;
                     }
@@ -2541,6 +2541,8 @@ def property_type_selector():
                 function animate() {
                     animationFrameId = requestAnimationFrame(animate);
                     if (threeRenderer && threeScene && threeCamera) {
+                        // Continuously update depth for smooth transitions
+                        updateAllModelsRenderOrder();
                         threeRenderer.render(threeScene, threeCamera);
                         updateControlOverlayPosition();
                     }
@@ -2691,6 +2693,9 @@ def property_type_selector():
 
                     // Update rotation only when crossing zone boundaries (keep tilt, size, brightness)
                     updateRotationIfZoneChanged(currentLoadedModel, newX);
+
+                    // Update render order based on Y position (lower Y = in front)
+                    updateAllModelsRenderOrder();
                 });
 
                 canvas.addEventListener('mouseup', () => {
@@ -2757,6 +2762,9 @@ def property_type_selector():
 
                     // Update rotation only when crossing zone boundaries (keep tilt, size, brightness)
                     updateRotationIfZoneChanged(currentLoadedModel, newX);
+
+                    // Update render order based on Y position (lower Y = in front)
+                    updateAllModelsRenderOrder();
                 }, { passive: true });
 
                 canvas.addEventListener('touchend', () => {
@@ -2878,6 +2886,9 @@ def property_type_selector():
                     threeScene.add(model);
                     allLoadedModels.push(model);
 
+                    // Set render order based on Z position (higher Z = in front)
+                    updateModelDepthFromY(model);
+
                     // Update brightness
                     updateModelBrightness(model, 2.5);
 
@@ -2903,6 +2914,89 @@ def property_type_selector():
                         });
                     }
                 });
+            }
+
+            // Update model render order based on lowest Y point - lower Y (bottom of screen) = renders in front
+            function updateModelDepthFromY(model) {
+                if (!model) return;
+
+                // Calculate the lowest Y point of the model (bottom of bounding box)
+                const box = new THREE.Box3().setFromObject(model);
+                const lowestY = box.min.y;
+
+                // Store previous render order for transition detection
+                const prevOrder = model.userData.renderOrder || 0;
+
+                // Lower Y = higher render order (appears in front)
+                // Scale to get good integer separation
+                const newOrder = Math.round((10 - lowestY) * 100);
+
+                // Check if crossing another model (significant order change)
+                const orderDiff = Math.abs(newOrder - prevOrder);
+                const isCrossing = orderDiff > 50 && prevOrder !== 0;
+
+                // Apply smooth opacity transition when crossing
+                if (isCrossing && !model.userData.isTransitioning) {
+                    model.userData.isTransitioning = true;
+                    // Brief fade for smooth transition
+                    animateModelOpacity(model, 0.7, 100, () => {
+                        model.renderOrder = newOrder;
+                        model.userData.renderOrder = newOrder;
+                        animateModelOpacity(model, 1.0, 100, () => {
+                            model.userData.isTransitioning = false;
+                        });
+                    });
+                } else if (!model.userData.isTransitioning) {
+                    model.renderOrder = newOrder;
+                    model.userData.renderOrder = newOrder;
+                }
+
+                // Set renderOrder on all children and disable depth test for renderOrder to work
+                model.traverse((child) => {
+                    child.renderOrder = model.renderOrder;
+                    if (child.isMesh && child.material) {
+                        const materials = Array.isArray(child.material) ? child.material : [child.material];
+                        materials.forEach(mat => {
+                            mat.depthTest = false;
+                            mat.depthWrite = false;
+                            mat.transparent = true;
+                        });
+                    }
+                });
+            }
+
+            // Animate model opacity for smooth transitions
+            function animateModelOpacity(model, targetOpacity, duration, callback) {
+                const startTime = performance.now();
+                const startOpacity = model.userData.currentOpacity || 1.0;
+
+                function animate() {
+                    const elapsed = performance.now() - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    const currentOpacity = startOpacity + (targetOpacity - startOpacity) * progress;
+
+                    model.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            const materials = Array.isArray(child.material) ? child.material : [child.material];
+                            materials.forEach(mat => {
+                                mat.opacity = currentOpacity;
+                            });
+                        }
+                    });
+                    model.userData.currentOpacity = currentOpacity;
+
+                    if (progress < 1) {
+                        requestAnimationFrame(animate);
+                    } else if (callback) {
+                        callback();
+                    }
+                }
+                requestAnimationFrame(animate);
+            }
+
+            // Update depth for all models (call after any position change)
+            function updateAllModelsRenderOrder() {
+                allLoadedModels.forEach(model => updateModelDepthFromY(model));
             }
 
             function addModelControlOverlay(container) {
@@ -3278,6 +3372,8 @@ def property_type_selector():
                 allLoadedModels.push(newModel);
                 currentLoadedModel = newModel;
 
+                // Update render order for all models
+                updateAllModelsRenderOrder();
                 saveModelStates();
             }
 
@@ -3483,6 +3579,8 @@ def property_type_selector():
                 function animate() {
                     animationFrameId = requestAnimationFrame(animate);
                     if (threeRenderer && threeScene && threeCamera) {
+                        // Continuously update depth for smooth transitions
+                        updateAllModelsRenderOrder();
                         threeRenderer.render(threeScene, threeCamera);
                         updateControlOverlayPosition();
                     }
@@ -3532,6 +3630,8 @@ def property_type_selector():
                         threeScene.add(model);
                         allLoadedModels.push(model);
 
+                        // Set render order based on Z position (higher Z = in front)
+                        updateModelDepthFromY(model);
                         updateModelBrightness(model, modelData.brightness || 2.5);
                         resolve();
                     }, undefined, (error) => {
@@ -4504,7 +4604,7 @@ def property_type_selector():
                         if (emojiDiv) {
                             let imgHtml = `<img src="${selectedItem.imageUrl}" alt="${selectedItem.itemName}">`;
                             if (selectedItem.model3d) {
-                                imgHtml += `<div class="item-3d-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>`;
+                                imgHtml += `<div class="item-3d-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>`;
                             }
                             emojiDiv.innerHTML = imgHtml;
                         }
@@ -5556,18 +5656,18 @@ def get_property_selector_styles():
         right: 6px;
         width: 28px;
         height: 28px;
-        background: rgba(0, 0, 0, 0.7);
-        border-radius: 6px;
+        background: none;
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #ffffff;
+        color: #000000;
         z-index: 2;
     }
 
     .item-3d-icon svg {
         width: 18px;
         height: 18px;
+        stroke: #000000;
     }
 
     /* 3D icon in item button */
@@ -5581,6 +5681,7 @@ def get_property_selector_styles():
     .item-btn .item-3d-icon svg {
         width: 14px;
         height: 14px;
+        stroke: #000000;
     }
 
     .items-modal .modal-footer {
