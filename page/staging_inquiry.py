@@ -2823,6 +2823,16 @@ def property_type_selector():
                 loader.load(modelUrl, (gltf) => {
                     const model = gltf.scene;
 
+                    // Make all materials double-sided so back/side faces render solid
+                    model.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            const materials = Array.isArray(child.material) ? child.material : [child.material];
+                            materials.forEach(mat => {
+                                mat.side = THREE.DoubleSide;
+                            });
+                        }
+                    });
+
                     // Center and scale model based on item dimensions
                     const box = new THREE.Box3().setFromObject(model);
                     const size = box.getSize(new THREE.Vector3());
@@ -2951,15 +2961,20 @@ def property_type_selector():
                     model.userData.renderOrder = newOrder;
                 }
 
-                // Set renderOrder on all children and disable depth test for renderOrder to work
+                // Set Z position based on Y for proper occlusion between models
+                // Lower Y = higher Z (closer to camera)
+                const targetZ = (10 - lowestY) * 0.5;
+                model.position.z = model.position.z + (targetZ - model.position.z) * 0.3;
+
+                // Keep depth testing enabled for proper face rendering within the model
                 model.traverse((child) => {
                     child.renderOrder = model.renderOrder;
                     if (child.isMesh && child.material) {
                         const materials = Array.isArray(child.material) ? child.material : [child.material];
                         materials.forEach(mat => {
-                            mat.depthTest = false;
-                            mat.depthWrite = false;
-                            mat.transparent = true;
+                            mat.depthTest = true;
+                            mat.depthWrite = true;
+                            mat.side = THREE.DoubleSide;
                         });
                     }
                 });
@@ -2994,9 +3009,61 @@ def property_type_selector():
                 requestAnimationFrame(animate);
             }
 
+            // Check if two models overlap in 2D (X-Y plane)
+            function modelsOverlap2D(modelA, modelB) {
+                const boxA = new THREE.Box3().setFromObject(modelA);
+                const boxB = new THREE.Box3().setFromObject(modelB);
+
+                // Check X overlap
+                const xOverlap = boxA.min.x < boxB.max.x && boxA.max.x > boxB.min.x;
+                // Check Y overlap
+                const yOverlap = boxA.min.y < boxB.max.y && boxA.max.y > boxB.min.y;
+
+                return xOverlap && yOverlap;
+            }
+
+            // Get the lowest Y point of a model (for depth ordering)
+            function getModelLowestY(model) {
+                const box = new THREE.Box3().setFromObject(model);
+                return box.min.y;
+            }
+
+            // Apply "all or nothing" visibility based on overlap
+            function applyAllOrNothingBlocking() {
+                // First, make all models visible
+                allLoadedModels.forEach(model => {
+                    model.visible = true;
+                    model.userData.blockedBy = null;
+                });
+
+                // Sort models by lowest Y (ascending = front to back, lower Y = front)
+                const sortedModels = [...allLoadedModels].sort((a, b) => {
+                    return getModelLowestY(a) - getModelLowestY(b);
+                });
+
+                // Check each pair - if front model overlaps back model, hide back model
+                for (let i = 0; i < sortedModels.length; i++) {
+                    const frontModel = sortedModels[i];
+                    if (!frontModel.visible) continue; // Already hidden
+
+                    for (let j = i + 1; j < sortedModels.length; j++) {
+                        const backModel = sortedModels[j];
+                        if (!backModel.visible) continue; // Already hidden
+
+                        // If front model overlaps with back model, hide back model
+                        if (modelsOverlap2D(frontModel, backModel)) {
+                            backModel.visible = false;
+                            backModel.userData.blockedBy = frontModel;
+                        }
+                    }
+                }
+            }
+
             // Update depth for all models (call after any position change)
             function updateAllModelsRenderOrder() {
                 allLoadedModels.forEach(model => updateModelDepthFromY(model));
+                // Apply all-or-nothing blocking after depth update
+                applyAllOrNothingBlocking();
             }
 
             function addModelControlOverlay(container) {
@@ -3468,18 +3535,30 @@ def property_type_selector():
             }
 
             // Load saved models from database for current photo
+            let isLoadingModels = false; // Prevent concurrent loads
+            let loadedBackgroundKey = null; // Track which background has been loaded
+
             async function loadSavedModelsForPhoto(photoIndex) {
                 const photos = areaPhotos[currentArea] || [];
                 if (photos.length === 0 || photoIndex < 0 || photoIndex >= photos.length) return;
 
-                // Don't reload if already loaded for this photo
-                if (current3DPhotoIndex === photoIndex && allLoadedModels.length > 0) {
-                    return;
-                }
-
                 // Use area + index as unique key
                 const backgroundKey = `${currentArea}_photo_${photoIndex}`;
                 const stagingId = window.stagingId || 0;
+
+                // Don't reload if already loaded for this photo or currently loading
+                if (isLoadingModels) {
+                    console.log('Already loading models, skipping');
+                    return;
+                }
+                // Check if this exact background key was already loaded with models
+                if (loadedBackgroundKey === backgroundKey && allLoadedModels.length > 0) {
+                    console.log('Models already loaded for this background, skipping');
+                    return;
+                }
+
+                isLoadingModels = true;
+                loadedBackgroundKey = backgroundKey;
 
                 try {
                     const response = await fetch(`/api/get-staging-models?staging_id=${stagingId}&background_image=${encodeURIComponent(backgroundKey)}`);
@@ -3498,9 +3577,11 @@ def property_type_selector():
                         await initPhoto3DSceneForRestore(photoIndex, container);
 
                         // Load all models
+                        console.log('Loading', data.models.length, 'models for background:', backgroundKey);
                         for (const modelData of data.models) {
                             await loadGLTFModelFromSaved(modelData);
                         }
+                        console.log('Loaded models count:', allLoadedModels.length);
 
                         // Clear selection - user must click to select a model
                         currentLoadedModel = null;
@@ -3508,6 +3589,9 @@ def property_type_selector():
                     }
                 } catch (error) {
                     console.error('Error loading saved models:', error);
+                    loadedBackgroundKey = null; // Reset on error to allow retry
+                } finally {
+                    isLoadingModels = false;
                 }
             }
 
@@ -3522,6 +3606,13 @@ def property_type_selector():
                 const containerRect = container.getBoundingClientRect();
                 const width = containerRect.width;
                 const height = containerRect.height;
+
+                // Explicitly remove all existing models from scene first
+                if (threeScene) {
+                    allLoadedModels.forEach(model => {
+                        threeScene.remove(model);
+                    });
+                }
 
                 // Clear existing 3D scene and models array
                 if (threeRenderer) {
@@ -3600,6 +3691,16 @@ def property_type_selector():
                 return new Promise((resolve) => {
                     loader.load(modelUrl, (gltf) => {
                         const model = gltf.scene;
+
+                        // Make all materials double-sided so back/side faces render solid
+                        model.traverse((child) => {
+                            if (child.isMesh && child.material) {
+                                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                                materials.forEach(mat => {
+                                    mat.side = THREE.DoubleSide;
+                                });
+                            }
+                        });
 
                         // Apply saved state
                         model.position.set(
