@@ -2500,9 +2500,9 @@ def property_type_selector():
                     frustumSize * aspect / 2,
                     frustumSize / 2,
                     frustumSize / -2,
-                    0.1, 1000
+                    1, 100
                 );
-                threeCamera.position.set(0, 0, 10);
+                threeCamera.position.set(0, 0, 50);
                 threeCamera.lookAt(0, 0, 0);
 
                 // Renderer
@@ -2926,7 +2926,8 @@ def property_type_selector():
                 });
             }
 
-            // Update model render order based on lowest Y point - lower Y (bottom of screen) = renders in front
+            // Update model depth based on lowest Y point
+            // Lower Y (bottom/front of screen) = blocks models behind
             function updateModelDepthFromY(model) {
                 if (!model) return;
 
@@ -2934,42 +2935,17 @@ def property_type_selector():
                 const box = new THREE.Box3().setFromObject(model);
                 const lowestY = box.min.y;
 
-                // Store previous render order for transition detection
-                const prevOrder = model.userData.renderOrder || 0;
+                // Lower Y = higher renderOrder = drawn last = appears on top
+                const renderOrder = Math.round((10 - lowestY) * 1000);
+                model.renderOrder = renderOrder;
 
-                // Lower Y = higher render order (appears in front)
-                // Scale to get good integer separation
-                const newOrder = Math.round((10 - lowestY) * 100);
+                // Set Z position: lower Y = closer to camera
+                // Use 5 units separation per Y unit to ensure no Z overlap between model geometries
+                model.position.z = (5 - lowestY) * 5;
 
-                // Check if crossing another model (significant order change)
-                const orderDiff = Math.abs(newOrder - prevOrder);
-                const isCrossing = orderDiff > 50 && prevOrder !== 0;
-
-                // Apply smooth opacity transition when crossing
-                if (isCrossing && !model.userData.isTransitioning) {
-                    model.userData.isTransitioning = true;
-                    // Brief fade for smooth transition
-                    animateModelOpacity(model, 0.7, 100, () => {
-                        model.renderOrder = newOrder;
-                        model.userData.renderOrder = newOrder;
-                        animateModelOpacity(model, 1.0, 100, () => {
-                            model.userData.isTransitioning = false;
-                        });
-                    });
-                } else if (!model.userData.isTransitioning) {
-                    model.renderOrder = newOrder;
-                    model.userData.renderOrder = newOrder;
-                }
-
-                // Set Z position based on Y for proper occlusion between models
-                // Lower Y = higher Z (closer to camera)
-                // Use larger multiplier (2.0) for clear depth separation between models
-                const targetZ = (10 - lowestY) * 2.0;
-                model.position.z = targetZ; // Set directly for immediate depth update
-
-                // Keep depth testing enabled for proper face rendering within the model
+                // Apply to all child meshes
                 model.traverse((child) => {
-                    child.renderOrder = model.renderOrder;
+                    child.renderOrder = renderOrder;
                     if (child.isMesh && child.material) {
                         const materials = Array.isArray(child.material) ? child.material : [child.material];
                         materials.forEach(mat => {
@@ -3587,9 +3563,9 @@ def property_type_selector():
                     frustumSize * aspect / 2,
                     frustumSize / 2,
                     frustumSize / -2,
-                    0.1, 1000
+                    1, 100
                 );
-                threeCamera.position.set(0, 0, 10);
+                threeCamera.position.set(0, 0, 50);
                 threeCamera.lookAt(0, 0, 0);
 
                 threeRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
