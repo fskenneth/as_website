@@ -2963,8 +2963,9 @@ def property_type_selector():
 
                 // Set Z position based on Y for proper occlusion between models
                 // Lower Y = higher Z (closer to camera)
-                const targetZ = (10 - lowestY) * 0.5;
-                model.position.z = model.position.z + (targetZ - model.position.z) * 0.3;
+                // Use larger multiplier (2.0) for clear depth separation between models
+                const targetZ = (10 - lowestY) * 2.0;
+                model.position.z = targetZ; // Set directly for immediate depth update
 
                 // Keep depth testing enabled for proper face rendering within the model
                 model.traverse((child) => {
@@ -3009,61 +3010,9 @@ def property_type_selector():
                 requestAnimationFrame(animate);
             }
 
-            // Check if two models overlap in 2D (X-Y plane)
-            function modelsOverlap2D(modelA, modelB) {
-                const boxA = new THREE.Box3().setFromObject(modelA);
-                const boxB = new THREE.Box3().setFromObject(modelB);
-
-                // Check X overlap
-                const xOverlap = boxA.min.x < boxB.max.x && boxA.max.x > boxB.min.x;
-                // Check Y overlap
-                const yOverlap = boxA.min.y < boxB.max.y && boxA.max.y > boxB.min.y;
-
-                return xOverlap && yOverlap;
-            }
-
-            // Get the lowest Y point of a model (for depth ordering)
-            function getModelLowestY(model) {
-                const box = new THREE.Box3().setFromObject(model);
-                return box.min.y;
-            }
-
-            // Apply "all or nothing" visibility based on overlap
-            function applyAllOrNothingBlocking() {
-                // First, make all models visible
-                allLoadedModels.forEach(model => {
-                    model.visible = true;
-                    model.userData.blockedBy = null;
-                });
-
-                // Sort models by lowest Y (ascending = front to back, lower Y = front)
-                const sortedModels = [...allLoadedModels].sort((a, b) => {
-                    return getModelLowestY(a) - getModelLowestY(b);
-                });
-
-                // Check each pair - if front model overlaps back model, hide back model
-                for (let i = 0; i < sortedModels.length; i++) {
-                    const frontModel = sortedModels[i];
-                    if (!frontModel.visible) continue; // Already hidden
-
-                    for (let j = i + 1; j < sortedModels.length; j++) {
-                        const backModel = sortedModels[j];
-                        if (!backModel.visible) continue; // Already hidden
-
-                        // If front model overlaps with back model, hide back model
-                        if (modelsOverlap2D(frontModel, backModel)) {
-                            backModel.visible = false;
-                            backModel.userData.blockedBy = frontModel;
-                        }
-                    }
-                }
-            }
-
             // Update depth for all models (call after any position change)
             function updateAllModelsRenderOrder() {
                 allLoadedModels.forEach(model => updateModelDepthFromY(model));
-                // Apply all-or-nothing blocking after depth update
-                applyAllOrNothingBlocking();
             }
 
             function addModelControlOverlay(container) {
