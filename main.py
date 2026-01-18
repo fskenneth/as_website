@@ -88,20 +88,25 @@ _background_tasks = []
 _sync_running = False
 
 async def background_zoho_read_sync():
-    """Background task for reading changes from Zoho (every 5 minutes)"""
+    """
+    Smart background sync that checks Item_Report_Sync every 30 seconds.
+    Only uses API credits when actual changes are detected.
+    """
     global _sync_running
     while True:
         try:
-            await asyncio.sleep(300)  # 5 minutes
+            await asyncio.sleep(30)  # 30 seconds
             if not _sync_running:
                 _sync_running = True
-                result = await sync_service.smart_incremental_sync('Item_Report')
-                print(f"[Background Sync] Read: {result.get('records_synced', 0)} records from Zoho")
+                result = await sync_service.smart_sync_check()
+                if result.get('changes_detected'):
+                    print(f"[Smart Sync] Synced {result.get('records_synced', 0)} changed records")
+                # Don't print anything if no changes (to avoid log spam)
                 _sync_running = False
         except asyncio.CancelledError:
             break
         except Exception as e:
-            print(f"[Background Sync] Read error: {e}")
+            print(f"[Smart Sync] Error: {e}")
             _sync_running = False
 
 async def background_zoho_write_sync():
@@ -137,7 +142,7 @@ async def startup():
     read_task = asyncio.create_task(background_zoho_read_sync())
     write_task = asyncio.create_task(background_zoho_write_sync())
     _background_tasks.extend([read_task, write_task])
-    print("[Background Sync] Started read (5min) and write (30s) sync tasks")
+    print("[Background Sync] Started smart read (30s) and write (30s) sync tasks")
 
 @app.on_event("shutdown")
 async def shutdown():

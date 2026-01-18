@@ -352,5 +352,127 @@ class SyncService:
                 "error": error_msg
             }
 
+    async def smart_sync_check(self) -> Dict:
+        """
+        Smart sync that only uses API credits when changes are detected.
+        1. Fetch Item_Report_Sync (today's modified records - lightweight)
+        2. Compare with local database
+        3. Only sync records that have actually changed
+        """
+        start_time = get_toronto_now()
+
+        try:
+            # Step 1: Get today's modified records from Item_Report_Sync
+            sync_records = await zoho_api.get_sync_report_records()
+
+            if not sync_records:
+                logger.info("[Smart Sync] No modified records found today")
+                return {
+                    "status": "success",
+                    "changes_detected": False,
+                    "records_synced": 0,
+                    "message": "No modified records today"
+                }
+
+            # Step 2: Compare with local database to find actual changes
+            table_name = "Item_Report"
+            records_to_sync = []
+
+            for record in sync_records:
+                record_id = record.get("ID")
+                if not record_id:
+                    continue
+
+                # Get local record
+                local_record = await db.fetchone(
+                    f"SELECT * FROM {table_name} WHERE ID = ?",
+                    (record_id,)
+                )
+
+                if not local_record:
+                    # New record, needs sync
+                    records_to_sync.append(record)
+                    logger.info(f"[Smart Sync] New record detected: {record_id}")
+                else:
+                    # Compare key fields to detect changes
+                    # Check if any important field has changed
+                    changed = False
+                    compare_fields = ['Item_Depth', 'Item_Width', 'Item_Height', 'Item_Name',
+                                     'Current_Location', 'Item_Notes', 'Last_Update_Date']
+
+                    for field in compare_fields:
+                        zoho_value = record.get(field)
+                        local_value = local_record.get(field) if local_record else None
+
+                        # Handle Current_Location which might be a dict in Zoho
+                        if field == 'Current_Location':
+                            if isinstance(zoho_value, dict):
+                                zoho_value = zoho_value.get('display_value', '')
+                            # Local value might be stored as JSON string
+                            if isinstance(local_value, str) and local_value.startswith('{'):
+                                try:
+                                    local_dict = json.loads(local_value.replace("'", '"'))
+                                    local_value = local_dict.get('display_value', local_value)
+                                except:
+                                    pass
+
+                        # Convert to string for comparison
+                        zoho_str = str(zoho_value) if zoho_value is not None else ""
+                        local_str = str(local_value) if local_value is not None else ""
+
+                        if zoho_str != local_str:
+                            changed = True
+                            logger.info(f"[Smart Sync] Change detected in {record_id}: {field} changed from '{local_str}' to '{zoho_str}'")
+                            break
+
+                    if changed:
+                        records_to_sync.append(record)
+
+            if not records_to_sync:
+                logger.info("[Smart Sync] No actual changes detected")
+                return {
+                    "status": "success",
+                    "changes_detected": False,
+                    "records_synced": 0,
+                    "message": "No changes detected (local DB is up to date)"
+                }
+
+            # Step 3: Sync only the changed records
+            logger.info(f"[Smart Sync] Syncing {len(records_to_sync)} changed records")
+
+            # Process image URLs
+            records_with_urls, urls_processed = image_url_processor.process_records_for_urls(
+                records_to_sync, "Item_Report"
+            )
+
+            # Upsert only the changed records
+            upsert_result = await db.upsert_records(table_name, records_with_urls)
+            synced_count = upsert_result["successful"]
+
+            # Log the sync
+            await db.log_sync("smart", table_name, "success", synced_count)
+
+            duration = (get_toronto_now() - start_time).total_seconds()
+            logger.info(f"[Smart Sync] Completed: {synced_count} records in {duration:.2f}s")
+
+            return {
+                "status": "success",
+                "changes_detected": True,
+                "records_synced": synced_count,
+                "urls_processed": urls_processed,
+                "duration": duration,
+                "message": f"Synced {synced_count} changed records"
+            }
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"[Smart Sync] Error: {error_msg}")
+            return {
+                "status": "failed",
+                "changes_detected": False,
+                "records_synced": 0,
+                "error": error_msg
+            }
+
 # Service instance
 sync_service = SyncService()

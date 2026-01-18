@@ -1,7 +1,7 @@
 import httpx
 import asyncio
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 from .config import settings
 import logging
@@ -117,19 +117,21 @@ class ZohoCreatorAPI:
 
     async def get_today_modified_records(self, report_name: str) -> List[Dict]:
         """Get records modified today"""
-        # Get today's date in Zoho format (dd-MMM-yyyy)
+        # Get today's and tomorrow's date in Zoho format (d-MMM-yyyy)
         today = datetime.now()
+        tomorrow = today + timedelta(days=1)
         month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-        day = today.strftime("%d").lstrip('0')  # Remove leading zero
-        month = month_names[today.month - 1]
-        year = today.year
-        today_str = f"{day}-{month}-{year}"
 
-        # Criteria for records modified today
-        criteria = f'Modified_Time == "{today_str}"'
+        # Format dates (Zoho uses d-MMM-yyyy format)
+        today_str = f"{today.day}-{month_names[today.month - 1]}-{today.year}"
+        tomorrow_str = f"{tomorrow.day}-{month_names[tomorrow.month - 1]}-{tomorrow.year}"
 
-        logger.info(f"Fetching records from {report_name} modified on {today_str}")
+        # Criteria for records modified today (using range for datetime field)
+        # Modified_Time is a datetime field, so == doesn't work with date-only values
+        criteria = f'Modified_Time >= "{today_str}" && Modified_Time < "{tomorrow_str}"'
+
+        logger.info(f"Fetching records from {report_name} modified between {today_str} and {tomorrow_str}")
         return await self.get_all_report_data(report_name, criteria)
 
     async def get_modified_records_since(self, report_name: str, since_date: datetime) -> List[Dict]:
@@ -257,6 +259,28 @@ class ZohoCreatorAPI:
         except Exception as e:
             logger.error(f"Failed to get record {record_id} from {report_name}: {e}")
             return None
+
+    async def get_sync_report_records(self) -> List[Dict]:
+        """
+        Get records from Item_Report_Sync (today's modified records only).
+        This is a lightweight call to check for changes without fetching all records.
+        """
+        try:
+            records = await self.get_all_report_data("Item_Report_Sync")
+            logger.info(f"Item_Report_Sync returned {len(records)} modified records")
+            return records
+        except Exception as e:
+            logger.error(f"Failed to fetch Item_Report_Sync: {e}")
+            return []
+
+    async def get_records_by_ids(self, report_name: str, record_ids: List[str]) -> List[Dict]:
+        """Fetch multiple records by their IDs"""
+        records = []
+        for record_id in record_ids:
+            record = await self.get_record_by_id(report_name, record_id)
+            if record:
+                records.append(record)
+        return records
 
 # API instance
 zoho_api = ZohoCreatorAPI()
