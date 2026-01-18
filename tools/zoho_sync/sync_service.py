@@ -1,11 +1,11 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple
 from .database import db
 from .zoho_api import zoho_api
 from .image_downloader import image_downloader
 from .image_url_processor import image_url_processor
-from .utils import get_toronto_now
+from .utils import get_toronto_now, get_toronto_now_iso
 import logging
 
 logger = logging.getLogger(__name__)
@@ -258,6 +258,99 @@ class SyncService:
             "reports": report_status,
             "recent_syncs": history
         }
+
+    async def smart_incremental_sync(self, report_name: str) -> Dict:
+        """
+        Smart incremental sync - only fetches records modified since last check.
+        Used for background sync to keep local DB updated without full syncs.
+        """
+        start_time = get_toronto_now()
+        table_name = db._sanitize_name(report_name)
+
+        try:
+            # Get last sync metadata
+            metadata = await db.get_sync_metadata(table_name)
+
+            if not metadata or not metadata.get('last_modified_time'):
+                # No metadata, need full sync
+                logger.info(f"No sync metadata for {report_name}, running full sync")
+                return await self.sync_report(report_name, "full")
+
+            last_modified = metadata['last_modified_time']
+            logger.info(f"Smart sync for {report_name} - checking records since {last_modified}")
+
+            # Parse last modified time
+            try:
+                # Handle various date formats from Zoho
+                if 'T' in last_modified:
+                    last_sync_dt = datetime.fromisoformat(last_modified.replace('Z', '+00:00'))
+                else:
+                    # Try parsing Zoho format: "31-Dec-2025 09:04:40"
+                    last_sync_dt = datetime.strptime(last_modified, "%d-%b-%Y %H:%M:%S")
+            except ValueError:
+                logger.warning(f"Could not parse last_modified_time: {last_modified}, running daily sync")
+                return await self.sync_report(report_name, "daily")
+
+            # Fetch records modified since last sync
+            records = await zoho_api.get_modified_records_since(report_name, last_sync_dt)
+
+            if not records:
+                logger.info(f"No modified records found for {report_name} since {last_modified}")
+                return {
+                    "report_name": report_name,
+                    "status": "success",
+                    "records_synced": 0,
+                    "message": "No new changes"
+                }
+
+            logger.info(f"Found {len(records)} modified records for {report_name}")
+
+            # Process image URLs
+            records_with_urls, urls_processed = image_url_processor.process_records_for_urls(
+                records, report_name
+            )
+
+            # Upsert records (not clearing table - incremental update)
+            upsert_result = await db.upsert_records(table_name, records_with_urls)
+            synced_count = upsert_result["successful"]
+
+            # Update sync metadata
+            new_last_modified = max(
+                (r.get("Modified_Time", "") for r in records if r.get("Modified_Time")),
+                default=last_modified
+            )
+
+            if new_last_modified:
+                # Get current record count
+                count_result = await db.fetchone(f"SELECT COUNT(*) as count FROM {table_name}")
+                record_count = count_result['count'] if count_result else 0
+                await db.update_sync_metadata(table_name, new_last_modified, record_count)
+
+            await db.log_sync("incremental", table_name, "success", synced_count)
+
+            duration = (get_toronto_now() - start_time).total_seconds()
+            logger.info(f"Smart sync completed: {synced_count} records in {duration:.2f}s")
+
+            return {
+                "report_name": report_name,
+                "status": "success",
+                "records_synced": synced_count,
+                "urls_processed": urls_processed,
+                "duration": duration,
+                "message": f"Synced {synced_count} modified records"
+            }
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Smart sync failed for {report_name}: {error_msg}")
+            await db.log_sync("incremental", table_name, "failed", 0, error_msg)
+
+            return {
+                "report_name": report_name,
+                "status": "failed",
+                "records_synced": 0,
+                "error": error_msg
+            }
 
 # Service instance
 sync_service = SyncService()

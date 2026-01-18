@@ -227,5 +227,36 @@ class ZohoCreatorAPI:
             logger.error(f"Connection test failed: {e}")
             return False
 
+    async def update_record(self, report_name: str, record_id: str, data: Dict[str, Any]) -> Dict:
+        """Update a single record in Zoho Creator"""
+        url = f"{self.base_url}/report/{report_name}/{record_id}"
+
+        try:
+            response = await self.make_authenticated_request(
+                url,
+                method="PATCH",
+                data={"data": data}
+            )
+
+            logger.info(f"Updated record {record_id} in {report_name}")
+            return {
+                "success": True,
+                "response": response
+            }
+        except Exception as e:
+            logger.error(f"Failed to update record {record_id} in {report_name}: {e}")
+            raise
+
+    async def get_record_by_id(self, report_name: str, record_id: str) -> Optional[Dict]:
+        """Get a single record by ID from Zoho Creator"""
+        url = f"{self.base_url}/report/{report_name}/{record_id}"
+
+        try:
+            response = await self.make_authenticated_request(url, params={"raw": "true"})
+            return response.get("data", None)
+        except Exception as e:
+            logger.error(f"Failed to get record {record_id} from {report_name}: {e}")
+            return None
+
 # API instance
 zoho_api = ZohoCreatorAPI()

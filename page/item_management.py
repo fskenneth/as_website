@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import List, Dict, Tuple
 import json
 from starlette.responses import JSONResponse
+from tools.zoho_sync.write_service import write_service
 
 # Database path
 ZOHO_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "zoho_sync.db")
@@ -1083,7 +1084,7 @@ def get_item_details(item_id: str):
 
 @rt("/update_item/{item_id}", methods=["POST"])
 async def update_item(item_id: str, request):
-    """Update an item's information"""
+    """Update an item's information and queue for Zoho sync"""
     try:
         # Get JSON data from request
         import json
@@ -1093,9 +1094,19 @@ async def update_item(item_id: str, request):
         conn = get_db_connection()
         cursor = conn.cursor()
 
+        # Get current values for tracking changes
+        cursor.execute("SELECT * FROM Item_Report WHERE ID = ?", (item_id,))
+        row = cursor.fetchone()
+        if row:
+            columns = [desc[0] for desc in cursor.description]
+            old_values = dict(zip(columns, row))
+        else:
+            old_values = {}
+
         # Build update query dynamically based on provided fields
         fields_to_update = []
         values = []
+        changes_for_zoho = {}
 
         # Define which fields can be updated
         updateable_fields = [
@@ -1108,14 +1119,20 @@ async def update_item(item_id: str, request):
             if field in data:
                 fields_to_update.append(f"{field} = ?")
                 values.append(data[field])
+                # Track changes for Zoho sync
+                if str(data[field]) != str(old_values.get(field, '')):
+                    changes_for_zoho[field] = data[field]
 
         if not fields_to_update:
             return {"error": "No valid fields to update"}, 400
 
         # Add modified timestamp and user
+        modified_time = datetime.now().strftime("%d-%b-%Y %H:%M:%S")
         fields_to_update.append("Modified_Time = ?")
         fields_to_update.append("Modified_User = ?")
-        values.extend([datetime.now().strftime("%m/%d/%Y %H:%M:%S"), "web_user"])
+        values.extend([modified_time, "web_user"])
+        changes_for_zoho['Modified_Time'] = modified_time
+        changes_for_zoho['Modified_User'] = "web_user"
 
         # Add item_id for WHERE clause
         values.append(item_id)
@@ -1126,7 +1143,27 @@ async def update_item(item_id: str, request):
         conn.commit()
         conn.close()
 
-        return JSONResponse({"success": True, "message": "Item updated successfully"})
+        # Queue changes for Zoho sync (non-blocking)
+        if changes_for_zoho:
+            try:
+                await write_service.queue_update(
+                    record_id=item_id,
+                    report_name='Item_Report',
+                    changes=changes_for_zoho,
+                    old_values=old_values
+                )
+            except Exception as sync_error:
+                # Log but don't fail the request if queue fails
+                print(f"Warning: Failed to queue Zoho sync for {item_id}: {sync_error}")
+
+        # Get pending sync count for this record
+        pending_count = await write_service.get_pending_for_record(item_id)
+
+        return JSONResponse({
+            "success": True,
+            "message": "Item updated successfully",
+            "sync_status": "queued" if pending_count > 0 else "synced"
+        })
 
     except Exception as e:
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
@@ -1152,6 +1189,34 @@ def delete_item(item_id: str):
 
         return JSONResponse({"success": True, "message": "Item deleted successfully"})
 
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@rt("/sync_status")
+async def get_sync_status():
+    """Get the current Zoho sync status"""
+    try:
+        status = await write_service.get_sync_status()
+        return JSONResponse({
+            "success": True,
+            "status": status
+        })
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@rt("/sync_status/{item_id}")
+async def get_item_sync_status(item_id: str):
+    """Get sync status for a specific item"""
+    try:
+        pending = await write_service.get_pending_for_record(item_id)
+        return JSONResponse({
+            "success": True,
+            "item_id": item_id,
+            "pending_changes": pending,
+            "sync_status": "pending" if pending > 0 else "synced"
+        })
     except Exception as e:
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 

@@ -34,6 +34,9 @@ from page.zoho_sync import zoho_sync_app_export
 from tools.zoho_sync.database import db as zoho_db
 from tools.zoho_sync.zoho_api import zoho_api
 from tools.zoho_sync.image_downloader import image_downloader
+from tools.zoho_sync.sync_service import sync_service
+from tools.zoho_sync.write_service import write_service
+import asyncio
 from starlette.staticfiles import StaticFiles
 from starlette.responses import Response, JSONResponse, RedirectResponse
 import sqlite3
@@ -80,15 +83,73 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/item_management", item_management_app_export)
 app.mount("/zoho_sync", zoho_sync_app_export)
 
+# Background sync task handle
+_background_tasks = []
+_sync_running = False
+
+async def background_zoho_read_sync():
+    """Background task for reading changes from Zoho (every 5 minutes)"""
+    global _sync_running
+    while True:
+        try:
+            await asyncio.sleep(300)  # 5 minutes
+            if not _sync_running:
+                _sync_running = True
+                result = await sync_service.smart_incremental_sync('Item_Report')
+                print(f"[Background Sync] Read: {result.get('records_synced', 0)} records from Zoho")
+                _sync_running = False
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"[Background Sync] Read error: {e}")
+            _sync_running = False
+
+async def background_zoho_write_sync():
+    """Background task for writing changes to Zoho (every 30 seconds)"""
+    while True:
+        try:
+            await asyncio.sleep(30)  # 30 seconds
+            result = await write_service.process_pending_updates()
+            if result['processed'] > 0 or result['failed'] > 0:
+                print(f"[Background Sync] Write: {result['processed']} synced, {result['failed']} failed")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"[Background Sync] Write error: {e}")
+
 # Startup/shutdown events for Zoho Sync database
 @app.on_event("startup")
 async def startup():
     """Initialize database connection on startup"""
     await zoho_db.connect()
 
+    # Initialize write service tables
+    await write_service.init_tables()
+
+    # Run initial incremental sync on startup
+    try:
+        result = await sync_service.smart_incremental_sync('Item_Report')
+        print(f"[Startup Sync] Item_Report: {result.get('records_synced', 0)} records synced")
+    except Exception as e:
+        print(f"[Startup Sync] Error: {e}")
+
+    # Start background sync tasks
+    read_task = asyncio.create_task(background_zoho_read_sync())
+    write_task = asyncio.create_task(background_zoho_write_sync())
+    _background_tasks.extend([read_task, write_task])
+    print("[Background Sync] Started read (5min) and write (30s) sync tasks")
+
 @app.on_event("shutdown")
 async def shutdown():
     """Close database connection on shutdown"""
+    # Cancel background tasks
+    for task in _background_tasks:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
     await zoho_db.disconnect()
     await zoho_api.close()
     await image_downloader.close()
