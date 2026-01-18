@@ -1,5 +1,15 @@
 [
   {
+    "timestamp": "2026-01-17T23:09:14.929696",
+    "item_name": "Accent Chair 01052",
+    "input_thumbnail": "/static/models/thumbnails/e1553646_input.png",
+    "model_url": "/static/models/e1553646.glb",
+    "format": "glb",
+    "method": "tripo3d",
+    "processing_time": 71.687211,
+    "info": "Tripo3D Pro API - High quality 3D mesh"
+  },
+  {
     "timestamp": "2026-01-08T14:11:16.815884",
     "input_thumbnail": "/static/models/thumbnails/04f1de8f_input.png",
     "input_original": "/static/models/thumbnails/04f1de8f_original.png",
