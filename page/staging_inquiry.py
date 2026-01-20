@@ -2868,8 +2868,8 @@ def property_type_selector():
                     model.position.set(worldX, worldY, 0);
 
                     // Apply front rotation so model faces the user
-                    // Always use -Math.PI/2 to make all models face front by default
-                    let frontRotation = -Math.PI/2;
+                    // Always use Math.PI/2 to make all models face front by default
+                    let frontRotation = Math.PI/2;
 
                     // Get initial zone and rotation based on drop position
                     const initialZone = getPositionZone(worldX);
