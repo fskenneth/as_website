@@ -240,6 +240,12 @@ class ZohoCreatorAPI:
                 data={"data": data}
             )
 
+            # Check for error codes in response body (Zoho returns 200 even on errors)
+            if response.get("code") and response.get("code") != 3000:
+                error_msg = response.get("message", "Unknown error")
+                logger.error(f"Zoho API error updating {record_id}: code={response.get('code')}, message={error_msg}")
+                raise Exception(f"Zoho API error: {error_msg}")
+
             logger.info(f"Updated record {record_id} in {report_name}")
             return {
                 "success": True,

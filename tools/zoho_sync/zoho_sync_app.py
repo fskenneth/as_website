@@ -8,6 +8,7 @@ from .database import db
 from .zoho_api import zoho_api
 from .sync_service import sync_service
 from .image_downloader import image_downloader
+from .page_sync_service import PageSyncService
 import logging
 from pathlib import Path
 import sys
@@ -438,6 +439,25 @@ async def get(request):
                 cls="mb-8"
             ),
 
+            # Page Sync (0 API calls)
+            Card(
+                H2("Page Sync (0 API Calls)", cls="text-xl font-semibold mb-4"),
+                Div(
+                    P("Syncs Item_Report using web scraping instead of API calls.", cls="text-sm text-gray-600 mb-2"),
+                    P("The report is filtered to show items modified in the last 1 minute.", cls="text-sm text-gray-600 mb-4"),
+                    Button(
+                        "Run Page Sync",
+                        hx_post="/zoho_sync/page-sync",
+                        hx_target="#page-sync-results",
+                        hx_indicator="#page-sync-indicator",
+                        cls="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 mr-2"
+                    ),
+                    Span(id="page-sync-indicator", cls="htmx-indicator ml-4", children="Scraping..."),
+                    Div(id="page-sync-results", cls="mt-4"),
+                ),
+                cls="mb-8"
+            ),
+
             # Report Status
             Card(
                 H2("Report Status", cls="text-xl font-semibold mb-4"),
@@ -643,6 +663,44 @@ async def post(sync_type: str, request: Request):
         ),
         cls="bg-gray-50 p-4 rounded"
     )
+
+# Page Sync endpoint (0 API calls)
+@rt("/page-sync")
+async def post():
+    await ensure_db_connected()
+    try:
+        # Create a new scraper instance for this request
+        service = PageSyncService()
+        await service.initialize()
+
+        try:
+            result = await service.sync_once()
+
+            status_class = "text-green-600" if result["status"] == "success" else "text-red-600"
+
+            return Div(
+                P(f"Status: {result['status']}", cls=f"font-semibold {status_class}"),
+                P(f"Records found: {result['records_found']}"),
+                P(f"Records synced: {result['records_synced']}"),
+                *[P(f"Error: {err}", cls="text-red-600 text-sm") for err in result.get("errors", [])],
+                P("Note: Report shows items modified in last 1 minute.", cls="text-sm text-gray-500 mt-2"),
+                Button(
+                    "Refresh Status",
+                    hx_get="/zoho_sync",
+                    hx_target="body",
+                    cls="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600 mt-4"
+                ),
+                cls="bg-gray-50 p-4 rounded"
+            )
+        finally:
+            await service.close()
+
+    except Exception as e:
+        logger.error(f"Page sync error: {e}")
+        return Div(
+            P(f"Error: {str(e)}", cls="text-red-600"),
+            cls="bg-gray-50 p-4 rounded"
+        )
 
 # Data preview endpoint
 @rt("/data")

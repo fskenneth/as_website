@@ -262,6 +262,158 @@ item_management_app, rt = fast_app(
                 width: 100% !important;
             }
 
+            /* 3D Icon Styles */
+            .item-3d-icon {
+                position: absolute;
+                top: 20px;
+                left: 22px;
+                width: 32px;
+                height: 32px;
+                background: rgba(255, 255, 255, 0.9);
+                border-radius: 6px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #000000;
+                z-index: 10;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            }
+
+            .item-3d-icon:hover {
+                background: rgba(255, 255, 255, 1);
+                transform: scale(1.1);
+            }
+
+            .item-3d-icon svg {
+                width: 20px;
+                height: 20px;
+                stroke: #000000;
+            }
+
+            /* 3D Modal Styles */
+            .model-3d-modal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                display: none;
+                z-index: 1002;
+                justify-content: center;
+                align-items: center;
+            }
+
+            .model-3d-container {
+                background: white;
+                border-radius: 12px;
+                width: 90%;
+                max-width: 800px;
+                height: 80vh;
+                max-height: 600px;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .model-3d-header {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                padding: 16px 20px;
+                background: rgba(255, 255, 255, 0.95);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                z-index: 10;
+                border-bottom: 1px solid #e0e0e0;
+            }
+
+            .model-3d-title {
+                font-weight: bold;
+                font-size: 18px;
+                color: #333;
+            }
+
+            .model-3d-close {
+                font-size: 28px;
+                cursor: pointer;
+                color: #666;
+                line-height: 1;
+                padding: 0 8px;
+            }
+
+            .model-3d-close:hover {
+                color: #333;
+            }
+
+            #model-3d-canvas {
+                width: 100%;
+                height: 100%;
+                background: white;
+            }
+
+            .model-3d-controls {
+                position: absolute;
+                bottom: 16px;
+                left: 50%;
+                transform: translateX(-50%);
+                display: flex;
+                gap: 8px;
+                background: rgba(255, 255, 255, 0.9);
+                padding: 8px 16px;
+                border-radius: 8px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            }
+
+            .model-3d-control-btn {
+                width: 40px;
+                height: 40px;
+                background: #f0f0f0;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s ease;
+            }
+
+            .model-3d-control-btn:hover {
+                background: #e0e0e0;
+            }
+
+            .model-3d-control-btn svg {
+                width: 20px;
+                height: 20px;
+                stroke: #333;
+            }
+
+            .model-3d-loading {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                text-align: center;
+                color: #666;
+            }
+
+            .model-3d-spinner {
+                width: 40px;
+                height: 40px;
+                border: 3px solid #e0e0e0;
+                border-top-color: #333;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 12px;
+            }
+
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+
             /* Ensure select elements and their dropdowns have consistent width */
             select, .uk-select, .uk-input-fake {
                 width: 100% !important;
@@ -434,7 +586,28 @@ def create_item_card(item_name: str, items: List[sqlite3.Row]) -> Div:
             )
         )
 
+    # Check if item has a 3D model
+    model_3d = first_item['Model_3D'] if 'Model_3D' in first_item.keys() else None
+    has_3d_model = model_3d and model_3d.strip()
+
+    # Get dimensions for 3D model
+    item_width = first_item['Item_Width'] or 0
+    item_height = first_item['Item_Height'] or 0
+    item_depth = first_item['Item_Depth'] or 0
+
     return Div(
+        # 3D Icon (top-left, only shown if item has 3D model)
+        Div(
+            NotStr('''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>'''),
+            cls="item-3d-icon",
+            onclick=f"show3DModal('{model_3d}', '{item_name}', {item_width}, {item_height}, {item_depth})",
+            title="View 3D Model"
+        ) if has_3d_model else None,
+
         # Count badges
         Div(
             Span(str(warehouse_count), cls="count-badge", style="background-color: green; color: white; margin-right: 4px;"),
@@ -664,6 +837,60 @@ async def get(request):
                 id="image-modal",
                 style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--modal-bg); display: none; z-index: 1001; justify-content: center; align-items: center;"
             )
+        ),
+
+        # 3D Model Modal
+        Div(
+            Div(
+                Div(
+                    Span("3D Model", cls="model-3d-title", id="model-3d-title"),
+                    Span("×", cls="model-3d-close", onclick="close3DModal()"),
+                    cls="model-3d-header"
+                ),
+                Div(
+                    Div(cls="model-3d-spinner"),
+                    Span("Loading 3D model..."),
+                    cls="model-3d-loading",
+                    id="model-3d-loading"
+                ),
+                Div(id="model-3d-canvas"),
+                Div(
+                    Button(
+                        NotStr('''<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                        </svg>'''),
+                        cls="model-3d-control-btn",
+                        onclick="resetModelView()",
+                        title="Reset View"
+                    ),
+                    Button(
+                        NotStr('''<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="M21 21l-4.35-4.35"/>
+                            <line x1="11" y1="8" x2="11" y2="14"/>
+                            <line x1="8" y1="11" x2="14" y2="11"/>
+                        </svg>'''),
+                        cls="model-3d-control-btn",
+                        onclick="zoomIn3D()",
+                        title="Zoom In"
+                    ),
+                    Button(
+                        NotStr('''<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="M21 21l-4.35-4.35"/>
+                            <line x1="8" y1="11" x2="14" y2="11"/>
+                        </svg>'''),
+                        cls="model-3d-control-btn",
+                        onclick="zoomOut3D()",
+                        title="Zoom Out"
+                    ),
+                    cls="model-3d-controls"
+                ),
+                cls="model-3d-container"
+            ),
+            id="model-3d-modal",
+            cls="model-3d-modal",
+            onclick="if(event.target === this) close3DModal()"
         ),
 
         # Add JavaScript for modal handling and enhanced lazy loading
@@ -1003,6 +1230,260 @@ async def get(request):
             document.addEventListener('DOMContentLoaded', function() {
                 ThemeManager.init();
             });
+
+            // 3D Model Viewer
+            let threeJsLoaded = false;
+            let scene3D = null;
+            let camera3D = null;
+            let renderer3D = null;
+            let controls3D = null;
+            let currentModel3D = null;
+            let animationId3D = null;
+
+            // Load Three.js libraries dynamically
+            function loadThreeJs() {
+                return new Promise((resolve, reject) => {
+                    if (threeJsLoaded) {
+                        resolve();
+                        return;
+                    }
+
+                    // Load Three.js
+                    const threeScript = document.createElement('script');
+                    threeScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+                    threeScript.onload = () => {
+                        // Load GLTFLoader
+                        const gltfScript = document.createElement('script');
+                        gltfScript.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
+                        gltfScript.onload = () => {
+                            // Load OrbitControls
+                            const orbitScript = document.createElement('script');
+                            orbitScript.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js';
+                            orbitScript.onload = () => {
+                                threeJsLoaded = true;
+                                resolve();
+                            };
+                            orbitScript.onerror = reject;
+                            document.head.appendChild(orbitScript);
+                        };
+                        gltfScript.onerror = reject;
+                        document.head.appendChild(gltfScript);
+                    };
+                    threeScript.onerror = reject;
+                    document.head.appendChild(threeScript);
+                });
+            }
+
+            // Initialize 3D scene
+            function init3DScene(container) {
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+
+                // Create scene
+                scene3D = new THREE.Scene();
+                scene3D.background = new THREE.Color(0xffffff);
+
+                // Create camera
+                camera3D = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+                camera3D.position.set(0, 1, 3);
+
+                // Create renderer
+                renderer3D = new THREE.WebGLRenderer({ antialias: true });
+                renderer3D.setSize(width, height);
+                renderer3D.setPixelRatio(window.devicePixelRatio);
+                renderer3D.outputEncoding = THREE.sRGBEncoding;
+                renderer3D.toneMapping = THREE.ACESFilmicToneMapping;
+                renderer3D.toneMappingExposure = 1.5;
+                container.appendChild(renderer3D.domElement);
+
+                // Add orbit controls
+                controls3D = new THREE.OrbitControls(camera3D, renderer3D.domElement);
+                controls3D.enableDamping = true;
+                controls3D.dampingFactor = 0.05;
+                controls3D.minDistance = 0.5;
+                controls3D.maxDistance = 10;
+
+                // Add lighting
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                scene3D.add(ambientLight);
+
+                const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight1.position.set(5, 10, 7.5);
+                scene3D.add(directionalLight1);
+
+                const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+                directionalLight2.position.set(-5, 5, -5);
+                scene3D.add(directionalLight2);
+
+                // Add subtle ground shadow
+                const groundGeometry = new THREE.PlaneGeometry(10, 10);
+                const groundMaterial = new THREE.ShadowMaterial({ opacity: 0.1 });
+                const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                ground.rotation.x = -Math.PI / 2;
+                ground.position.y = -0.5;
+                scene3D.add(ground);
+
+                // Animation loop
+                function animate() {
+                    animationId3D = requestAnimationFrame(animate);
+                    controls3D.update();
+                    renderer3D.render(scene3D, camera3D);
+                }
+                animate();
+
+                // Handle resize
+                window.addEventListener('resize', () => {
+                    if (renderer3D && camera3D) {
+                        const newWidth = container.clientWidth;
+                        const newHeight = container.clientHeight;
+                        camera3D.aspect = newWidth / newHeight;
+                        camera3D.updateProjectionMatrix();
+                        renderer3D.setSize(newWidth, newHeight);
+                    }
+                });
+            }
+
+            // Load 3D model
+            function load3DModel(modelFile, itemWidth, itemHeight, itemDepth) {
+                const loader = new THREE.GLTFLoader();
+                const modelUrl = '/static/models/' + modelFile;
+
+                loader.load(
+                    modelUrl,
+                    (gltf) => {
+                        // Remove old model
+                        if (currentModel3D) {
+                            scene3D.remove(currentModel3D);
+                        }
+
+                        currentModel3D = gltf.scene;
+
+                        // Make materials double-sided
+                        currentModel3D.traverse((child) => {
+                            if (child.isMesh) {
+                                child.material.side = THREE.DoubleSide;
+                                if (child.material.map) {
+                                    child.material.map.encoding = THREE.sRGBEncoding;
+                                }
+                            }
+                        });
+
+                        // Calculate bounding box and scale
+                        const box = new THREE.Box3().setFromObject(currentModel3D);
+                        const size = box.getSize(new THREE.Vector3());
+                        const center = box.getCenter(new THREE.Vector3());
+
+                        // Scale to fit in view
+                        const maxDim = Math.max(size.x, size.y, size.z);
+                        const scale = 2 / maxDim;
+                        currentModel3D.scale.multiplyScalar(scale);
+
+                        // Center the model
+                        currentModel3D.position.x = -center.x * scale;
+                        currentModel3D.position.y = -center.y * scale;
+                        currentModel3D.position.z = -center.z * scale;
+
+                        scene3D.add(currentModel3D);
+
+                        // Hide loading indicator
+                        document.getElementById('model-3d-loading').style.display = 'none';
+
+                        // Adjust camera position
+                        camera3D.position.set(0, 1, 3);
+                        controls3D.target.set(0, 0, 0);
+                        controls3D.update();
+                    },
+                    (progress) => {
+                        // Progress callback
+                        console.log('Loading progress:', (progress.loaded / progress.total * 100).toFixed(1) + '%');
+                    },
+                    (error) => {
+                        console.error('Error loading 3D model:', error);
+                        document.getElementById('model-3d-loading').innerHTML = '<span style="color: #dc3545;">Error loading 3D model</span>';
+                    }
+                );
+            }
+
+            // Show 3D modal
+            async function show3DModal(modelFile, itemName, width, height, depth) {
+                const modal = document.getElementById('model-3d-modal');
+                const title = document.getElementById('model-3d-title');
+                const loading = document.getElementById('model-3d-loading');
+                const canvas = document.getElementById('model-3d-canvas');
+
+                // Set title
+                title.textContent = itemName + ' - 3D Model';
+
+                // Show modal and loading
+                modal.style.display = 'flex';
+                loading.style.display = 'block';
+                loading.innerHTML = '<div class="model-3d-spinner"></div><span>Loading 3D model...</span>';
+
+                // Clear previous canvas
+                canvas.innerHTML = '';
+
+                try {
+                    // Load Three.js if not loaded
+                    await loadThreeJs();
+
+                    // Initialize scene
+                    init3DScene(canvas);
+
+                    // Load model
+                    load3DModel(modelFile, width, height, depth);
+                } catch (error) {
+                    console.error('Error initializing 3D viewer:', error);
+                    loading.innerHTML = '<span style="color: #dc3545;">Error initializing 3D viewer</span>';
+                }
+            }
+
+            // Close 3D modal
+            function close3DModal() {
+                const modal = document.getElementById('model-3d-modal');
+                modal.style.display = 'none';
+
+                // Clean up Three.js resources
+                if (animationId3D) {
+                    cancelAnimationFrame(animationId3D);
+                    animationId3D = null;
+                }
+                if (renderer3D) {
+                    renderer3D.dispose();
+                    renderer3D = null;
+                }
+                if (currentModel3D) {
+                    currentModel3D = null;
+                }
+                scene3D = null;
+                camera3D = null;
+                controls3D = null;
+
+                // Clear canvas
+                document.getElementById('model-3d-canvas').innerHTML = '';
+            }
+
+            // Reset model view
+            function resetModelView() {
+                if (camera3D && controls3D) {
+                    camera3D.position.set(0, 1, 3);
+                    controls3D.target.set(0, 0, 0);
+                    controls3D.update();
+                }
+            }
+
+            // Zoom in
+            function zoomIn3D() {
+                if (camera3D) {
+                    camera3D.position.multiplyScalar(0.8);
+                }
+            }
+
+            // Zoom out
+            function zoomOut3D() {
+                if (camera3D) {
+                    camera3D.position.multiplyScalar(1.25);
+                }
+            }
         """)
     ]
 

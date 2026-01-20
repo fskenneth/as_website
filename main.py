@@ -36,6 +36,7 @@ from tools.zoho_sync.zoho_api import zoho_api
 from tools.zoho_sync.image_downloader import image_downloader
 from tools.zoho_sync.sync_service import sync_service
 from tools.zoho_sync.write_service import write_service
+from tools.zoho_sync.page_sync_service import PageSyncService
 import asyncio
 from starlette.staticfiles import StaticFiles
 from starlette.responses import Response, JSONResponse, RedirectResponse
@@ -86,6 +87,28 @@ app.mount("/zoho_sync", zoho_sync_app_export)
 # Background sync task handle
 _background_tasks = []
 _sync_running = False
+_page_sync_service = None
+
+async def background_page_sync():
+    """
+    Background page sync using Playwright (0 API calls).
+    Polls the Zoho report every 30 seconds and syncs modified items.
+    """
+    global _page_sync_service
+    _page_sync_service = PageSyncService(poll_interval_seconds=30)
+    await _page_sync_service.initialize()
+
+    while True:
+        try:
+            result = await _page_sync_service.sync_once()
+            if result.get('records_synced', 0) > 0:
+                print(f"[Page Sync] Synced {result['records_synced']} records (0 API calls)")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"[Page Sync] Error: {e}")
+
+        await asyncio.sleep(30)
 
 async def background_zoho_read_sync():
     """
@@ -139,14 +162,17 @@ async def startup():
         print(f"[Startup Sync] Error: {e}")
 
     # Start background sync tasks
-    read_task = asyncio.create_task(background_zoho_read_sync())
+    # Use page sync (0 API calls) instead of API-based read sync
+    page_sync_task = asyncio.create_task(background_page_sync())
     write_task = asyncio.create_task(background_zoho_write_sync())
-    _background_tasks.extend([read_task, write_task])
-    print("[Background Sync] Started smart read (30s) and write (30s) sync tasks")
+    _background_tasks.extend([page_sync_task, write_task])
+    print("[Background Sync] Started page sync (30s, 0 API calls) and write (30s) sync tasks")
 
 @app.on_event("shutdown")
 async def shutdown():
     """Close database connection on shutdown"""
+    global _page_sync_service
+
     # Cancel background tasks
     for task in _background_tasks:
         task.cancel()
@@ -154,6 +180,10 @@ async def shutdown():
             await task
         except asyncio.CancelledError:
             pass
+
+    # Close page sync service (Playwright browser)
+    if _page_sync_service:
+        await _page_sync_service.close()
 
     await zoho_db.disconnect()
     await zoho_api.close()
