@@ -650,11 +650,13 @@ def get_inventory_items(item_type: str = ""):
             # If no rotation from Zoho and we have a 3D model, check database for saved default
             if front_rotation is None and model_3d:
                 try:
-                    saved_rotation = zoho_db.execute('''
-                        SELECT rotation FROM model_default_rotations WHERE model3d = ?
-                    ''', (model_3d,)).fetchone()
-                    if saved_rotation:
-                        front_rotation = saved_rotation[0]
+                    async with zoho_db._connection.cursor() as cursor:
+                        await cursor.execute('''
+                            SELECT rotation FROM model_default_rotations WHERE model3d = ?
+                        ''', (model_3d,))
+                        saved_rotation = await cursor.fetchone()
+                        if saved_rotation:
+                            front_rotation = saved_rotation[0]
                 except:
                     pass  # Table may not exist yet, that's okay
 
@@ -704,28 +706,31 @@ async def save_default_rotation(request: Request):
             return JSONResponse({'success': False, 'error': 'Missing model3d or rotation'}, status_code=400)
 
         # Create table if it doesn't exist
-        zoho_db.execute('''
-            CREATE TABLE IF NOT EXISTS model_default_rotations (
-                model3d TEXT PRIMARY KEY,
-                rotation REAL NOT NULL,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
+        async with zoho_db._connection.cursor() as cursor:
+            await cursor.execute('''
+                CREATE TABLE IF NOT EXISTS model_default_rotations (
+                    model3d TEXT PRIMARY KEY,
+                    rotation REAL NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
 
-        # Insert or update the rotation
-        zoho_db.execute('''
-            INSERT INTO model_default_rotations (model3d, rotation, updated_at)
-            VALUES (?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(model3d) DO UPDATE SET
-                rotation = excluded.rotation,
-                updated_at = CURRENT_TIMESTAMP
-        ''', (model3d, rotation))
+            # Insert or update the rotation
+            await cursor.execute('''
+                INSERT INTO model_default_rotations (model3d, rotation, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(model3d) DO UPDATE SET
+                    rotation = excluded.rotation,
+                    updated_at = CURRENT_TIMESTAMP
+            ''', (model3d, rotation))
 
-        zoho_db.commit()
+        await zoho_db._connection.commit()
 
         return JSONResponse({'success': True, 'model3d': model3d, 'rotation': rotation})
     except Exception as e:
         print(f"Error saving default rotation: {e}")
+        import traceback
+        traceback.print_exc()
         return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
 
 
@@ -733,9 +738,11 @@ async def save_default_rotation(request: Request):
 async def get_default_rotation(model3d: str):
     """Get default rotation for a 3D model"""
     try:
-        result = zoho_db.execute('''
-            SELECT rotation FROM model_default_rotations WHERE model3d = ?
-        ''', (model3d,)).fetchone()
+        async with zoho_db._connection.cursor() as cursor:
+            await cursor.execute('''
+                SELECT rotation FROM model_default_rotations WHERE model3d = ?
+            ''', (model3d,))
+            result = await cursor.fetchone()
 
         if result:
             return JSONResponse({'success': True, 'rotation': result[0]})
