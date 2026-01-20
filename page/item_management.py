@@ -13,7 +13,7 @@ ZOHO_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 
 # Initialize FastHTML app
 item_management_app, rt = fast_app(
-    live=True,  # Always enable live reload
+    live=False,  # Disable live reload for sub-app (main app already has it)
     hdrs=[
         Theme.blue.headers(daisy=True),
         Meta(name="viewport", content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"),

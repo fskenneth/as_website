@@ -644,6 +644,9 @@ def get_inventory_items(item_type: str = ""):
             depth = parse_dimension(item['Item_Depth'])
             height = parse_dimension(item['Item_Height'])
 
+            # Get front rotation if available (in radians)
+            front_rotation = parse_dimension(item.get('Front_Rotation')) if item.get('Front_Rotation') else None
+
             if name not in items_data:
                 items_data[name] = {
                     'name': name,
@@ -669,7 +672,7 @@ def get_inventory_items(item_type: str = ""):
                     'width': width,
                     'depth': depth,
                     'height': height,
-                    'front_rotation': None  # Default to null, frontend uses Math.PI (180°) as default
+                    'front_rotation': front_rotation  # Rotation in radians, frontend uses -Math.PI/2 as default if null
                 })
 
         return JSONResponse({'success': True, 'items': list(items_data.values())})
