@@ -3092,10 +3092,9 @@ def property_type_selector():
                                 <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
                             </svg>
                         </button>
-                        <button class="model-control-btn" id="btn-duplicate" title="Duplicate model">
+                        <button class="model-control-btn" id="btn-set-default" title="Set as default rotation">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
                             </svg>
                         </button>
                         <button class="model-control-btn model-control-danger" id="btn-delete" title="Delete model">
@@ -3122,7 +3121,7 @@ def property_type_selector():
                 const btnRotate = overlay.querySelector('#btn-rotate');
                 const btnScale = overlay.querySelector('#btn-scale');
                 const btnTilt = overlay.querySelector('#btn-tilt');
-                const btnDuplicate = overlay.querySelector('#btn-duplicate');
+                const btnSetDefault = overlay.querySelector('#btn-set-default');
                 const btnDelete = overlay.querySelector('#btn-delete');
 
                 // Brightness control - mouse
@@ -3179,16 +3178,16 @@ def property_type_selector():
                     e.preventDefault();
                 }, { passive: false });
 
-                // Duplicate - click and touch
-                btnDuplicate.addEventListener('click', () => {
+                // Set Default Rotation - click and touch
+                btnSetDefault.addEventListener('click', () => {
                     if (currentLoadedModel) {
-                        duplicateCurrentModel();
+                        setDefaultRotation();
                     }
                 });
-                btnDuplicate.addEventListener('touchend', (e) => {
+                btnSetDefault.addEventListener('touchend', (e) => {
                     e.preventDefault();
                     if (currentLoadedModel) {
-                        duplicateCurrentModel();
+                        setDefaultRotation();
                     }
                 });
 
@@ -3444,26 +3443,46 @@ def property_type_selector():
                 return 1.0;
             }
 
-            function duplicateCurrentModel() {
-                if (!currentLoadedModel || !threeScene) return;
+            async function setDefaultRotation() {
+                if (!currentLoadedModel) return;
 
-                const userData = currentLoadedModel.userData;
-                const newModel = currentLoadedModel.clone();
+                const model3d = currentLoadedModel.userData.model3d;
+                const rotation = currentLoadedModel.rotation.y;
 
-                // Offset position slightly
-                newModel.position.x += 0.3;
-                newModel.position.y += 0.1;
+                if (!model3d) {
+                    alert('Unable to identify model');
+                    return;
+                }
 
-                // Copy and update userData
-                newModel.userData = { ...userData, instanceId: allLoadedModels.length };
+                try {
+                    const response = await fetch('/api/save-default-rotation', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model3d: model3d,
+                            rotation: rotation
+                        })
+                    });
 
-                threeScene.add(newModel);
-                allLoadedModels.push(newModel);
-                currentLoadedModel = newModel;
+                    const result = await response.json();
 
-                // Update render order for all models
-                updateAllModelsRenderOrder();
-                saveModelStates();
+                    if (result.success) {
+                        // Visual feedback
+                        const btn = document.querySelector('#btn-set-default');
+                        const originalColor = btn.style.backgroundColor;
+                        btn.style.backgroundColor = '#4CAF50';
+                        setTimeout(() => {
+                            btn.style.backgroundColor = originalColor;
+                        }, 500);
+
+                        console.log(`Saved default rotation for ${model3d}: ${rotation} radians`);
+                    } else {
+                        alert('Failed to save default rotation');
+                    }
+                } catch (error) {
+                    console.error('Error saving default rotation:', error);
+                    alert('Error saving default rotation');
+                }
             }
 
             function deleteCurrentModel() {

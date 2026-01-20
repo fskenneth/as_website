@@ -644,8 +644,19 @@ def get_inventory_items(item_type: str = ""):
             depth = parse_dimension(item['Item_Depth'])
             height = parse_dimension(item['Item_Height'])
 
-            # Get front rotation if available (in radians)
+            # Get front rotation from Zoho field or saved defaults
             front_rotation = parse_dimension(item.get('Front_Rotation')) if item.get('Front_Rotation') else None
+
+            # If no rotation from Zoho and we have a 3D model, check database for saved default
+            if front_rotation is None and model_3d:
+                try:
+                    saved_rotation = zoho_db.execute('''
+                        SELECT rotation FROM model_default_rotations WHERE model3d = ?
+                    ''', (model_3d,)).fetchone()
+                    if saved_rotation:
+                        front_rotation = saved_rotation[0]
+                except:
+                    pass  # Table may not exist yet, that's okay
 
             if name not in items_data:
                 items_data[name] = {
@@ -678,6 +689,60 @@ def get_inventory_items(item_type: str = ""):
         return JSONResponse({'success': True, 'items': list(items_data.values())})
     except Exception as e:
         print(f"Error getting inventory items: {e}")
+        return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+
+
+@rt('/api/save-default-rotation', methods=['POST'])
+async def save_default_rotation(request: Request):
+    """Save default rotation for a 3D model"""
+    try:
+        data = await request.json()
+        model3d = data.get('model3d')
+        rotation = data.get('rotation')
+
+        if not model3d or rotation is None:
+            return JSONResponse({'success': False, 'error': 'Missing model3d or rotation'}, status_code=400)
+
+        # Create table if it doesn't exist
+        zoho_db.execute('''
+            CREATE TABLE IF NOT EXISTS model_default_rotations (
+                model3d TEXT PRIMARY KEY,
+                rotation REAL NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # Insert or update the rotation
+        zoho_db.execute('''
+            INSERT INTO model_default_rotations (model3d, rotation, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(model3d) DO UPDATE SET
+                rotation = excluded.rotation,
+                updated_at = CURRENT_TIMESTAMP
+        ''', (model3d, rotation))
+
+        zoho_db.commit()
+
+        return JSONResponse({'success': True, 'model3d': model3d, 'rotation': rotation})
+    except Exception as e:
+        print(f"Error saving default rotation: {e}")
+        return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+
+
+@rt('/api/get-default-rotation/{model3d}')
+async def get_default_rotation(model3d: str):
+    """Get default rotation for a 3D model"""
+    try:
+        result = zoho_db.execute('''
+            SELECT rotation FROM model_default_rotations WHERE model3d = ?
+        ''', (model3d,)).fetchone()
+
+        if result:
+            return JSONResponse({'success': True, 'rotation': result[0]})
+        else:
+            return JSONResponse({'success': False, 'error': 'No default rotation found'}, status_code=404)
+    except Exception as e:
+        print(f"Error getting default rotation: {e}")
         return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
 
 
