@@ -388,7 +388,60 @@ item_management_app, rt = fast_app(
             .model-3d-control-btn svg {
                 width: 20px;
                 height: 20px;
+                min-width: 20px;
+                min-height: 20px;
+                flex-shrink: 0;
                 stroke: #333;
+                display: block;
+            }
+
+            .model-3d-controls-divider {
+                width: 1px;
+                height: 24px;
+                background: #d0d0d0;
+                margin: 8px 4px;
+            }
+
+            .model-3d-brightness-control {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .model-3d-brightness-control svg {
+                width: 20px;
+                height: 20px;
+                stroke: #333;
+                flex-shrink: 0;
+            }
+
+            .model-3d-brightness-slider {
+                width: 80px;
+                height: 4px;
+                -webkit-appearance: none;
+                appearance: none;
+                background: #d0d0d0;
+                border-radius: 2px;
+                outline: none;
+            }
+
+            .model-3d-brightness-slider::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                appearance: none;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: #333;
+                cursor: pointer;
+            }
+
+            .model-3d-brightness-slider::-moz-range-thumb {
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: #333;
+                cursor: pointer;
+                border: none;
             }
 
             .model-3d-loading {
@@ -856,17 +909,18 @@ async def get(request):
                 Div(id="model-3d-canvas"),
                 Div(
                     Button(
-                        NotStr('''<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                        NotStr('''<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                            <path d="M3 3v5h5"/>
                         </svg>'''),
                         cls="model-3d-control-btn",
                         onclick="resetModelView()",
                         title="Reset View"
                     ),
                     Button(
-                        NotStr('''<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        NotStr('''<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="11" cy="11" r="8"/>
-                            <path d="M21 21l-4.35-4.35"/>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
                             <line x1="11" y1="8" x2="11" y2="14"/>
                             <line x1="8" y1="11" x2="14" y2="11"/>
                         </svg>'''),
@@ -875,14 +929,42 @@ async def get(request):
                         title="Zoom In"
                     ),
                     Button(
-                        NotStr('''<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        NotStr('''<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="11" cy="11" r="8"/>
-                            <path d="M21 21l-4.35-4.35"/>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
                             <line x1="8" y1="11" x2="14" y2="11"/>
                         </svg>'''),
                         cls="model-3d-control-btn",
                         onclick="zoomOut3D()",
                         title="Zoom Out"
+                    ),
+                    # Divider
+                    Div(cls="model-3d-controls-divider"),
+                    # Brightness control
+                    Div(
+                        NotStr('''<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="5"/>
+                            <line x1="12" y1="1" x2="12" y2="3"/>
+                            <line x1="12" y1="21" x2="12" y2="23"/>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                            <line x1="1" y1="12" x2="3" y2="12"/>
+                            <line x1="21" y1="12" x2="23" y2="12"/>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                        </svg>'''),
+                        Input(
+                            type="range",
+                            min="0.5",
+                            max="3",
+                            step="0.1",
+                            value="1.5",
+                            cls="model-3d-brightness-slider",
+                            id="brightness-slider",
+                            oninput="adjustBrightness3D(this.value)",
+                            title="Adjust Brightness"
+                        ),
+                        cls="model-3d-brightness-control"
                     ),
                     cls="model-3d-controls"
                 ),
@@ -1137,6 +1219,43 @@ async def get(request):
                 }
             });
 
+            // Transform files.zohopublic.com URLs to creatorexport.zoho.com format
+            function transformZohoImageUrl(url, fieldName) {
+                if (!url || !url.includes('files.zohopublic.com')) {
+                    return url;
+                }
+
+                try {
+                    // Extract the x-cli-msg parameter
+                    const urlObj = new URL(url);
+                    const cliMsg = urlObj.searchParams.get('x-cli-msg');
+                    if (!cliMsg) return url;
+
+                    // Decode base64 then URL decode
+                    const decoded = decodeURIComponent(atob(cliMsg));
+                    const data = JSON.parse(decoded);
+
+                    // Extract needed info
+                    const recordId = data.recordid;
+                    const filepath = data.filepath;
+                    const reportName = 'Item_Report';
+
+                    if (!recordId || !filepath) return url;
+
+                    // Extract timestamp from filepath (e.g., "1684870719493" from "1684870719493_710")
+                    const timestamp = filepath.split('_')[0];
+
+                    // Construct the working URL format: timestamp_fieldName.jpg
+                    const privateKey = 'nRxUJtEBFywkxJJ2RNwqbbG9FTZ8QZ0wzde3u0fh5p58fbPt9Kzr06ntwR9vGeJwO63SOMJtQSMY54X3TzMvP4gqOTR14mDDnZNx';
+                    const filename = timestamp + '_' + fieldName + '.jpg';
+
+                    return `https://creatorexport.zoho.com/file/astrastaging/staging-manager/${reportName}/${recordId}/${fieldName}/image-download/${privateKey}?filepath=/${filename}`;
+                } catch (e) {
+                    console.error('Error transforming URL:', e);
+                    return url;
+                }
+            }
+
             async function showImageModal(itemId) {
                 try {
                     const response = await fetch(`/item_management/get_item_details/${itemId}`);
@@ -1148,21 +1267,76 @@ async def get(request):
                     }
 
                     const imageModalContent = document.getElementById('image-modal-content');
-                    imageModalContent.innerHTML = `
-                        <div style="flex: 1; text-align: center;">
-                            <label class="block font-bold mb-2">Original Image</label>
-                            <img src="${item.Item_Image}" style="max-width: 100%; max-height: 80vh; background-color: white; border-radius: 4px;">
-                        </div>
-                        <div style="flex: 1; text-align: center;">
-                            <label class="block font-bold mb-2">Resized Image</label>
-                            <img src="${item.Resized_Image}" style="max-width: 100%; max-height: 80vh; background-color: white; border-radius: 4px;">
-                        </div>
-                    `;
+                    // Transform only Item_Image URL (files.zohopublic.com returns 403 for Item_Image but 200 for Resized_Image)
+                    const originalUrl = transformZohoImageUrl(item.Item_Image, 'Item_Image');
+                    const resizedUrl = item.Resized_Image; // Resized_Image works directly without transformation
+
+                    // Check if both URLs are different and both exist
+                    const showBothImages = originalUrl && resizedUrl && originalUrl !== resizedUrl;
+
+                    if (showBothImages) {
+                        imageModalContent.innerHTML = `
+                            <div id="original-image-container" style="flex: 1; text-align: center;">
+                                <label class="block font-bold mb-2">Original Image</label>
+                                <img id="original-image" src="${originalUrl}" style="max-width: 100%; max-height: 80vh; background-color: white; border-radius: 4px;" onerror="handleOriginalImageError(this)">
+                            </div>
+                            <div id="resized-image-container" style="flex: 1; text-align: center;">
+                                <label class="block font-bold mb-2">Resized Image</label>
+                                <img id="resized-image" src="${resizedUrl}" style="max-width: 100%; max-height: 80vh; background-color: white; border-radius: 4px;" onerror="handleResizedImageError(this)">
+                            </div>
+                        `;
+                    } else {
+                        // Only show one image - centered
+                        const imageUrl = resizedUrl || originalUrl;
+                        imageModalContent.innerHTML = `
+                            <div style="width: 100%; display: flex; justify-content: center;">
+                                <img src="${imageUrl}" style="max-width: 100%; max-height: 80vh; background-color: white; border-radius: 4px;">
+                            </div>
+                        `;
+                    }
 
                     document.getElementById('image-modal').style.display = 'flex';
                 } catch (error) {
                     console.error('Error loading item images:', error);
                     alert('Error loading item images');
+                }
+            }
+
+            // Handle original image load errors - hide the original and center the resized
+            function handleOriginalImageError(img) {
+                const originalContainer = document.getElementById('original-image-container');
+                const resizedContainer = document.getElementById('resized-image-container');
+                if (originalContainer) {
+                    originalContainer.style.display = 'none';
+                }
+                if (resizedContainer) {
+                    resizedContainer.style.flex = 'none';
+                    resizedContainer.style.width = '100%';
+                    resizedContainer.style.display = 'flex';
+                    resizedContainer.style.flexDirection = 'column';
+                    resizedContainer.style.alignItems = 'center';
+                    // Remove the label when showing single image
+                    const label = resizedContainer.querySelector('label');
+                    if (label) label.style.display = 'none';
+                }
+            }
+
+            // Handle resized image load errors - hide the resized and center the original
+            function handleResizedImageError(img) {
+                const originalContainer = document.getElementById('original-image-container');
+                const resizedContainer = document.getElementById('resized-image-container');
+                if (resizedContainer) {
+                    resizedContainer.style.display = 'none';
+                }
+                if (originalContainer) {
+                    originalContainer.style.flex = 'none';
+                    originalContainer.style.width = '100%';
+                    originalContainer.style.display = 'flex';
+                    originalContainer.style.flexDirection = 'column';
+                    originalContainer.style.alignItems = 'center';
+                    // Remove the label when showing single image
+                    const label = originalContainer.querySelector('label');
+                    if (label) label.style.display = 'none';
                 }
             }
 
@@ -1239,6 +1413,16 @@ async def get(request):
             let controls3D = null;
             let currentModel3D = null;
             let animationId3D = null;
+            let ambientLight3D = null;
+            let directionalLight1_3D = null;
+            let directionalLight2_3D = null;
+            let currentModelFile3D = null;
+            let currentBrightness3D = 2.5;
+
+            // Base values for 3D viewer
+            const BASE_ROTATION_Y = -Math.PI / 2;  // Front-facing rotation
+            const BASE_TILT = 0;                   // No tilt for upright view in 3D viewer
+            const BASE_BRIGHTNESS = 2.5;           // Default brightness
 
             // Load Three.js libraries dynamically
             function loadThreeJs() {
@@ -1303,17 +1487,17 @@ async def get(request):
                 controls3D.minDistance = 0.5;
                 controls3D.maxDistance = 10;
 
-                // Add lighting
-                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-                scene3D.add(ambientLight);
+                // Add lighting (store references for brightness control)
+                ambientLight3D = new THREE.AmbientLight(0xffffff, 0.6);
+                scene3D.add(ambientLight3D);
 
-                const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
-                directionalLight1.position.set(5, 10, 7.5);
-                scene3D.add(directionalLight1);
+                directionalLight1_3D = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight1_3D.position.set(5, 10, 7.5);
+                scene3D.add(directionalLight1_3D);
 
-                const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
-                directionalLight2.position.set(-5, 5, -5);
-                scene3D.add(directionalLight2);
+                directionalLight2_3D = new THREE.DirectionalLight(0xffffff, 0.4);
+                directionalLight2_3D.position.set(-5, 5, -5);
+                scene3D.add(directionalLight2_3D);
 
                 // Add subtle ground shadow
                 const groundGeometry = new THREE.PlaneGeometry(10, 10);
@@ -1348,6 +1532,9 @@ async def get(request):
                 const loader = new THREE.GLTFLoader();
                 const modelUrl = '/static/models/' + modelFile;
 
+                // Store current model file
+                currentModelFile3D = modelFile;
+
                 loader.load(
                     modelUrl,
                     (gltf) => {
@@ -1378,19 +1565,33 @@ async def get(request):
                         const scale = 2 / maxDim;
                         currentModel3D.scale.multiplyScalar(scale);
 
-                        // Center the model
+                        // Center horizontally, but position so bottom (feet) sits at floor level
                         currentModel3D.position.x = -center.x * scale;
-                        currentModel3D.position.y = -center.y * scale;
+                        currentModel3D.position.y = -box.min.y * scale;  // Bottom at y=0
                         currentModel3D.position.z = -center.z * scale;
+
+                        // Calculate model center height for camera target
+                        const modelCenterY = (size.y * scale) / 2;
+
+                        // Apply base rotation and tilt
+                        currentModel3D.rotation.y = BASE_ROTATION_Y;
+                        currentModel3D.rotation.x = BASE_TILT;
+
+                        // Position camera at model center height
+                        camera3D.position.set(0, modelCenterY, 4.5);
+
+                        // Set brightness to base
+                        currentBrightness3D = BASE_BRIGHTNESS;
+                        document.getElementById('brightness-slider').value = BASE_BRIGHTNESS;
+                        applyBrightness(BASE_BRIGHTNESS);
 
                         scene3D.add(currentModel3D);
 
                         // Hide loading indicator
                         document.getElementById('model-3d-loading').style.display = 'none';
 
-                        // Adjust camera position
-                        camera3D.position.set(0, 1, 3);
-                        controls3D.target.set(0, 0, 0);
+                        // Look at model center, not floor
+                        controls3D.target.set(0, modelCenterY, 0);
                         controls3D.update();
                     },
                     (progress) => {
@@ -1402,6 +1603,20 @@ async def get(request):
                         document.getElementById('model-3d-loading').innerHTML = '<span style="color: #dc3545;">Error loading 3D model</span>';
                     }
                 );
+            }
+
+            // Apply brightness to all lights
+            function applyBrightness(value) {
+                const brightness = parseFloat(value);
+                if (ambientLight3D) ambientLight3D.intensity = 0.6 * brightness;
+                if (directionalLight1_3D) directionalLight1_3D.intensity = 0.8 * brightness;
+                if (directionalLight2_3D) directionalLight2_3D.intensity = 0.4 * brightness;
+            }
+
+            // Adjust brightness (called from slider)
+            function adjustBrightness3D(value) {
+                currentBrightness3D = parseFloat(value);
+                applyBrightness(value);
             }
 
             // Show 3D modal
@@ -1465,7 +1680,7 @@ async def get(request):
             // Reset model view
             function resetModelView() {
                 if (camera3D && controls3D) {
-                    camera3D.position.set(0, 1, 3);
+                    camera3D.position.set(0, 0.5, 3);
                     controls3D.target.set(0, 0, 0);
                     controls3D.update();
                 }

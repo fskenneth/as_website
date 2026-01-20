@@ -2520,12 +2520,15 @@ def property_type_selector():
                 }
                 container.appendChild(threeRenderer.domElement);
 
-                // Lights
-                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                // Lights - brighter to illuminate 3D models properly
+                const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
                 threeScene.add(ambientLight);
-                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-                directionalLight.position.set(5, 10, 7);
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+                directionalLight.position.set(5, 10, 7.5);
                 threeScene.add(directionalLight);
+                const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.6);
+                directionalLight2.position.set(-5, 5, -5);
+                threeScene.add(directionalLight2);
 
                 // Mark container as 3D mode
                 container.classList.add('photo-3d-mode');
@@ -2865,8 +2868,8 @@ def property_type_selector():
                     model.position.set(worldX, worldY, 0);
 
                     // Apply front rotation so model faces the user
-                    // frontRotation defines the model's default facing direction (default: -90° to face camera)
-                    const frontRotation = itemData.frontRotation ?? -Math.PI/2;
+                    let frontRotation = itemData.frontRotation ?? -Math.PI/2;
+
                     // Get initial zone and rotation based on drop position
                     const initialZone = getPositionZone(worldX);
                     const initialRotation = getRotationForZone(initialZone, frontRotation);
@@ -2874,6 +2877,9 @@ def property_type_selector():
 
                     // Apply default tilt
                     model.rotation.x = DEFAULT_TILT;
+
+                    // Use default brightness
+                    const modelBrightness = 2.5;
 
                     // Store item data
                     model.userData = {
@@ -2887,7 +2893,7 @@ def property_type_selector():
                         yRotation: initialRotation, // Start from position-based rotation
                         positionZone: initialZone, // Track current zone for rotation changes
                         tilt: DEFAULT_TILT,
-                        brightness: 2.5,
+                        brightness: modelBrightness,
                         baseScale: targetScale,
                         instanceId: allLoadedModels.length
                     };
@@ -2900,7 +2906,7 @@ def property_type_selector():
                     updateModelDepthFromY(model);
 
                     // Update brightness
-                    updateModelBrightness(model, 2.5);
+                    updateModelBrightness(model, modelBrightness);
 
                     // Show controls for the newly dropped model
                     showModelControls(true);
@@ -2924,6 +2930,70 @@ def property_type_selector():
                         });
                     }
                 });
+            }
+
+            function showBrightnessSlider(show) {
+                const slider = current3DViewerContainer?.querySelector('#brightness-slider');
+                const buttonGroup = current3DViewerContainer?.querySelector('.model-control-group');
+                const btnBrightness = current3DViewerContainer?.querySelector('#btn-brightness');
+
+                if (slider && buttonGroup && btnBrightness) {
+                    if (show && currentLoadedModel) {
+                        const brightness = currentLoadedModel.userData.brightness ?? 2.5;
+                        const thumbPercent = brightness / 2.5; // 0 to 1
+
+                        // Get button center position BEFORE hiding the button group
+                        const container = current3DViewerContainer;
+                        const containerRect = container.getBoundingClientRect();
+                        const btnRect = btnBrightness.getBoundingClientRect();
+                        const btnCenterX = btnRect.left + btnRect.width / 2 - containerRect.left;
+
+                        // Get button top position for vertical alignment
+                        const btnTop = btnRect.top - containerRect.top;
+
+                        // Slider track width (200px from CSS, minus padding 15px each side = 170px track)
+                        const sliderWidth = 200;
+                        const paddingLeft = 15;
+                        const trackWidth = sliderWidth - paddingLeft * 2;
+
+                        // Calculate where thumb would be within the track
+                        const thumbOffsetInTrack = thumbPercent * trackWidth;
+
+                        // Position slider so thumb aligns with button center
+                        // Position relative to container (not overlay)
+                        const sliderLeft = btnCenterX - paddingLeft - thumbOffsetInTrack;
+
+                        // Move slider out of overlay and into container for proper positioning
+                        slider.style.position = 'absolute';
+                        slider.style.left = sliderLeft + 'px';
+                        slider.style.top = btnTop + 'px';
+                        slider.style.transform = 'none';
+                        slider.style.display = 'block';
+                        slider.style.zIndex = '25';
+
+                        // Move slider to container if it's still in overlay
+                        if (slider.parentElement !== container) {
+                            container.appendChild(slider);
+                        }
+
+                        // Hide buttons AFTER getting position
+                        buttonGroup.style.display = 'none';
+
+                        updateBrightnessSliderPosition(brightness);
+                    } else {
+                        slider.style.display = 'none';
+                        buttonGroup.style.display = 'flex';
+                    }
+                }
+            }
+
+            function updateBrightnessSliderPosition(brightness) {
+                const thumb = current3DViewerContainer?.querySelector('#brightness-slider-thumb');
+                if (thumb) {
+                    // brightness ranges from 0 to 2.5, convert to percentage
+                    const percent = (brightness / 2.5) * 100;
+                    thumb.style.left = percent + '%';
+                }
             }
 
             // Update model depth based on lowest Y point
@@ -3000,12 +3070,6 @@ def property_type_selector():
                 overlay.style.display = 'none'; // Hidden until a model is clicked
                 overlay.innerHTML = `
                     <div class="model-control-group">
-                        <button class="model-control-btn" id="btn-brightness" title="Brightness - Drag left/right">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="5"/>
-                                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-                            </svg>
-                        </button>
                         <button class="model-control-btn" id="btn-rotate" title="Rotate - Drag left/right">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
@@ -3014,6 +3078,12 @@ def property_type_selector():
                         <button class="model-control-btn" id="btn-tilt" title="Tilt - Drag up/down">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M12 2v20M8 6l4-4 4 4M8 18l4 4 4-4"/>
+                            </svg>
+                        </button>
+                        <button class="model-control-btn" id="btn-brightness" title="Brightness - Drag left/right">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="5"/>
+                                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
                             </svg>
                         </button>
                         <button class="model-control-btn" id="btn-scale" title="Scale - Drag up/down">
@@ -3032,6 +3102,12 @@ def property_type_selector():
                                 <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
                             </svg>
                         </button>
+                    </div>
+                    <div class="brightness-slider" id="brightness-slider" style="display: none;">
+                        <div class="brightness-slider-track">
+                            <div class="brightness-slider-fill" id="brightness-slider-fill"></div>
+                            <div class="brightness-slider-thumb" id="brightness-slider-thumb"></div>
+                        </div>
                     </div>
                 `;
                 container.appendChild(overlay);
@@ -3052,12 +3128,14 @@ def property_type_selector():
                 btnBrightness.addEventListener('mousedown', (e) => {
                     isDraggingBrightness = true;
                     lastMouseX = e.clientX;
+                    showBrightnessSlider(true);
                     e.preventDefault();
                 });
                 // Brightness control - touch
                 btnBrightness.addEventListener('touchstart', (e) => {
                     isDraggingBrightness = true;
                     lastMouseX = e.touches[0].clientX;
+                    showBrightnessSlider(true);
                     e.preventDefault();
                 }, { passive: false });
 
@@ -3139,11 +3217,15 @@ def property_type_selector():
                 if (!currentLoadedModel) return;
 
                 if (isDraggingBrightness) {
-                    const delta = (e.clientX - lastMouseX) * 0.01;
-                    lastMouseX = e.clientX;
-                    const newBrightness = Math.max(0, Math.min(2.5, (currentLoadedModel.userData.brightness || 2.5) + delta));
-                    currentLoadedModel.userData.brightness = newBrightness;
-                    updateModelBrightness(currentLoadedModel, newBrightness);
+                    const sliderTrack = current3DViewerContainer?.querySelector('.brightness-slider-track');
+                    if (sliderTrack) {
+                        const rect = sliderTrack.getBoundingClientRect();
+                        const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                        const newBrightness = percent * 2.5;
+                        currentLoadedModel.userData.brightness = newBrightness;
+                        updateModelBrightness(currentLoadedModel, newBrightness);
+                        updateBrightnessSliderPosition(newBrightness);
+                    }
                 }
 
                 if (isDraggingRotate) {
@@ -3177,6 +3259,7 @@ def property_type_selector():
 
             function handleModelControlMouseUp() {
                 const wasScaling = isDraggingScale;
+                const wasBrightness = isDraggingBrightness;
                 isDraggingBrightness = false;
                 isDraggingRotate = false;
                 isDraggingScale = false;
@@ -3184,6 +3267,10 @@ def property_type_selector():
                 // Recalculate bar position if we were scaling
                 if (wasScaling) {
                     updateControlOverlayPosition(true);
+                }
+                // Hide brightness slider
+                if (wasBrightness) {
+                    showBrightnessSlider(false);
                 }
                 // Save state after control ends
                 saveModelStates();
@@ -3196,11 +3283,15 @@ def property_type_selector():
                 const touch = e.touches[0];
 
                 if (isDraggingBrightness) {
-                    const delta = (touch.clientX - lastMouseX) * 0.01;
-                    lastMouseX = touch.clientX;
-                    const newBrightness = Math.max(0, Math.min(2.5, (currentLoadedModel.userData.brightness || 2.5) + delta));
-                    currentLoadedModel.userData.brightness = newBrightness;
-                    updateModelBrightness(currentLoadedModel, newBrightness);
+                    const sliderTrack = current3DViewerContainer?.querySelector('.brightness-slider-track');
+                    if (sliderTrack) {
+                        const rect = sliderTrack.getBoundingClientRect();
+                        const percent = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+                        const newBrightness = percent * 2.5;
+                        currentLoadedModel.userData.brightness = newBrightness;
+                        updateModelBrightness(currentLoadedModel, newBrightness);
+                        updateBrightnessSliderPosition(newBrightness);
+                    }
                     e.preventDefault();
                 }
 
@@ -3235,6 +3326,7 @@ def property_type_selector():
 
             function handleModelControlTouchEnd() {
                 const wasScaling = isDraggingScale;
+                const wasBrightness = isDraggingBrightness;
                 isDraggingBrightness = false;
                 isDraggingRotate = false;
                 isDraggingScale = false;
@@ -3242,6 +3334,10 @@ def property_type_selector():
                 // Recalculate bar position if we were scaling
                 if (wasScaling) {
                     updateControlOverlayPosition(true);
+                }
+                // Hide brightness slider
+                if (wasBrightness) {
+                    showBrightnessSlider(false);
                 }
                 // Save state after control ends
                 saveModelStates();
@@ -3582,11 +3678,15 @@ def property_type_selector():
                 }
                 container.appendChild(threeRenderer.domElement);
 
-                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                // Lights - brighter to illuminate 3D models properly
+                const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
                 threeScene.add(ambientLight);
-                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-                directionalLight.position.set(5, 10, 7);
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+                directionalLight.position.set(5, 10, 7.5);
                 threeScene.add(directionalLight);
+                const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.6);
+                directionalLight2.position.set(-5, 5, -5);
+                threeScene.add(directionalLight2);
 
                 container.classList.add('photo-3d-mode');
                 addModelControlOverlay(container);
@@ -7337,6 +7437,43 @@ def get_property_selector_styles():
     .model-control-btn svg {
         width: 18px;
         height: 18px;
+    }
+
+    /* Brightness Slider */
+    .brightness-slider {
+        background: rgba(0, 0, 0, 0.7);
+        border-radius: 9999px;
+        padding: 10px 15px;
+        width: 200px;
+    }
+
+    .brightness-slider-track {
+        position: relative;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 9999px;
+    }
+
+    .brightness-slider-fill {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        background: linear-gradient(to right, #666, #fff);
+        border-radius: 4px;
+        width: 100%;
+    }
+
+    .brightness-slider-thumb {
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 16px;
+        height: 16px;
+        background: white;
+        border: 2px solid rgba(0, 0, 0, 0.3);
+        border-radius: 50%;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     /* Mobile adjustments for 3D controls */

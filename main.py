@@ -154,13 +154,6 @@ async def startup():
     # Initialize write service tables
     await write_service.init_tables()
 
-    # Run initial incremental sync on startup
-    try:
-        result = await sync_service.smart_incremental_sync('Item_Report')
-        print(f"[Startup Sync] Item_Report: {result.get('records_synced', 0)} records synced")
-    except Exception as e:
-        print(f"[Startup Sync] Error: {e}")
-
     # Start background sync tasks
     # Use page sync (0 API calls) instead of API-based read sync
     page_sync_task = asyncio.create_task(background_page_sync())
