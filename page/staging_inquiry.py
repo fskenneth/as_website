@@ -2174,6 +2174,10 @@ def property_type_selector():
             let touchDragData = null;
             let touchDragClone = null;
             let touchDragSource = null;
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let isDraggingItem = false;
+            const DRAG_THRESHOLD = 10; // pixels - movement needed to start drag
 
             function setupItemDragHandlers() {
                 // Desktop: Use event delegation on the document for drag events
@@ -2205,10 +2209,13 @@ def property_type_selector():
                 document.addEventListener('touchstart', function(e) {
                     const itemBtn = e.target.closest('.item-btn');
                     if (itemBtn && itemBtn.dataset.model3d && itemBtn.classList.contains('has-selected-image')) {
-                        // Prevent default to avoid context menu and text selection
-                        e.preventDefault();
-
                         const touch = e.touches[0];
+
+                        // Store start position but don't start drag yet
+                        touchStartX = touch.clientX;
+                        touchStartY = touch.clientY;
+                        isDraggingItem = false;
+
                         touchDragSource = itemBtn;
                         touchDragData = {
                             imageUrl: itemBtn.dataset.selectedImage,
@@ -2219,100 +2226,122 @@ def property_type_selector():
                             height: parseFloat(itemBtn.dataset.height) || 0,
                             frontRotation: parseFloat(itemBtn.dataset.frontRotation) || -Math.PI/2
                         };
-
-                        // Create visual drag clone
-                        const img = itemBtn.querySelector('.item-emoji img');
-                        if (img) {
-                            touchDragClone = document.createElement('div');
-                            touchDragClone.className = 'touch-drag-clone';
-                            touchDragClone.innerHTML = `<img src="${img.src}" alt="Dragging">`;
-                            touchDragClone.style.cssText = `
-                                position: fixed;
-                                left: ${touch.clientX - 40}px;
-                                top: ${touch.clientY - 40}px;
-                                width: 80px;
-                                height: 80px;
-                                z-index: 10000;
-                                pointer-events: none;
-                                opacity: 0.8;
-                                border-radius: 8px;
-                                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                                background: white;
-                            `;
-                            touchDragClone.querySelector('img').style.cssText = `
-                                width: 100%;
-                                height: 100%;
-                                object-fit: contain;
-                                border-radius: 8px;
-                            `;
-                            document.body.appendChild(touchDragClone);
-                        }
-
-                        itemBtn.classList.add('dragging');
-
-                        // Show drop zone hint
-                        const dropZone = document.querySelector('.items-photos-section');
-                        if (dropZone) dropZone.classList.add('drag-over-3d');
                     }
-                }, { passive: false });
+                }, { passive: true });
 
                 document.addEventListener('touchmove', function(e) {
-                    if (touchDragClone && touchDragData) {
+                    if (touchDragData && !isDraggingItem) {
+                        // Prevent scrolling immediately when touching a draggable item
+                        e.preventDefault();
+
+                        const touch = e.touches[0];
+                        const deltaX = Math.abs(touch.clientX - touchStartX);
+                        const deltaY = Math.abs(touch.clientY - touchStartY);
+
+                        // Check if movement exceeds threshold to start visual drag
+                        if (deltaX > DRAG_THRESHOLD || deltaY > DRAG_THRESHOLD) {
+                            isDraggingItem = true;
+
+                            // Create visual drag clone
+                            const itemBtn = touchDragSource;
+                            const img = itemBtn?.querySelector('.item-emoji img');
+                            if (img) {
+                                touchDragClone = document.createElement('div');
+                                touchDragClone.className = 'touch-drag-clone';
+                                touchDragClone.innerHTML = `<img src="${img.src}" alt="Dragging">`;
+                                touchDragClone.style.cssText = `
+                                    position: fixed;
+                                    left: ${touch.clientX - 40}px;
+                                    top: ${touch.clientY - 40}px;
+                                    width: 80px;
+                                    height: 80px;
+                                    z-index: 10000;
+                                    pointer-events: none;
+                                    opacity: 0.8;
+                                    border-radius: 8px;
+                                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                                    background: white;
+                                `;
+                                touchDragClone.querySelector('img').style.cssText = `
+                                    width: 100%;
+                                    height: 100%;
+                                    object-fit: contain;
+                                    border-radius: 8px;
+                                `;
+                                document.body.appendChild(touchDragClone);
+                            }
+
+                            itemBtn?.classList.add('dragging');
+
+                            // Show drop zone hint
+                            const dropZone = document.querySelector('.items-photos-section');
+                            if (dropZone) dropZone.classList.add('drag-over-3d');
+                        }
+                    } else if (touchDragClone && isDraggingItem) {
+                        // Already dragging, update clone position
+                        e.preventDefault();
                         const touch = e.touches[0];
                         touchDragClone.style.left = (touch.clientX - 40) + 'px';
                         touchDragClone.style.top = (touch.clientY - 40) + 'px';
                     }
-                }, { passive: true });
+                }, { passive: false });
 
                 document.addEventListener('touchend', async function(e) {
-                    if (touchDragData && touchDragClone) {
-                        const touch = e.changedTouches[0];
+                    if (touchDragData) {
+                        // Check if we actually dragged or just tapped
+                        if (isDraggingItem && touchDragClone) {
+                            // Was dragging - handle drop
+                            const touch = e.changedTouches[0];
 
-                        // Remove drag clone
-                        touchDragClone.remove();
-                        touchDragClone = null;
+                            // Remove drag clone
+                            touchDragClone.remove();
+                            touchDragClone = null;
 
-                        // Remove dragging class
-                        if (touchDragSource) {
-                            touchDragSource.classList.remove('dragging');
-                        }
+                            // Remove dragging class
+                            if (touchDragSource) {
+                                touchDragSource.classList.remove('dragging');
+                            }
 
-                        // Remove drop zone hint
-                        const dropZone = document.querySelector('.items-photos-section');
-                        if (dropZone) dropZone.classList.remove('drag-over-3d');
+                            // Remove drop zone hint
+                            const dropZone = document.querySelector('.items-photos-section');
+                            if (dropZone) dropZone.classList.remove('drag-over-3d');
 
-                        // Check if dropped on photo carousel
-                        const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
-                        const carouselContainer = dropTarget?.closest('.photos-carousel-container') ||
-                                                   dropTarget?.closest('.items-photos-section');
+                            // Check if dropped on photo carousel
+                            const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+                            const carouselContainer = dropTarget?.closest('.photos-carousel-container') ||
+                                                       dropTarget?.closest('.items-photos-section');
 
-                        if (carouselContainer) {
-                            // Check if we have a photo to use as background
-                            const photos = areaPhotos[currentArea] || [];
-                            if (photos.length === 0) {
-                                alert('Please add a photo first before dropping 3D models.');
-                            } else {
-                                // Get drop position relative to carousel container
-                                const container = document.getElementById('items-photos-carousel-container');
-                                const rect = container ? container.getBoundingClientRect() : null;
-                                let dropX = 0, dropY = 0;
-                                if (rect) {
-                                    // Convert to normalized coordinates (-1 to 1)
-                                    dropX = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
-                                    dropY = -(((touch.clientY - rect.top) / rect.height) * 2 - 1);
-                                }
-
-                                // Initialize or add to 3D scene
-                                if (current3DPhotoIndex !== currentItemsPhotoIndex) {
-                                    await initPhoto3DScene(currentItemsPhotoIndex, touchDragData, dropX, dropY);
+                            if (carouselContainer) {
+                                // Check if we have a photo to use as background
+                                const photos = areaPhotos[currentArea] || [];
+                                if (photos.length === 0) {
+                                    alert('Please add a photo first before dropping 3D models.');
                                 } else {
-                                    await loadGLTFModelOnPhoto(touchDragData, dropX, dropY);
+                                    // Get drop position relative to carousel container
+                                    const container = document.getElementById('items-photos-carousel-container');
+                                    const rect = container ? container.getBoundingClientRect() : null;
+                                    let dropX = 0, dropY = 0;
+                                    if (rect) {
+                                        // Convert to normalized coordinates (-1 to 1)
+                                        dropX = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+                                        dropY = -(((touch.clientY - rect.top) / rect.height) * 2 - 1);
+                                    }
+
+                                    // Initialize or add to 3D scene
+                                    if (current3DPhotoIndex !== currentItemsPhotoIndex) {
+                                        await initPhoto3DScene(currentItemsPhotoIndex, touchDragData, dropX, dropY);
+                                    } else {
+                                        await loadGLTFModelOnPhoto(touchDragData, dropX, dropY);
+                                    }
                                 }
                             }
                         }
+                        // If not dragging (just tapped), allow the click event to fire naturally
 
+                        // Reset state
                         touchDragData = null;
                         touchDragSource = null;
+                        isDraggingItem = false;
                     }
                 });
 
@@ -6029,21 +6058,22 @@ def get_property_selector_styles():
     /* Shutter Button */
     .shutter-btn {
         position: absolute;
-        bottom: 20px;
-        left: 50%;
+        top: 12px;
+        left: calc(50% - 88px);
         transform: translateX(-50%);
-        width: 70px;
-        height: 70px;
+        width: 36px;
+        height: 36px;
         border-radius: 50%;
-        background: #000000;
-        border: 4px solid white;
+        background: rgba(0, 0, 0, 0.5);
+        border: none;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         opacity: 1;
+        z-index: 25;
     }
 
     .shutter-btn.hidden {
@@ -6052,12 +6082,13 @@ def get_property_selector_styles():
     }
 
     .shutter-btn:hover {
-        background: #1a1a1a;
+        background: rgba(0, 0, 0, 0.7);
+        transform: translateX(-50%) scale(1.1);
     }
 
     .shutter-btn:focus {
         outline: none;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         -webkit-tap-highlight-color: transparent;
     }
 
@@ -6066,11 +6097,11 @@ def get_property_selector_styles():
     }
 
     .shutter-inner {
-        width: 54px;
-        height: 54px;
+        width: 20px;
+        height: 20px;
         border-radius: 50%;
         background: white;
-        border: 3px solid white;
+        border: 2px solid white;
         transition: all 0.15s ease;
     }
 
@@ -6171,7 +6202,8 @@ def get_property_selector_styles():
     .photo-rotate-btn {
         position: absolute;
         top: 12px;
-        right: 56px;
+        left: calc(50% + 44px);
+        transform: translateX(-50%);
         width: 36px;
         height: 36px;
         background: rgba(0, 0, 0, 0.5);
@@ -6195,13 +6227,14 @@ def get_property_selector_styles():
 
     .photo-rotate-btn:hover {
         background: rgba(0, 0, 0, 0.7);
-        transform: scale(1.1);
+        transform: translateX(-50%) scale(1.1);
     }
 
     .photo-delete-btn {
         position: absolute;
         top: 12px;
-        right: 12px;
+        left: calc(50% + 88px);
+        transform: translateX(-50%);
         width: 36px;
         height: 36px;
         background: rgba(220, 38, 38, 0.6);
@@ -6225,7 +6258,7 @@ def get_property_selector_styles():
 
     .photo-delete-btn:hover {
         background: rgba(220, 38, 38, 0.8);
-        transform: scale(1.1);
+        transform: translateX(-50%) scale(1.1);
     }
 
     .carousel-nav-btn {
@@ -6520,7 +6553,8 @@ def get_property_selector_styles():
     .photo-camera-inline-btn {
         position: absolute;
         top: 12px;
-        right: 188px;
+        left: calc(50% - 88px);
+        transform: translateX(-50%);
         width: 36px;
         height: 36px;
         border-radius: 50%;
@@ -6543,14 +6577,15 @@ def get_property_selector_styles():
 
     .photo-camera-inline-btn:hover {
         background: rgba(0, 0, 0, 0.7);
-        transform: scale(1.1);
+        transform: translateX(-50%) scale(1.1);
     }
 
     /* Upload button inline with rotate button - positioned to the left of rotate */
     .photo-upload-inline-btn {
         position: absolute;
         top: 12px;
-        right: 144px;
+        left: calc(50% - 44px);
+        transform: translateX(-50%);
         width: 36px;
         height: 36px;
         border-radius: 50%;
@@ -6573,13 +6608,14 @@ def get_property_selector_styles():
 
     .photo-upload-inline-btn:hover {
         background: rgba(0, 0, 0, 0.7);
-        transform: scale(1.1);
+        transform: translateX(-50%) scale(1.1);
     }
 
     .photo-brightness-btn {
         position: absolute;
         top: 12px;
-        right: 100px;
+        left: 50%;
+        transform: translateX(-50%);
         width: 36px;
         height: 36px;
         border-radius: 50%;
@@ -6602,7 +6638,7 @@ def get_property_selector_styles():
 
     .photo-brightness-btn:hover {
         background: rgba(0, 0, 0, 0.7);
-        transform: scale(1.1);
+        transform: translateX(-50%) scale(1.1);
     }
 
     .photo-brightness-btn:active {

@@ -608,14 +608,15 @@ def get_inventory_items(item_type: str = ""):
         params = []
 
         if item_type:
-            query += " AND Item_Type = ?"
+            # Filter by item name pattern (e.g., "Accent Chair" matches "Accent Chair 01052")
+            query += " AND (Item_Type = ? OR Item_Name LIKE ?)"
             params.append(item_type)
+            params.append(f"{item_type}%")
 
         query += " ORDER BY Item_Name"
 
         cursor.execute(query, params)
         items = cursor.fetchall()
-        conn.close()
 
         # Group by item name and get unique images
         items_data = {}
@@ -623,10 +624,22 @@ def get_inventory_items(item_type: str = ""):
             name = item['Item_Name']
             # Get image URL (prefer resized, then original)
             image_url = None
-            if item['Resized_Image'] and item['Resized_Image'] != 'blank.png' and item['Resized_Image'].startswith('http'):
-                image_url = item['Resized_Image']
-            elif item['Item_Image'] and item['Item_Image'] != 'blank.png' and item['Item_Image'].startswith('http'):
-                image_url = item['Item_Image']
+
+            # Helper to check if URL is valid
+            def is_valid_image_url(url):
+                if not url or url == 'blank.png' or url.strip() == '':
+                    return False
+                # Accept both http:// and https:// URLs
+                return url.strip().startswith('http://') or url.strip().startswith('https://')
+
+            # Try Resized_Image first, then fall back to Item_Image
+            if is_valid_image_url(item['Resized_Image']):
+                image_url = item['Resized_Image'].strip()
+            elif is_valid_image_url(item['Item_Image']):
+                image_url = item['Item_Image'].strip()
+            else:
+                # Log when no valid image found
+                print(f"No valid image for {name}: Resized_Image='{item['Resized_Image']}', Item_Image='{item['Item_Image']}'")
 
             # Get 3D model filename
             model_3d = item['Model_3D'] if item['Model_3D'] else None
@@ -645,7 +658,10 @@ def get_inventory_items(item_type: str = ""):
             height = parse_dimension(item['Item_Height'])
 
             # Get front rotation from Zoho field or saved defaults
-            front_rotation = parse_dimension(item.get('Front_Rotation')) if item.get('Front_Rotation') else None
+            try:
+                front_rotation = parse_dimension(item['Front_Rotation']) if item['Front_Rotation'] else None
+            except (KeyError, IndexError):
+                front_rotation = None
 
             # If no rotation from Zoho and we have a 3D model, check database for saved default
             if front_rotation is None and model_3d:
@@ -690,9 +706,12 @@ def get_inventory_items(item_type: str = ""):
                     'front_rotation': front_rotation  # Rotation in radians, frontend uses -Math.PI/2 as default if null
                 })
 
+        conn.close()
         return JSONResponse({'success': True, 'items': list(items_data.values())})
     except Exception as e:
         print(f"Error getting inventory items: {e}")
+        if 'conn' in locals():
+            conn.close()
         return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
 
 
