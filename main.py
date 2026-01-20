@@ -650,13 +650,13 @@ def get_inventory_items(item_type: str = ""):
             # If no rotation from Zoho and we have a 3D model, check database for saved default
             if front_rotation is None and model_3d:
                 try:
-                    async with zoho_db._connection.cursor() as cursor:
-                        await cursor.execute('''
-                            SELECT rotation FROM model_default_rotations WHERE model3d = ?
-                        ''', (model_3d,))
-                        saved_rotation = await cursor.fetchone()
-                        if saved_rotation:
-                            front_rotation = saved_rotation[0]
+                    saved_cursor = conn.cursor()
+                    saved_cursor.execute('''
+                        SELECT rotation FROM model_default_rotations WHERE model3d = ?
+                    ''', (model_3d,))
+                    saved_rotation = saved_cursor.fetchone()
+                    if saved_rotation:
+                        front_rotation = saved_rotation[0]
                 except:
                     pass  # Table may not exist yet, that's okay
 
