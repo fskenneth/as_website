@@ -657,7 +657,9 @@ def get_inventory_items(item_type: str = ""):
                     saved_rotation = saved_cursor.fetchone()
                     if saved_rotation:
                         front_rotation = saved_rotation[0]
-                except:
+                        print(f"Loaded saved rotation for {model_3d}: {front_rotation}")
+                except Exception as e:
+                    print(f"Error loading saved rotation for {model_3d}: {e}")
                     pass  # Table may not exist yet, that's okay
 
             if name not in items_data:

@@ -2043,13 +2043,15 @@ def property_type_selector():
                                     const width = typeof imageObj === 'object' ? (imageObj.width || 0) : 0;
                                     const depth = typeof imageObj === 'object' ? (imageObj.depth || 0) : 0;
                                     const height = typeof imageObj === 'object' ? (imageObj.height || 0) : 0;
+                                    const front_rotation = typeof imageObj === 'object' ? imageObj.front_rotation : null;
                                     allImages.push({
                                         name: item.name,
                                         url: url,
                                         model_3d: model3d,
                                         width: width,
                                         depth: depth,
-                                        height: height
+                                        height: height,
+                                        front_rotation: front_rotation
                                     });
                                 });
                             }
