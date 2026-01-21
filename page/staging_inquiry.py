@@ -851,6 +851,31 @@ def inquiry_modal():
     )
 
 
+def image_preview_modal():
+    """Modal for displaying 2D image of 3D model"""
+    return Div(
+        Div(
+            # Modal content
+            Div(
+                # Close button
+                Button("✕", cls="image-modal-close-btn", onclick="event.stopPropagation(); close2DImageModal()"),
+                # Image container
+                Div(
+                    Img(id="modal-2d-image", src="", alt="2D Preview", cls="modal-2d-image", onclick="event.stopPropagation()"),
+                    cls="image-modal-content",
+                    onclick="event.stopPropagation()"
+                ),
+                cls="image-modal-inner",
+                onclick="event.stopPropagation()"
+            ),
+            cls="image-modal-container"
+        ),
+        id="image-preview-modal",
+        cls="image-preview-modal hidden",
+        onclick="close2DImageModal()"
+    )
+
+
 def property_type_selector():
     """Property type selector with 3 square buttons"""
     return Section(
@@ -958,6 +983,8 @@ def property_type_selector():
             item_select_modal(),
             # Inquiry Modal
             inquiry_modal(),
+            # Image Preview Modal
+            image_preview_modal(),
             # Floating Action Buttons
             Div(
                 Button("Inquire", cls="staging-inquiry-btn", onclick="openInquiryModal()"),
@@ -3112,15 +3139,22 @@ def property_type_selector():
                                 <path d="M12 2v20M8 6l4-4 4 4M8 18l4 4 4-4"/>
                             </svg>
                         </button>
+                        <button class="model-control-btn" id="btn-scale" title="Scale - Drag up/down">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                            </svg>
+                        </button>
                         <button class="model-control-btn" id="btn-brightness" title="Brightness - Drag left/right">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <circle cx="12" cy="12" r="5"/>
                                 <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
                             </svg>
                         </button>
-                        <button class="model-control-btn" id="btn-scale" title="Scale - Drag up/down">
+                        <button class="model-control-btn" id="btn-image-preview" title="View 2D Image">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <polyline points="21 15 16 10 5 21"/>
                             </svg>
                         </button>
                         <button class="model-control-btn" id="btn-set-default" title="Set as default rotation">
@@ -3208,6 +3242,20 @@ def property_type_selector():
                     lastMouseY = e.touches[0].clientY;
                     e.preventDefault();
                 }, { passive: false });
+
+                // Image Preview - click and touch
+                const btnImagePreview = overlay.querySelector('#btn-image-preview');
+                btnImagePreview.addEventListener('click', () => {
+                    if (currentLoadedModel) {
+                        show2DImageModal();
+                    }
+                });
+                btnImagePreview.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    if (currentLoadedModel) {
+                        show2DImageModal();
+                    }
+                });
 
                 // Set Default Rotation - click and touch
                 btnSetDefault.addEventListener('click', () => {
@@ -3646,6 +3694,7 @@ def property_type_selector():
                     instanceId: idx,
                     modelUrl: model.userData.model3d,
                     itemName: model.userData.itemName,
+                    imageUrl: model.userData.imageUrl,
                     positionX: model.position.x,
                     positionY: model.position.y,
                     positionZ: model.position.z,
@@ -3866,6 +3915,8 @@ def property_type_selector():
 
                         model.userData = {
                             model3d: modelData.modelUrl,
+                            itemName: modelData.itemName,
+                            imageUrl: modelData.imageUrl,
                             frontRotation: -Math.PI/2, // Default front rotation
                             yRotation: modelData.rotationY || 0,
                             positionZone: currentZone, // Track zone for rotation changes
@@ -5116,6 +5167,39 @@ def property_type_selector():
             function closeInquiryModal() {
                 document.getElementById('inquiry-modal').classList.add('hidden');
                 document.body.style.overflow = '';
+            }
+
+            // 2D Image Preview Modal Functions
+            function show2DImageModal() {
+                if (!currentLoadedModel) return;
+
+                // Get the image URL from the model's userData
+                const imageUrl = currentLoadedModel.userData.imageUrl;
+                if (!imageUrl) {
+                    alert('No 2D image available for this model');
+                    return;
+                }
+
+                // Set the image source
+                const modalImage = document.getElementById('modal-2d-image');
+                if (modalImage) {
+                    modalImage.src = imageUrl;
+                }
+
+                // Show the modal
+                const modal = document.getElementById('image-preview-modal');
+                if (modal) {
+                    modal.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden';
+                }
+            }
+
+            function close2DImageModal() {
+                const modal = document.getElementById('image-preview-modal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                    document.body.style.overflow = '';
+                }
             }
 
             // Close inquiry modal on backdrop click
@@ -7145,6 +7229,94 @@ def get_property_selector_styles():
     .inquiry-submit-btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+    }
+
+    /* Image Preview Modal */
+    .image-preview-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.95);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        cursor: pointer;
+    }
+
+    .image-preview-modal.hidden {
+        display: none;
+    }
+
+    .image-modal-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .image-modal-inner {
+        position: relative;
+        max-width: 100%;
+        max-height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .image-modal-content {
+        max-width: 100%;
+        max-height: calc(100vh - 40px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-2d-image {
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        border-radius: 8px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        cursor: default;
+    }
+
+    .image-modal-close-btn {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        width: 44px;
+        height: 44px;
+        background: rgba(255, 255, 255, 0.15);
+        border: none;
+        border-radius: 50%;
+        color: white;
+        font-size: 24px;
+        font-weight: 300;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        z-index: 10000;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+
+    .image-modal-close-btn:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: scale(1.1);
+    }
+
+    .image-modal-close-btn:active {
+        transform: scale(0.95);
     }
 
     /* Desktop (768px+) */
