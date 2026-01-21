@@ -3395,64 +3395,136 @@ def property_type_selector():
                 const bgBrightnessBtn = document.getElementById('bg-brightness-btn');
                 if (!bgBrightnessBtn) return;
 
-                // Mouse events
+                // Click to show slider and start dragging
                 bgBrightnessBtn.addEventListener('mousedown', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     isDraggingBgBrightness = true;
-                    bgBrightnessLastX = e.clientX;
-                    bgBrightnessBtn.style.cursor = 'grabbing';
-                    document.addEventListener('mousemove', handleBgBrightnessMouseMove);
-                    document.addEventListener('mouseup', handleBgBrightnessMouseUp);
+                    showPhotoBrightnessSlider(true);
                 });
 
-                // Touch events
+                // Touch to show slider and start dragging
                 bgBrightnessBtn.addEventListener('touchstart', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     isDraggingBgBrightness = true;
-                    bgBrightnessLastX = e.touches[0].clientX;
-                    document.addEventListener('touchmove', handleBgBrightnessTouchMove, { passive: false });
-                    document.addEventListener('touchend', handleBgBrightnessTouchEnd);
+                    showPhotoBrightnessSlider(true);
+                }, { passive: false });
+
+                // Document-level mouse move handler
+                document.addEventListener('mousemove', (e) => {
+                    if (!isDraggingBgBrightness) return;
+                    const sliderTrack = document.querySelector('.photo-brightness-slider-track');
+                    if (sliderTrack) {
+                        const rect = sliderTrack.getBoundingClientRect();
+                        const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                        bgBrightnessValue = 0.2 + (percent * 3.8);
+                        applyBackgroundBrightness(bgBrightnessValue);
+                        updatePhotoBrightnessSliderPosition(bgBrightnessValue);
+                    }
+                });
+
+                // Document-level mouse up handler
+                document.addEventListener('mouseup', () => {
+                    if (isDraggingBgBrightness) {
+                        isDraggingBgBrightness = false;
+                        showPhotoBrightnessSlider(false);
+                        saveBackgroundBrightness();
+                    }
+                });
+
+                // Document-level touch move handler
+                document.addEventListener('touchmove', (e) => {
+                    if (!isDraggingBgBrightness) return;
+                    e.preventDefault();
+                    const sliderTrack = document.querySelector('.photo-brightness-slider-track');
+                    if (sliderTrack) {
+                        const touch = e.touches[0];
+                        const rect = sliderTrack.getBoundingClientRect();
+                        const percent = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+                        bgBrightnessValue = 0.2 + (percent * 3.8);
+                        applyBackgroundBrightness(bgBrightnessValue);
+                        updatePhotoBrightnessSliderPosition(bgBrightnessValue);
+                    }
+                }, { passive: false });
+
+                // Document-level touch end handler
+                document.addEventListener('touchend', () => {
+                    if (isDraggingBgBrightness) {
+                        isDraggingBgBrightness = false;
+                        showPhotoBrightnessSlider(false);
+                        saveBackgroundBrightness();
+                    }
                 });
             }
 
-            function handleBgBrightnessMouseMove(e) {
-                if (!isDraggingBgBrightness) return;
-                const delta = (e.clientX - bgBrightnessLastX) * 0.01;
-                bgBrightnessLastX = e.clientX;
-                bgBrightnessValue = Math.max(0.2, Math.min(4.0, bgBrightnessValue + delta));
-                applyBackgroundBrightness(bgBrightnessValue);
-            }
+            function showPhotoBrightnessSlider(show) {
+                const slider = document.getElementById('photo-brightness-slider');
+                const photoSlide = document.getElementById('items-photo-slide');
 
-            function handleBgBrightnessMouseUp() {
-                isDraggingBgBrightness = false;
-                const bgBrightnessBtn = document.getElementById('bg-brightness-btn');
-                if (bgBrightnessBtn) {
-                    bgBrightnessBtn.style.cursor = 'grab';
+                if (!slider || !photoSlide) return;
+
+                if (show) {
+                    // Get brightness button position BEFORE hiding buttons
+                    const bgBtn = document.getElementById('bg-brightness-btn');
+                    if (!bgBtn) return;
+
+                    const container = photoSlide;
+                    const containerRect = container.getBoundingClientRect();
+                    const btnRect = bgBtn.getBoundingClientRect();
+
+                    // Get button center in viewport
+                    const btnCenterX = btnRect.left + btnRect.width / 2;
+                    const btnCenterY = btnRect.top + btnRect.height / 2;
+
+                    // Convert to container-relative position
+                    const relativeX = btnCenterX - containerRect.left;
+                    const relativeY = btnCenterY - containerRect.top;
+
+                    // Calculate current brightness percentage (0-100)
+                    const brightnessPercent = ((bgBrightnessValue - 0.2) / 3.8) * 100;
+
+                    // Position slider so the thumb (at brightnessPercent) is at button center
+                    // If brightness is 75%, we want the thumb at 75% of track to be at button position
+                    // So slider needs to be offset by (75% - 50%) of track width to the left
+                    const sliderWidth = 200; // slider width from CSS
+                    const trackWidth = sliderWidth - 30; // subtract padding (15px each side)
+                    const thumbOffset = (brightnessPercent / 100) * trackWidth;
+                    const centerOffset = trackWidth / 2;
+                    const adjustmentX = thumbOffset - centerOffset;
+
+                    slider.style.left = `${relativeX - adjustmentX}px`;
+                    slider.style.top = `${relativeY}px`;
+                    slider.style.transform = 'translate(-50%, -50%)';
+
+                    // Update thumb and fill position based on current brightness
+                    updatePhotoBrightnessSliderPosition(bgBrightnessValue);
+
+                    // Hide all photo control buttons
+                    const buttons = photoSlide.querySelectorAll('.photo-camera-inline-btn, .photo-upload-inline-btn, .photo-brightness-btn, .photo-rotate-btn, .photo-delete-btn');
+                    buttons.forEach(btn => btn.style.display = 'none');
+
+                    // Show slider
+                    slider.style.display = 'block';
+                } else {
+                    // Hide slider
+                    slider.style.display = 'none';
+
+                    // Show all photo control buttons
+                    const buttons = photoSlide.querySelectorAll('.photo-camera-inline-btn, .photo-upload-inline-btn, .photo-brightness-btn, .photo-rotate-btn, .photo-delete-btn');
+                    buttons.forEach(btn => btn.style.display = 'flex');
                 }
-                document.removeEventListener('mousemove', handleBgBrightnessMouseMove);
-                document.removeEventListener('mouseup', handleBgBrightnessMouseUp);
-                // Save brightness to localStorage
-                saveBackgroundBrightness();
             }
 
-            function handleBgBrightnessTouchMove(e) {
-                if (!isDraggingBgBrightness) return;
-                e.preventDefault();
-                const touch = e.touches[0];
-                const delta = (touch.clientX - bgBrightnessLastX) * 0.01;
-                bgBrightnessLastX = touch.clientX;
-                bgBrightnessValue = Math.max(0.2, Math.min(4.0, bgBrightnessValue + delta));
-                applyBackgroundBrightness(bgBrightnessValue);
-            }
-
-            function handleBgBrightnessTouchEnd() {
-                isDraggingBgBrightness = false;
-                document.removeEventListener('touchmove', handleBgBrightnessTouchMove);
-                document.removeEventListener('touchend', handleBgBrightnessTouchEnd);
-                // Save brightness to localStorage
-                saveBackgroundBrightness();
+            function updatePhotoBrightnessSliderPosition(brightness) {
+                const thumb = document.getElementById('photo-brightness-slider-thumb');
+                const fill = document.getElementById('photo-brightness-slider-fill');
+                if (thumb && fill) {
+                    // Map brightness (0.2-4.0) to percentage (0-100)
+                    const percent = ((brightness - 0.2) / 3.8) * 100;
+                    thumb.style.left = percent + '%';
+                    fill.style.width = percent + '%';
+                }
             }
 
             function saveBackgroundBrightness() {
@@ -3971,6 +4043,12 @@ def property_type_selector():
                                 <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
                             </svg>
                         </button>
+                        <div class="photo-brightness-slider" id="photo-brightness-slider" style="display: none;">
+                            <div class="photo-brightness-slider-track">
+                                <div class="photo-brightness-slider-fill" id="photo-brightness-slider-fill"></div>
+                                <div class="photo-brightness-slider-thumb" id="photo-brightness-slider-thumb"></div>
+                            </div>
+                        </div>
                     </div>
                 `;
 
@@ -6644,6 +6722,46 @@ def get_property_selector_styles():
     .photo-brightness-btn:active {
         cursor: grabbing;
         background: rgba(0, 0, 0, 0.8);
+    }
+
+    /* Photo Brightness Slider */
+    .photo-brightness-slider {
+        position: absolute;
+        background: rgba(0, 0, 0, 0.7);
+        border-radius: 9999px;
+        padding: 10px 15px;
+        width: 200px;
+        z-index: 30;
+    }
+
+    .photo-brightness-slider-track {
+        position: relative;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 9999px;
+        cursor: pointer;
+    }
+
+    .photo-brightness-slider-fill {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        background: linear-gradient(to right, #666, #fff);
+        border-radius: 9999px;
+        pointer-events: none;
+    }
+
+    .photo-brightness-slider-thumb {
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 16px;
+        height: 16px;
+        background: white;
+        border-radius: 50%;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        pointer-events: none;
     }
 
     .item-btn {
