@@ -7292,26 +7292,27 @@ def get_property_selector_styles():
         position: absolute;
         top: 20px;
         right: 20px;
-        width: 44px;
-        height: 44px;
-        background: rgba(255, 255, 255, 0.15);
-        border: none;
+        width: 50px;
+        height: 50px;
+        background: rgba(255, 255, 255, 0.2);
+        border: 2px solid rgba(255, 255, 255, 0.3);
         border-radius: 50%;
         color: white;
-        font-size: 24px;
-        font-weight: 300;
+        font-size: 28px;
+        font-weight: 400;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
         transition: all 0.2s ease;
-        z-index: 10000;
+        z-index: 10002;
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
     }
 
     .image-modal-close-btn:hover {
-        background: rgba(255, 255, 255, 0.25);
+        background: rgba(255, 255, 255, 0.35);
+        border-color: rgba(255, 255, 255, 0.5);
         transform: scale(1.1);
     }
 
@@ -7408,6 +7409,15 @@ def get_property_selector_styles():
 
         .photos-carousel-counter {
             margin-top: 16px;
+        }
+
+        /* Image Preview Modal - Desktop max-width */
+        .image-modal-content {
+            max-width: 800px;
+        }
+
+        .modal-2d-image {
+            border-radius: 12px;
         }
     }
 
