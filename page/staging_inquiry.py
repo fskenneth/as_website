@@ -854,21 +854,17 @@ def inquiry_modal():
 def image_preview_modal():
     """Modal for displaying 2D image of 3D model"""
     return Div(
+        # Close button - positioned at modal level
+        Button("✕", cls="image-modal-close-btn", onclick="event.stopPropagation(); close2DImageModal()"),
+        # Image container
         Div(
-            # Modal content
             Div(
-                # Close button
-                Button("✕", cls="image-modal-close-btn", onclick="event.stopPropagation(); close2DImageModal()"),
-                # Image container
-                Div(
-                    Img(id="modal-2d-image", src="", alt="2D Preview", cls="modal-2d-image", onclick="event.stopPropagation()"),
-                    cls="image-modal-content",
-                    onclick="event.stopPropagation()"
-                ),
-                cls="image-modal-inner",
+                Img(id="modal-2d-image", src="", alt="2D Preview", cls="modal-2d-image", onclick="event.stopPropagation()"),
+                cls="image-modal-content",
                 onclick="event.stopPropagation()"
             ),
-            cls="image-modal-container"
+            cls="image-modal-inner",
+            onclick="event.stopPropagation()"
         ),
         id="image-preview-modal",
         cls="image-preview-modal hidden",
@@ -7289,7 +7285,7 @@ def get_property_selector_styles():
     }
 
     .image-modal-close-btn {
-        position: absolute;
+        position: fixed;
         top: 20px;
         right: 20px;
         width: 50px;
