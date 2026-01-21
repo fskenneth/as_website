@@ -133,6 +133,17 @@ def init_db():
     except:
         pass  # Column already exists
 
+    # Migration: Add item_name and image_url columns if they don't exist
+    try:
+        cursor.execute('ALTER TABLE design_models ADD COLUMN item_name TEXT')
+    except:
+        pass  # Column already exists
+
+    try:
+        cursor.execute('ALTER TABLE design_models ADD COLUMN image_url TEXT')
+    except:
+        pass  # Column already exists
+
     # Drop old unique constraint and add new one with instance_id
     # SQLite doesn't support DROP CONSTRAINT, so we need to recreate the table
     # For now, just ensure the new table structure is used for new installations

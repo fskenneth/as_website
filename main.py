@@ -909,8 +909,9 @@ async def save_staging_models(request: Request):
             cursor.execute("""
                 INSERT INTO design_models (
                     staging_id, background_image, model_url, instance_id,
-                    position_x, position_y, position_z, scale, rotation_y, tilt, brightness
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    position_x, position_y, position_z, scale, rotation_y, tilt, brightness,
+                    item_name, image_url
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 staging_id,
                 background_image,
@@ -922,7 +923,9 @@ async def save_staging_models(request: Request):
                 model.get('scale', 1),
                 model.get('rotationY', 0),
                 model.get('tilt', 0.1745),
-                model.get('brightness', 2.5)
+                model.get('brightness', 2.5),
+                model.get('itemName', ''),
+                model.get('imageUrl', '')
             ))
 
         conn.commit()
@@ -947,7 +950,7 @@ def get_staging_models(staging_id: int = 0, background_image: str = ""):
         # Match on background_image only for flexibility (staging_id may be 0 or NULL)
         cursor.execute("""
             SELECT model_url, instance_id, position_x, position_y, position_z,
-                   scale, rotation_y, tilt, brightness
+                   scale, rotation_y, tilt, brightness, item_name, image_url
             FROM design_models
             WHERE background_image = ?
             ORDER BY instance_id
@@ -964,7 +967,9 @@ def get_staging_models(staging_id: int = 0, background_image: str = ""):
                 'scale': row[5],
                 'rotationY': row[6],
                 'tilt': row[7],
-                'brightness': row[8]
+                'brightness': row[8],
+                'itemName': row[9],
+                'imageUrl': row[10]
             })
 
         conn.close()
