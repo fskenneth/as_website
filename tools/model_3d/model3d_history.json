@@ -38,5 +38,15 @@
     "method": "tripo3d",
     "processing_time": 119.71086430549622,
     "info": "Tripo3D Pro API - High quality 3D mesh"
+  },
+  {
+    "timestamp": "2026-01-22T16:36:21.695280",
+    "input_thumbnail": "/static/models/thumbnails/a2a5aa25_input.png",
+    "input_original": "/static/models/thumbnails/a2a5aa25_original.png",
+    "model_url": "/static/models/9a093253.glb",
+    "format": "glb",
+    "method": "tripo3d",
+    "processing_time": 93.60692691802979,
+    "info": "Tripo3D Pro API - High quality 3D mesh"
   }
 ]

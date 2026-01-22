@@ -553,30 +553,68 @@ def get_location_groups(items: List[sqlite3.Row]) -> Dict[str, List[sqlite3.Row]
     return location_groups
 
 
+def transform_zoho_image_url(url: str, field_name: str) -> str:
+    """Transform files.zohopublic.com URLs to creatorexport.zoho.com format"""
+    if not url or 'files.zohopublic.com' not in url:
+        return url
+
+    try:
+        import base64
+        from urllib.parse import urlparse, parse_qs, unquote
+
+        # Parse URL and extract x-cli-msg parameter
+        parsed = urlparse(url)
+        params = parse_qs(parsed.query)
+        cli_msg = params.get('x-cli-msg', [None])[0]
+
+        if not cli_msg:
+            return url
+
+        # Decode: base64 decode -> URL decode -> parse JSON
+        decoded_b64 = base64.b64decode(cli_msg).decode('utf-8')
+        decoded_url = unquote(decoded_b64)
+        data = json.loads(decoded_url)
+
+        # Extract needed info
+        record_id = data.get('recordid')
+        filepath = data.get('filepath')
+        private_key = data.get('privatekey')
+        report_name = 'Item_Report'
+
+        if not record_id or not filepath or not private_key:
+            return url
+
+        # Extract timestamp from filepath (e.g., "1684870719493" from "1684870719493_710")
+        timestamp = filepath.split('_')[0]
+
+        # Construct the working URL format using the actual private key from the data
+        filename = f"{timestamp}_{field_name}.jpg"
+
+        return f"https://creatorexport.zoho.com/file/astrastaging/staging-manager/{report_name}/{record_id}/{field_name}/image-download/{private_key}?filepath=/{filename}"
+
+    except Exception as e:
+        print(f"Error transforming URL: {e}")
+        return url
+
+
 def get_item_image_url(item: sqlite3.Row) -> str:
     """Get the appropriate image URL for an item"""
-    # Check if we have a resized image
+    # files.zohopublic.com URLs return 403 Forbidden and are not publicly accessible
+    # Only use creatorexport.zoho.com URLs which are working
+
+    # Check if we have a resized image with creatorexport format (working)
     if item['Resized_Image'] and item['Resized_Image'] != 'blank.png':
-        # If it's already a full URL (starts with http), use it directly
-        if item['Resized_Image'].startswith('http'):
+        if item['Resized_Image'].startswith('https://creatorexport.zoho.com'):
             return item['Resized_Image']
-        # Otherwise, return a data URL for white background
-        else:
-            # Return white background as data URL
-            return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Crect width='300' height='300' fill='white'/%3E%3C/svg%3E"
-    # Check if we have an original image
-    elif item['Item_Image'] and item['Item_Image'] != 'blank.png':
-        # If it's already a full URL (starts with http), use it directly
-        if item['Item_Image'].startswith('http'):
+
+    # Fall back to Item_Image if it's in creatorexport format
+    if item['Item_Image'] and item['Item_Image'] != 'blank.png':
+        if item['Item_Image'].startswith('https://creatorexport.zoho.com'):
             return item['Item_Image']
-        # Otherwise, return a data URL for white background
-        else:
-            # Return white background as data URL
-            return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Crect width='300' height='300' fill='white'/%3E%3C/svg%3E"
-    # Default to white background
-    else:
-        # Return white background as data URL
-        return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Crect width='300' height='300' fill='white'/%3E%3C/svg%3E"
+
+    # For files.zohopublic.com URLs or other formats, show placeholder
+    # These images need to be re-synced to get working creatorexport URLs
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Crect width='300' height='300' fill='%23f0f0f0'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23999' font-family='Arial' font-size='14'%3EImage Unavailable%3C/text%3E%3C/svg%3E"
 
 
 def get_item_attributes(item: sqlite3.Row) -> List[str]:
@@ -1951,18 +1989,36 @@ async def get(request):
                     const result = await response.json();
 
                     if (result.success && result.model_url) {
-                        statusSpan.textContent = 'Conversion successful! Saving model...';
+                        statusSpan.textContent = 'Conversion successful! Renaming and saving model...';
 
-                        // Generate model filename from item name (e.g., "Accent_Chair_01905.glb")
+                        // Generate model filename from item name (e.g., "Accent_Chair_01725.glb")
                         const sanitizedName = currentConvertItemName.replace(/[^a-zA-Z0-9]/g, '_');
                         const modelFilename = sanitizedName + '.glb';
 
-                        // Save model name to all items with same Item_Name
-                        await saveModelToAllItems(currentConvertItemName, modelFilename);
+                        // Rename the model file and save to database
+                        const renameResponse = await fetch('/item_management/rename_and_save_model', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                old_model_url: result.model_url,
+                                new_model_filename: modelFilename,
+                                item_name: currentConvertItemName,
+                                cleanup_thumbnails: true,
+                                input_thumbnail: result.input_thumbnail,
+                                input_original: result.input_original
+                            })
+                        });
+
+                        const renameData = await renameResponse.json();
+                        if (!renameData.success) {
+                            throw new Error(renameData.error || 'Failed to save model');
+                        }
+
+                        const newModelUrl = renameData.new_model_url;
 
                         // Display the 3D model in the modal
                         statusSpan.textContent = 'Model saved! Loading preview...';
-                        await displayConvertedModel(result.model_url);
+                        await displayConvertedModel(newModelUrl);
 
                         // Update button
                         convertBtn.textContent = 'Conversion Complete ✓';
@@ -1982,29 +2038,6 @@ async def get(request):
                     statusSpan.style.color = '#f44336';
                     convertBtn.disabled = false;
                     convertBtn.textContent = 'Try Again';
-                }
-            }
-
-            async function saveModelToAllItems(itemName, modelFilename) {
-                try {
-                    // Get all items with the same Item_Name
-                    const response = await fetch(`/item_management/update_model_for_items`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            item_name: itemName,
-                            model_filename: modelFilename
-                        })
-                    });
-
-                    const result = await response.json();
-                    if (!result.success) {
-                        throw new Error(result.error || 'Failed to save model');
-                    }
-                    console.log(`Model saved to ${result.count} items`);
-                } catch (error) {
-                    console.error('Error saving model:', error);
-                    throw error;
                 }
             }
 
@@ -2324,6 +2357,125 @@ async def fetch_image_base64(request):
 
     except Exception as e:
         print(f"Error fetching image: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@rt("/rename_and_save_model", methods=["POST"])
+async def rename_and_save_model(request):
+    """Rename model file, update database, and cleanup thumbnails"""
+    try:
+        import shutil
+        from pathlib import Path
+
+        body = await request.body()
+        data = json.loads(body.decode())
+
+        old_model_url = data.get('old_model_url')  # e.g., "/static/models/abc123.glb"
+        new_model_filename = data.get('new_model_filename')  # e.g., "Accent_Chair_01725.glb"
+        item_name = data.get('item_name')
+        cleanup_thumbnails = data.get('cleanup_thumbnails', False)
+        input_thumbnail = data.get('input_thumbnail')
+        input_original = data.get('input_original')
+
+        if not old_model_url or not new_model_filename or not item_name:
+            return JSONResponse({"success": False, "error": "Missing required parameters"}, status_code=400)
+
+        # Get the old file path
+        old_path = Path('.' + old_model_url)  # Convert /static/models/abc.glb to ./static/models/abc.glb
+        new_path = Path('static/models') / new_model_filename
+
+        if not old_path.exists():
+            return JSONResponse({"success": False, "error": f"Model file not found: {old_path}"}, status_code=404)
+
+        # Rename the model file
+        try:
+            shutil.move(str(old_path), str(new_path))
+            print(f"Renamed model: {old_path} -> {new_path}")
+        except Exception as e:
+            print(f"Error renaming model: {e}")
+            return JSONResponse({"success": False, "error": f"Failed to rename model: {str(e)}"}, status_code=500)
+
+        # Update database for all items with this Item_Name
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Get all items with this Item_Name
+        cursor.execute("SELECT ID FROM Item_Report WHERE Item_Name = ?", (item_name,))
+        items = cursor.fetchall()
+
+        if not items:
+            conn.close()
+            return JSONResponse({"success": False, "error": "No items found with this name"}, status_code=404)
+
+        # Update Model_3D for all matching items
+        modified_time = datetime.now().strftime("%d-%b-%Y %H:%M:%S")
+        cursor.execute("""
+            UPDATE Item_Report
+            SET Model_3D = ?, Modified_Time = ?, Modified_User = ?
+            WHERE Item_Name = ?
+        """, (new_model_filename, modified_time, "web_user", item_name))
+
+        updated_count = cursor.rowcount
+        conn.commit()
+
+        # Queue updates for Zoho sync for each item
+        for item in items:
+            item_id = item['ID']
+            try:
+                # Get current values for the item
+                cursor.execute("SELECT * FROM Item_Report WHERE ID = ?", (item_id,))
+                row = cursor.fetchone()
+                if row:
+                    columns = [desc[0] for desc in cursor.description]
+                    old_values = dict(zip(columns, row))
+
+                    changes = {
+                        'Model_3D': new_model_filename,
+                        'Modified_Time': modified_time,
+                        'Modified_User': 'web_user'
+                    }
+
+                    await write_service.queue_update(
+                        record_id=item_id,
+                        report_name='Item_Report',
+                        changes=changes,
+                        old_values=old_values
+                    )
+            except Exception as sync_error:
+                print(f"Warning: Failed to queue Zoho sync for {item_id}: {sync_error}")
+
+        conn.close()
+
+        # Cleanup thumbnail images if requested
+        if cleanup_thumbnails:
+            try:
+                if input_thumbnail:
+                    thumb_path = Path('.' + input_thumbnail)
+                    if thumb_path.exists():
+                        thumb_path.unlink()
+                        print(f"Deleted thumbnail: {thumb_path}")
+
+                if input_original:
+                    orig_path = Path('.' + input_original)
+                    if orig_path.exists():
+                        orig_path.unlink()
+                        print(f"Deleted original: {orig_path}")
+            except Exception as cleanup_error:
+                print(f"Warning: Failed to cleanup thumbnails: {cleanup_error}")
+
+        new_model_url = f'/static/models/{new_model_filename}'
+
+        return JSONResponse({
+            "success": True,
+            "new_model_url": new_model_url,
+            "count": updated_count,
+            "message": f"Model renamed and saved to {updated_count} items"
+        })
+
+    except Exception as e:
+        print(f"Error in rename_and_save_model: {e}")
         import traceback
         traceback.print_exc()
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)

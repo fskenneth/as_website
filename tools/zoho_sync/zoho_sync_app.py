@@ -257,6 +257,23 @@ zoho_sync_app, rt = fast_app(
             .space-y-2 > div {
                 margin-bottom: 16px !important;
             }
+
+            /* Force all sections to full width */
+            body > div, body > div > div, body > div > div > div {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+
+            /* Grid layouts should span full width */
+            .grid {
+                width: 100% !important;
+            }
+
+            /* Ensure all direct children of main content div are full width */
+            [style*="padding: 20px 40px"] > * {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
         """)
     ]
 )
@@ -336,7 +353,7 @@ async def get(request):
                     id="theme-toggle",
                     **{"aria-label": "Toggle theme"}
                 ),
-                style="display: flex; justify-content: space-between; align-items: center; margin: 0 auto; max-width: 1450px; width: 100%;"
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0 20px; box-sizing: border-box;"
             ),
             style="background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); padding: 10px 20px; margin-bottom: 20px; position: sticky; top: 0; z-index: 50;"
         ),
@@ -545,7 +562,7 @@ async def get(request):
                 Script("htmx.trigger(htmx.find('[name=table]'), 'change')")
             ),
 
-            style="max-width: 1450px; margin: 0 auto; padding: 20px;"
+            style="width: 100%; padding: 20px 40px; box-sizing: border-box;"
         ),
         Script(src="https://unpkg.com/htmx.org@1.9.10"),
         Script(src="https://unpkg.com/hyperscript.org@0.9.12"),

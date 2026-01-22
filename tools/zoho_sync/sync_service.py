@@ -78,7 +78,8 @@ class SyncService:
             logger.info(f"Processing image URLs for {len(records)} records in {report_name}")
             records_with_urls, urls_processed = image_url_processor.process_records_for_urls(
                 records,
-                report_name
+                report_name,
+                existing_records  # Pass existing records to preserve good URLs
             )
 
             # Verify record count for full sync
@@ -305,9 +306,17 @@ class SyncService:
 
             logger.info(f"Found {len(records)} modified records for {report_name}")
 
+            # Get existing records to preserve good URLs
+            existing_records = {}
+            try:
+                existing_data = await db.get_all_records(table_name)
+                existing_records = {str(r.get('ID', '')): r for r in existing_data}
+            except Exception as e:
+                logger.warning(f"Could not fetch existing records for comparison: {e}")
+
             # Process image URLs
             records_with_urls, urls_processed = image_url_processor.process_records_for_urls(
-                records, report_name
+                records, report_name, existing_records
             )
 
             # Upsert records (not clearing table - incremental update)
@@ -440,9 +449,17 @@ class SyncService:
             # Step 3: Sync only the changed records
             logger.info(f"[Smart Sync] Syncing {len(records_to_sync)} changed records")
 
+            # Get existing records to preserve good URLs
+            existing_records = {}
+            try:
+                existing_data = await db.get_all_records(table_name)
+                existing_records = {str(r.get('ID', '')): r for r in existing_data}
+            except Exception as e:
+                logger.warning(f"Could not fetch existing records for comparison: {e}")
+
             # Process image URLs
             records_with_urls, urls_processed = image_url_processor.process_records_for_urls(
-                records_to_sync, "Item_Report"
+                records_to_sync, "Item_Report", existing_records
             )
 
             # Upsert only the changed records
