@@ -1418,6 +1418,8 @@ async def get(request):
             let directionalLight2_3D = null;
             let currentModelFile3D = null;
             let currentBrightness3D = 2.5;
+            let initialCameraPosition3D = null;    // Store initial camera position
+            let initialCameraTarget3D = null;      // Store initial camera target
 
             // Base values for 3D viewer
             const BASE_ROTATION_Y = -Math.PI / 2;  // Front-facing rotation
@@ -1580,6 +1582,10 @@ async def get(request):
                         // Position camera at model center height
                         camera3D.position.set(0, modelCenterY, 4.5);
 
+                        // Store initial camera position and target for reset functionality
+                        initialCameraPosition3D = camera3D.position.clone();
+                        initialCameraTarget3D = new THREE.Vector3(0, modelCenterY, 0);
+
                         // Set brightness to base
                         currentBrightness3D = BASE_BRIGHTNESS;
                         document.getElementById('brightness-slider').value = BASE_BRIGHTNESS;
@@ -1591,7 +1597,7 @@ async def get(request):
                         document.getElementById('model-3d-loading').style.display = 'none';
 
                         // Look at model center, not floor
-                        controls3D.target.set(0, modelCenterY, 0);
+                        controls3D.target.copy(initialCameraTarget3D);
                         controls3D.update();
                     },
                     (progress) => {
@@ -1679,9 +1685,9 @@ async def get(request):
 
             // Reset model view
             function resetModelView() {
-                if (camera3D && controls3D) {
-                    camera3D.position.set(0, 0.5, 3);
-                    controls3D.target.set(0, 0, 0);
+                if (camera3D && controls3D && initialCameraPosition3D && initialCameraTarget3D) {
+                    camera3D.position.copy(initialCameraPosition3D);
+                    controls3D.target.copy(initialCameraTarget3D);
                     controls3D.update();
                 }
             }
