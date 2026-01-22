@@ -467,6 +467,12 @@ item_management_app, rt = fast_app(
                 to { transform: rotate(360deg); }
             }
 
+            /* Animation for conversion modal spinner */
+            @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+
             /* Ensure select elements and their dropdowns have consistent width */
             select, .uk-select, .uk-input-fake {
                 width: 100% !important;
@@ -649,7 +655,7 @@ def create_item_card(item_name: str, items: List[sqlite3.Row]) -> Div:
     item_depth = first_item['Item_Depth'] or 0
 
     return Div(
-        # 3D Icon (top-left, only shown if item has 3D model)
+        # 3D Icon (top-left, shown if item has 3D model)
         Div(
             NotStr('''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
@@ -660,6 +666,21 @@ def create_item_card(item_name: str, items: List[sqlite3.Row]) -> Div:
             onclick=f"show3DModal('{model_3d}', '{item_name}', {item_width}, {item_height}, {item_depth})",
             title="View 3D Model"
         ) if has_3d_model else None,
+
+        # Convert to 3D Icon (top-left, shown if item does NOT have 3D model)
+        Div(
+            NotStr('''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                <line x1="12" y1="22.08" x2="12" y2="12"/>
+                <line x1="7" y1="10" x2="17" y2="10"/>
+                <line x1="12" y1="5" x2="12" y2="15"/>
+            </svg>'''),
+            cls="item-3d-icon",
+            style="background: rgba(76, 175, 80, 0.9);",
+            onclick=f"showConvert3DModal('{first_item['ID']}', '{item_name}', '{get_item_image_url(first_item)}')",
+            title="Convert to 3D Model"
+        ) if not has_3d_model else None,
 
         # Count badges
         Div(
@@ -973,6 +994,98 @@ async def get(request):
             id="model-3d-modal",
             cls="model-3d-modal",
             onclick="if(event.target === this) close3DModal()"
+        ),
+
+        # 3D Conversion Modal
+        Div(
+            Div(
+                Div(
+                    H3("🪑 2D to 3D Conversion", style="margin: 0; color: #333;"),
+                    Span("×", style="font-size: 28px; cursor: pointer; color: #666; line-height: 1;", onclick="closeConvert3DModal()"),
+                    style="display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid #e0e0e0;"
+                ),
+                Div(
+                    # Image preview
+                    Div(
+                        H4("Image", style="margin: 0 0 12px 0; color: #333; text-align: center;"),
+                        Div(
+                            Img(id="convert-preview-image", src="", style="max-width: 100%; max-height: 200px; border-radius: 8px; background: white; display: block; margin: 0 auto;"),
+                            style="display: flex; justify-content: center; align-items: center;"
+                        ),
+                        style="margin-bottom: 20px;"
+                    ),
+                    # Balance display
+                    Div(
+                        Span("💰 Tripo3D Credits: ", style="font-weight: bold; color: #333;"),
+                        Span("Loading...", id="tripo-balance", style="color: #4caf50;"),
+                        style="margin-bottom: 20px; padding: 12px; background: #f5f5f5; border-radius: 8px; text-align: center;"
+                    ),
+                    # Parameters
+                    Div(
+                        H4("⚙️ Parameters:", style="margin: 0 0 12px 0; color: #333;"),
+                        Div(
+                            NotStr('''
+                                <label style="cursor: pointer; color: #333; display: inline-flex; align-items: center;">
+                                    <input type="checkbox" id="convert-pbr" checked style="margin-right: 4px; cursor: pointer;">
+                                    PBR Materials
+                                </label>
+                                <label style="cursor: pointer; color: #333; margin-left: 20px; display: inline-flex; align-items: center;">
+                                    <input type="checkbox" id="convert-autofix" checked style="margin-right: 4px; cursor: pointer;">
+                                    Image Autofix
+                                </label>
+                                <label style="cursor: pointer; color: #333; margin-left: 20px; display: inline-flex; align-items: center;">
+                                    <input type="checkbox" id="convert-orientation" checked style="margin-right: 4px; cursor: pointer;">
+                                    Align Orientation
+                                </label>
+                            '''),
+                            style="margin-bottom: 16px;"
+                        ),
+                        Div(
+                            Label("📝 Prompt:", **{"for": "convert-prompt"}, style="display: block; margin-bottom: 4px; color: #333;"),
+                            Input(
+                                type="text",
+                                id="convert-prompt",
+                                placeholder="Front facing, legs touching floor level.",
+                                value="Front facing, legs touching floor level.",
+                                style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px;"
+                            ),
+                            style="margin-bottom: 16px;"
+                        ),
+                        style="margin-bottom: 20px; padding: 16px; background: #e8f5e9; border-radius: 8px;"
+                    ),
+                    # Progress section
+                    Div(
+                        Div(
+                            Div(style="width: 40px; height: 40px; border: 3px solid #f3f3f3; border-top: 3px solid #4caf50; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 12px;"),
+                            Span("Starting conversion...", id="convert-status", style="color: #666;"),
+                            style="text-align: center;"
+                        ),
+                        id="convert-progress",
+                        style="display: none; margin: 20px 0; padding: 20px; background: #f5f5f5; border-radius: 8px;"
+                    ),
+                    # Result section (3D viewer)
+                    Div(
+                        Div(id="convert-result-canvas"),
+                        id="convert-result",
+                        style="display: none; margin: 20px 0; height: 400px; background: white; border-radius: 8px;"
+                    ),
+                    # Convert button
+                    Div(
+                        Button(
+                            "Convert to 3D",
+                            id="convert-to-3d-btn",
+                            onclick="startConversion()",
+                            style="background-color: #4caf50; color: white; padding: 12px 32px; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; width: 100%;"
+                        ),
+                        style="margin-top: 20px;"
+                    ),
+                    style="padding: 20px; max-height: 70vh; overflow-y: auto;"
+                ),
+                style="background: white; border-radius: 12px; width: 90%; max-width: 600px; position: relative;"
+            ),
+            id="convert-3d-modal",
+            style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: none; z-index: 1003; justify-content: center; align-items: center;",
+            onclick="if(event.target === this) closeConvert3DModal()"
         ),
 
         # Add JavaScript for modal handling and enhanced lazy loading
@@ -1705,6 +1818,258 @@ async def get(request):
                     camera3D.position.multiplyScalar(1.25);
                 }
             }
+
+            // =========================================================================
+            // 3D CONVERSION MODAL FUNCTIONS
+            // =========================================================================
+            let currentConvertItemId = null;
+            let currentConvertItemName = null;
+            let currentConvertImageUrl = null;
+            let conversionScene = null;
+            let conversionCamera = null;
+            let conversionRenderer = null;
+            let conversionControls = null;
+            let conversionModel = null;
+            let conversionAnimationId = null;
+
+            async function showConvert3DModal(itemId, itemName, imageUrl) {
+                currentConvertItemId = itemId;
+                currentConvertItemName = itemName;
+                currentConvertImageUrl = imageUrl;
+
+                const modal = document.getElementById('convert-3d-modal');
+                const previewImage = document.getElementById('convert-preview-image');
+                const balanceSpan = document.getElementById('tripo-balance');
+                const convertBtn = document.getElementById('convert-to-3d-btn');
+                const progressDiv = document.getElementById('convert-progress');
+                const resultDiv = document.getElementById('convert-result');
+
+                // Reset state
+                previewImage.src = imageUrl;
+                balanceSpan.textContent = 'Loading...';
+                convertBtn.disabled = false;
+                convertBtn.textContent = 'Convert to 3D';
+                progressDiv.style.display = 'none';
+                resultDiv.style.display = 'none';
+
+                // Show modal
+                modal.style.display = 'flex';
+
+                // Load Tripo3D balance
+                try {
+                    const response = await fetch('/api/tripo-balance');
+                    const data = await response.json();
+                    if (data.success && data.balance) {
+                        const balance = data.balance;
+                        // Display balance amount (could be credits or USD depending on account type)
+                        const balanceAmount = balance.balance || 0;
+                        const currency = balance.currency || '';
+                        const displayText = currency ? `${balanceAmount} ${currency}` : `${balanceAmount} credits`;
+                        balanceSpan.textContent = displayText;
+                    } else {
+                        balanceSpan.textContent = 'Unable to load balance';
+                        balanceSpan.style.color = '#f44336';
+                    }
+                } catch (error) {
+                    console.error('Error loading balance:', error);
+                    balanceSpan.textContent = 'Error loading balance';
+                    balanceSpan.style.color = '#f44336';
+                }
+            }
+
+            function closeConvert3DModal() {
+                const modal = document.getElementById('convert-3d-modal');
+                modal.style.display = 'none';
+
+                // Clean up 3D resources if any
+                if (conversionAnimationId) {
+                    cancelAnimationFrame(conversionAnimationId);
+                    conversionAnimationId = null;
+                }
+                if (conversionRenderer) {
+                    conversionRenderer.dispose();
+                    conversionRenderer = null;
+                }
+                conversionScene = null;
+                conversionCamera = null;
+                conversionControls = null;
+                conversionModel = null;
+            }
+
+            async function startConversion() {
+                const convertBtn = document.getElementById('convert-to-3d-btn');
+                const progressDiv = document.getElementById('convert-progress');
+                const statusSpan = document.getElementById('convert-status');
+                const resultDiv = document.getElementById('convert-result');
+
+                // Disable button and show progress
+                convertBtn.disabled = true;
+                convertBtn.textContent = 'Converting...';
+                progressDiv.style.display = 'block';
+                resultDiv.style.display = 'none';
+                statusSpan.textContent = 'Starting conversion...';
+
+                try {
+                    // Get parameters
+                    const pbr = document.getElementById('convert-pbr').checked;
+                    const autofix = document.getElementById('convert-autofix').checked;
+                    const orientation = document.getElementById('convert-orientation').checked ? 'align_image' : 'default';
+                    const prompt = document.getElementById('convert-prompt').value;
+
+                    // Fetch image via backend proxy to avoid CORS
+                    statusSpan.textContent = 'Fetching image...';
+                    const proxyResponse = await fetch('/item_management/fetch_image_base64', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            image_url: currentConvertImageUrl
+                        })
+                    });
+
+                    const proxyData = await proxyResponse.json();
+                    if (!proxyData.success) {
+                        throw new Error(proxyData.error || 'Failed to fetch image');
+                    }
+
+                    const imageBase64 = proxyData.image_base64;
+
+                    // Start conversion
+                    statusSpan.textContent = 'Uploading to Tripo3D... (this may take 60-90 seconds)';
+                    const response = await fetch('/api/convert-to-3d', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            image: imageBase64,
+                            method: 'tripo3d',
+                            pbr: pbr,
+                            enable_image_autofix: autofix,
+                            orientation: orientation,
+                            prompt: prompt
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success && result.model_url) {
+                        statusSpan.textContent = 'Conversion successful! Saving model...';
+
+                        // Generate model filename from item name (e.g., "Accent_Chair_01905.glb")
+                        const sanitizedName = currentConvertItemName.replace(/[^a-zA-Z0-9]/g, '_');
+                        const modelFilename = sanitizedName + '.glb';
+
+                        // Save model name to all items with same Item_Name
+                        await saveModelToAllItems(currentConvertItemName, modelFilename);
+
+                        // Display the 3D model in the modal
+                        statusSpan.textContent = 'Model saved! Loading preview...';
+                        await displayConvertedModel(result.model_url);
+
+                        // Update button
+                        convertBtn.textContent = 'Conversion Complete ✓';
+                        convertBtn.style.backgroundColor = '#4caf50';
+
+                        // Reload page after 2 seconds to show updated items
+                        setTimeout(() => {
+                            location.reload();
+                        }, 2000);
+                    } else {
+                        throw new Error(result.error || 'Conversion failed');
+                    }
+
+                } catch (error) {
+                    console.error('Conversion error:', error);
+                    statusSpan.textContent = 'Error: ' + error.message;
+                    statusSpan.style.color = '#f44336';
+                    convertBtn.disabled = false;
+                    convertBtn.textContent = 'Try Again';
+                }
+            }
+
+            async function saveModelToAllItems(itemName, modelFilename) {
+                try {
+                    // Get all items with the same Item_Name
+                    const response = await fetch(`/item_management/update_model_for_items`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            item_name: itemName,
+                            model_filename: modelFilename
+                        })
+                    });
+
+                    const result = await response.json();
+                    if (!result.success) {
+                        throw new Error(result.error || 'Failed to save model');
+                    }
+                    console.log(`Model saved to ${result.count} items`);
+                } catch (error) {
+                    console.error('Error saving model:', error);
+                    throw error;
+                }
+            }
+
+            async function displayConvertedModel(modelUrl) {
+                const resultDiv = document.getElementById('convert-result');
+                const canvas = document.getElementById('convert-result-canvas');
+
+                resultDiv.style.display = 'block';
+                canvas.innerHTML = '';
+
+                // Load Three.js if not loaded
+                await loadThreeJs();
+
+                // Initialize scene
+                const width = canvas.clientWidth;
+                const height = 400;
+
+                conversionScene = new THREE.Scene();
+                conversionScene.background = new THREE.Color(0xffffff);
+
+                conversionCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+                conversionCamera.position.set(0, 1, 3);
+
+                conversionRenderer = new THREE.WebGLRenderer({ antialias: true });
+                conversionRenderer.setSize(width, height);
+                conversionRenderer.setPixelRatio(window.devicePixelRatio);
+                canvas.appendChild(conversionRenderer.domElement);
+
+                conversionControls = new THREE.OrbitControls(conversionCamera, conversionRenderer.domElement);
+                conversionControls.enableDamping = true;
+
+                // Add lighting
+                const ambLight = new THREE.AmbientLight(0xffffff, 0.6);
+                conversionScene.add(ambLight);
+                const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                dirLight.position.set(5, 10, 7.5);
+                conversionScene.add(dirLight);
+
+                // Load model
+                const loader = new THREE.GLTFLoader();
+                loader.load(modelUrl, (gltf) => {
+                    conversionModel = gltf.scene;
+
+                    // Center and scale model
+                    const box = new THREE.Box3().setFromObject(conversionModel);
+                    const size = box.getSize(new THREE.Vector3());
+                    const center = box.getCenter(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    const scale = 2 / maxDim;
+                    conversionModel.scale.multiplyScalar(scale);
+                    conversionModel.position.x = -center.x * scale;
+                    conversionModel.position.y = -box.min.y * scale;
+                    conversionModel.position.z = -center.z * scale;
+
+                    conversionScene.add(conversionModel);
+
+                    // Animation loop
+                    function animate() {
+                        conversionAnimationId = requestAnimationFrame(animate);
+                        conversionControls.update();
+                        conversionRenderer.render(conversionScene, conversionCamera);
+                    }
+                    animate();
+                });
+            }
         """)
     ]
 
@@ -1920,6 +2285,124 @@ async def get_item_sync_status(item_id: str):
             "sync_status": "pending" if pending > 0 else "synced"
         })
     except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@rt("/fetch_image_base64", methods=["POST"])
+async def fetch_image_base64(request):
+    """Fetch image from URL and return as base64 (proxy to avoid CORS)"""
+    try:
+        import httpx
+        import base64
+
+        body = await request.body()
+        data = json.loads(body.decode())
+        image_url = data.get('image_url')
+
+        if not image_url:
+            return JSONResponse({"success": False, "error": "image_url is required"}, status_code=400)
+
+        # Fetch the image (follow redirects)
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            response = await client.get(image_url)
+
+            if response.status_code != 200:
+                return JSONResponse({"success": False, "error": f"Failed to fetch image: {response.status_code}"}, status_code=500)
+
+            # Convert to base64
+            image_bytes = response.content
+            image_base64 = base64.b64encode(image_bytes).decode()
+
+            # Add data URL prefix
+            content_type = response.headers.get('content-type', 'image/jpeg')
+            data_url = f"data:{content_type};base64,{image_base64}"
+
+            return JSONResponse({
+                "success": True,
+                "image_base64": data_url
+            })
+
+    except Exception as e:
+        print(f"Error fetching image: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@rt("/update_model_for_items", methods=["POST"])
+async def update_model_for_items(request):
+    """Update Model_3D field for all items with the same Item_Name"""
+    try:
+        # Get JSON data from request
+        body = await request.body()
+        data = json.loads(body.decode())
+
+        item_name = data.get('item_name')
+        model_filename = data.get('model_filename')
+
+        if not item_name or not model_filename:
+            return JSONResponse({"success": False, "error": "item_name and model_filename are required"}, status_code=400)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Get all items with this Item_Name
+        cursor.execute("SELECT ID FROM Item_Report WHERE Item_Name = ?", (item_name,))
+        items = cursor.fetchall()
+
+        if not items:
+            conn.close()
+            return JSONResponse({"success": False, "error": "No items found with this name"}, status_code=404)
+
+        # Update Model_3D for all matching items
+        modified_time = datetime.now().strftime("%d-%b-%Y %H:%M:%S")
+        cursor.execute("""
+            UPDATE Item_Report
+            SET Model_3D = ?, Modified_Time = ?, Modified_User = ?
+            WHERE Item_Name = ?
+        """, (model_filename, modified_time, "web_user", item_name))
+
+        updated_count = cursor.rowcount
+        conn.commit()
+
+        # Queue updates for Zoho sync for each item
+        for item in items:
+            item_id = item['ID']
+            try:
+                # Get current values for the item
+                cursor.execute("SELECT * FROM Item_Report WHERE ID = ?", (item_id,))
+                row = cursor.fetchone()
+                if row:
+                    columns = [desc[0] for desc in cursor.description]
+                    old_values = dict(zip(columns, row))
+
+                    changes = {
+                        'Model_3D': model_filename,
+                        'Modified_Time': modified_time,
+                        'Modified_User': 'web_user'
+                    }
+
+                    await write_service.queue_update(
+                        record_id=item_id,
+                        report_name='Item_Report',
+                        changes=changes,
+                        old_values=old_values
+                    )
+            except Exception as sync_error:
+                print(f"Warning: Failed to queue Zoho sync for {item_id}: {sync_error}")
+
+        conn.close()
+
+        return JSONResponse({
+            "success": True,
+            "count": updated_count,
+            "message": f"Updated {updated_count} items with model {model_filename}"
+        })
+
+    except Exception as e:
+        print(f"Error updating model for items: {e}")
+        import traceback
+        traceback.print_exc()
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 

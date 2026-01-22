@@ -679,7 +679,43 @@ def register_test_routes(rt):
             traceback.print_exc()
             return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
 
-    print("Test API routes registered: /api/temp-image, /api/test-inpainting, /api/inpainting-history, /api/remove-background, /api/convert-to-3d, /api/model3d-history, /api/model-state, /api/models-for-background, /api/save-all-models")
+    @rt('/api/tripo-balance')
+    async def get_tripo_balance():
+        """Get Tripo3D account balance and credits"""
+        import os
+        import httpx
+
+        try:
+            api_key = os.getenv('TRIPO_API_KEY')
+            if not api_key:
+                return JSONResponse({'error': 'TRIPO_API_KEY not set in environment'}, status_code=500)
+
+            base_url = "https://api.tripo3d.ai/v2/openapi"
+            headers = {"Authorization": f"Bearer {api_key}"}
+
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    f"{base_url}/user/balance",
+                    headers=headers
+                )
+
+                if response.status_code != 200:
+                    return JSONResponse({'error': f'API error: {response.status_code}'}, status_code=500)
+
+                data = response.json()
+                if data.get("code") != 0:
+                    return JSONResponse({'error': 'Failed to fetch balance'}, status_code=500)
+
+                return JSONResponse({
+                    'success': True,
+                    'balance': data.get('data', {})
+                })
+
+        except Exception as e:
+            print(f"Error fetching Tripo3D balance: {e}")
+            return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+
+    print("Test API routes registered: /api/temp-image, /api/test-inpainting, /api/inpainting-history, /api/remove-background, /api/convert-to-3d, /api/model3d-history, /api/model-state, /api/models-for-background, /api/save-all-models, /api/tripo-balance")
 
 
 # =========================================================================
