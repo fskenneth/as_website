@@ -742,6 +742,23 @@ async def save_default_rotation(request: Request):
                 )
             ''')
 
+            # Migrate existing table if needed - add brightness and tilt columns
+            try:
+                # Check if columns exist
+                await cursor.execute("PRAGMA table_info(model_default_rotations)")
+                columns = await cursor.fetchall()
+                column_names = [col[1] for col in columns]
+
+                if 'brightness' not in column_names:
+                    await cursor.execute('ALTER TABLE model_default_rotations ADD COLUMN brightness REAL DEFAULT 3.0')
+                    print("Added brightness column to model_default_rotations")
+
+                if 'tilt' not in column_names:
+                    await cursor.execute('ALTER TABLE model_default_rotations ADD COLUMN tilt REAL DEFAULT 0.1745')
+                    print("Added tilt column to model_default_rotations")
+            except Exception as migrate_error:
+                print(f"Migration check/update: {migrate_error}")
+
             # Insert or update all properties
             await cursor.execute('''
                 INSERT INTO model_default_rotations (model3d, rotation, brightness, tilt, updated_at)
