@@ -6040,6 +6040,9 @@ def get_property_selector_styles():
     }
 
     .item-3d-icon {
+        position: absolute;
+        top: 6px;
+        right: 6px;
         width: 28px;
         height: 28px;
         background: none;
@@ -6047,6 +6050,7 @@ def get_property_selector_styles():
         align-items: center;
         justify-content: center;
         color: #000000;
+        z-index: 2;
     }
 
     .item-count-label {
@@ -6071,10 +6075,12 @@ def get_property_selector_styles():
 
     /* 3D icon in item button */
     .item-btn .item-3d-icon {
+        position: absolute;
         top: 4px;
         right: 4px;
         width: 24px;
         height: 24px;
+        z-index: 2;
     }
 
     .item-btn .item-3d-icon svg {
@@ -6961,6 +6967,7 @@ def get_property_selector_styles():
         aspect-ratio: 1;
         flex-shrink: 0;
         display: block;
+        position: relative;
     }
 
     .item-btn.has-selected-image .item-emoji img {

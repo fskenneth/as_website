@@ -11,6 +11,12 @@ from datetime import datetime
 from typing import List, Dict, Optional
 import logging
 
+# Handle both relative and absolute imports
+try:
+    from .image_url_processor import image_url_processor
+except ImportError:
+    from image_url_processor import image_url_processor
+
 logger = logging.getLogger(__name__)
 
 # Report URL - filtered to show items modified in last 1 minute
@@ -104,8 +110,40 @@ class ZohoPageScraper:
 
                         // Check for images
                         const img = cell.querySelector('img');
-                        if (img && img.src) {
-                            value = img.src;
+                        if (img) {
+                            // Try to extract original URL from various sources
+                            // 1. Check data-src attribute (often contains original URL)
+                            if (img.dataset.src && img.dataset.src.includes('files.zohopublic.com')) {
+                                value = img.dataset.src;
+                            }
+                            // 2. Check if src contains files.zohopublic.com
+                            else if (img.src && img.src.includes('files.zohopublic.com')) {
+                                value = img.src;
+                            }
+                            // 3. Try to extract from imgproxy URL
+                            else if (img.src && img.src.includes('imgproxy')) {
+                                // Extract the original URL from imgproxy URL pattern
+                                // Format: /imgproxy/.../.../aHR0cHM6Ly9maWxlcy56b2hvcHVibGljLmNvbS8uLi4
+                                const match = img.src.match(/\\/([^\\/]+)$/);
+                                if (match) {
+                                    try {
+                                        const decoded = atob(match[1].replace(/-/g, '+').replace(/_/g, '/'));
+                                        if (decoded.startsWith('http')) {
+                                            value = decoded;
+                                        } else {
+                                            value = img.src;
+                                        }
+                                    } catch (e) {
+                                        value = img.src;
+                                    }
+                                } else {
+                                    value = img.src;
+                                }
+                            }
+                            // 4. Fallback to whatever src is available
+                            else if (img.src) {
+                                value = img.src;
+                            }
                         }
 
                         // Use header name if available, otherwise use index
@@ -151,6 +189,7 @@ class ZohoPageScraper:
         """
         Normalize raw scraped item to match database schema.
         Maps scraped column names to database field names.
+        Transforms files.zohopublic.com URLs to creatorexport.zoho.com URLs.
         """
         # Field mapping from scraped names to database names
         field_map = {
@@ -203,6 +242,31 @@ class ZohoPageScraper:
         # Must have ID
         if not normalized.get('ID'):
             return None
+
+        # Transform files.zohopublic.com URLs to creatorexport.zoho.com format
+        report_name = "Item_Report"
+
+        # Transform Item_Image if present
+        if normalized.get('Item_Image') and 'files.zohopublic.com' in normalized['Item_Image']:
+            result = image_url_processor.transform_files_zohopublic_url(
+                normalized['Item_Image'],
+                'Item_Image',
+                report_name
+            )
+            if result['success']:
+                normalized['Item_Image'] = result['url']
+                logger.debug(f"Transformed Item_Image URL for record {normalized['ID']}")
+
+        # Transform Resized_Image if present
+        if normalized.get('Resized_Image') and 'files.zohopublic.com' in normalized['Resized_Image']:
+            result = image_url_processor.transform_files_zohopublic_url(
+                normalized['Resized_Image'],
+                'Resized_Image',
+                report_name
+            )
+            if result['success']:
+                normalized['Resized_Image'] = result['url']
+                logger.debug(f"Transformed Resized_Image URL for record {normalized['ID']}")
 
         return normalized
 

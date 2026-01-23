@@ -35,17 +35,15 @@ def transform_zoho_image_url(url, field_name):
         # Extract needed info
         record_id = data.get('recordid')
         filepath = data.get('filepath')
+        private_key = data.get('privatekey')
         report_name = 'Item_Report'
 
-        if not record_id or not filepath:
-            print(f"  Missing recordid or filepath: {data}")
+        if not record_id or not filepath or not private_key:
+            print(f"  Missing recordid, filepath, or privatekey: recordid={record_id}, filepath={filepath}, privatekey={'***' if private_key else None}")
             return url
 
         # Extract timestamp from filepath (e.g., "1684870719493" from "1684870719493_710")
         timestamp = filepath.split('_')[0]
-
-        # Construct the working URL format
-        private_key = 'nRxUJtEBFywkxJJ2RNwqbbG9FTZ8QZ0wzde3u0fh5p58fbPt9Kzr06ntwR9vGeJwO63SOMJtQSMY54X3TzMvP4gqOTR14mDDnZNx'
 
         # Get the actual filename from the filepath
         # If filepath contains an actual filename like "1672853471626_Sofa_6764_1920.jpeg", use it
