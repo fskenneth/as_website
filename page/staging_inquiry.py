@@ -3576,7 +3576,7 @@ def property_type_selector():
                     updatePhotoBrightnessSliderPosition(bgBrightnessValue);
 
                     // Hide all photo control buttons
-                    const buttons = photoSlide.querySelectorAll('.photo-camera-inline-btn, .photo-upload-inline-btn, .photo-brightness-btn, .photo-rotate-btn, .photo-delete-btn');
+                    const buttons = photoSlide.querySelectorAll('.photo-camera-inline-btn, .photo-upload-inline-btn, .photo-brightness-btn, .photo-empty-room-btn, .photo-rotate-btn, .photo-delete-btn');
                     buttons.forEach(btn => btn.style.display = 'none');
 
                     // Show slider
@@ -3586,7 +3586,7 @@ def property_type_selector():
                     slider.style.display = 'none';
 
                     // Show all photo control buttons
-                    const buttons = photoSlide.querySelectorAll('.photo-camera-inline-btn, .photo-upload-inline-btn, .photo-brightness-btn, .photo-rotate-btn, .photo-delete-btn');
+                    const buttons = photoSlide.querySelectorAll('.photo-camera-inline-btn, .photo-upload-inline-btn, .photo-brightness-btn, .photo-empty-room-btn, .photo-rotate-btn, .photo-delete-btn');
                     buttons.forEach(btn => btn.style.display = 'flex');
                 }
             }
@@ -4148,6 +4148,11 @@ def property_type_selector():
                                 <line x1="21" y1="12" x2="23" y2="12"/>
                                 <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
                                 <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                            </svg>
+                        </button>
+                        <button class="photo-empty-room-btn" onclick="emptyRoomBackground()" title="Empty Room - Remove Furniture">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 10l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V10z"/>
                             </svg>
                         </button>
                         <button class="photo-rotate-btn" onclick="rotateItemsPhoto(${currentItemsPhotoIndex})">
@@ -5392,7 +5397,146 @@ def property_type_selector():
                 // Then restore from session storage
                 setTimeout(restoreStagingSession, 50);
             });
+
+            // Empty Room - Remove furniture from background
+            async function emptyRoomBackground() {
+                const photos = window.itemsPhotos || [];
+                if (photos.length === 0 || currentItemsPhotoIndex === null) {
+                    alert('No photo available to process');
+                    return;
+                }
+
+                const currentPhotoSrc = photos[currentItemsPhotoIndex];
+
+                // Show progress modal
+                const modal = document.getElementById('empty-room-modal');
+                modal.classList.add('active');
+
+                const statusEl = document.getElementById('empty-room-status');
+                const progressText = document.getElementById('progress-text');
+                const progressFill = document.getElementById('progress-circle-fill');
+                const creditsEl = document.getElementById('credits-remaining');
+
+                statusEl.textContent = 'Fetching credits...';
+                progressText.textContent = '0%';
+                progressFill.style.strokeDashoffset = '408.4';
+
+                try {
+                    // Fetch remaining credits
+                    const creditsResponse = await fetch('/api/decor8-credits');
+                    const creditsData = await creditsResponse.json();
+
+                    if (creditsData.credits !== undefined) {
+                        creditsEl.textContent = creditsData.credits;
+                    } else {
+                        creditsEl.textContent = 'Unknown';
+                    }
+
+                    // Convert image to base64
+                    statusEl.textContent = 'Preparing image...';
+                    updateProgress(10);
+
+                    const response = await fetch(currentPhotoSrc);
+                    const blob = await response.blob();
+                    const reader = new FileReader();
+
+                    const base64Image = await new Promise((resolve, reject) => {
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(blob);
+                    });
+
+                    statusEl.textContent = 'Removing furniture... (1-2 minutes)';
+                    updateProgress(20);
+
+                    // Call API to remove furniture
+                    const inpaintResponse = await fetch('/api/test-inpainting', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            image: base64Image,
+                            method: 5
+                        })
+                    });
+
+                    updateProgress(90);
+
+                    const result = await inpaintResponse.json();
+
+                    if (result.success && result.result.result_base64) {
+                        statusEl.textContent = 'Adding to carousel...';
+                        updateProgress(95);
+
+                        // Add the empty room image to photos array
+                        const emptyRoomImage = result.result.result_base64;
+                        window.itemsPhotos.push(emptyRoomImage);
+
+                        // Navigate to the new image
+                        currentItemsPhotoIndex = window.itemsPhotos.length - 1;
+                        updateItemsPhotoDisplay();
+
+                        statusEl.textContent = 'Complete!';
+                        updateProgress(100);
+
+                        // Close modal after success
+                        setTimeout(() => {
+                            modal.classList.remove('active');
+                        }, 1500);
+                    } else {
+                        throw new Error(result.error || 'Failed to remove furniture');
+                    }
+                } catch (error) {
+                    console.error('Empty room error:', error);
+                    statusEl.textContent = 'Error: ' + error.message;
+                    statusEl.style.color = '#dc2626';
+
+                    // Close modal after error
+                    setTimeout(() => {
+                        modal.classList.remove('active');
+                        alert('Failed to remove furniture: ' + error.message);
+                    }, 2000);
+                }
+            }
+
+            function updateProgress(percent) {
+                const progressText = document.getElementById('progress-text');
+                const progressFill = document.getElementById('progress-circle-fill');
+
+                progressText.textContent = Math.round(percent) + '%';
+
+                // Calculate stroke-dashoffset (408.4 is full circle, 0 is complete)
+                const offset = 408.4 - (408.4 * percent / 100);
+                progressFill.style.strokeDashoffset = offset;
+            }
         """),
+        # Empty Room Progress Modal
+        Div(
+            Div(
+                H3("Removing Furniture..."),
+                Div(
+                    Div(
+                        f'<svg class="progress-circle" width="150" height="150" viewBox="0 0 150 150">',
+                        f'<circle class="progress-circle-bg" cx="75" cy="75" r="65"></circle>',
+                        f'<circle class="progress-circle-fill" cx="75" cy="75" r="65" '
+                        f'stroke-dasharray="408.4" stroke-dashoffset="408.4" id="progress-circle-fill"></circle>',
+                        f'</svg>',
+                        NotStr=True
+                    ),
+                    Div("0%", id="progress-text", cls="progress-text"),
+                    cls="progress-circle-container"
+                ),
+                Div("Initializing...", id="empty-room-status", cls="empty-room-status"),
+                Div(
+                    Div("Remaining Credits: ", Strong("Loading...", id="credits-remaining")),
+                    cls="credits-info"
+                ),
+                cls="empty-room-modal-content"
+            ),
+            id="empty-room-modal",
+            cls="empty-room-modal"
+        ),
         cls="property-type-section"
     )
 
@@ -6066,9 +6210,6 @@ def get_property_selector_styles():
     }
 
     .item-3d-icon {
-        position: absolute;
-        top: 6px;
-        right: 6px;
         width: 28px;
         height: 28px;
         background: none;
@@ -6076,7 +6217,7 @@ def get_property_selector_styles():
         align-items: center;
         justify-content: center;
         color: #000000;
-        z-index: 2;
+        flex-shrink: 0;
     }
 
     .item-count-label {
@@ -6091,6 +6232,7 @@ def get_property_selector_styles():
         align-items: center;
         justify-content: center;
         border: 1px solid #000000;
+        flex-shrink: 0;
     }
 
     .item-3d-icon svg {
@@ -6456,7 +6598,7 @@ def get_property_selector_styles():
     .photo-rotate-btn {
         position: absolute;
         top: 12px;
-        left: calc(50% + 44px);
+        left: calc(50% + 88px);
         transform: translateX(-50%);
         width: 36px;
         height: 36px;
@@ -6487,7 +6629,7 @@ def get_property_selector_styles():
     .photo-delete-btn {
         position: absolute;
         top: 12px;
-        left: calc(50% + 88px);
+        left: calc(50% + 132px);
         transform: translateX(-50%);
         width: 36px;
         height: 36px;
@@ -6898,6 +7040,134 @@ def get_property_selector_styles():
     .photo-brightness-btn:active {
         cursor: grabbing;
         background: rgba(0, 0, 0, 0.8);
+    }
+
+    .photo-empty-room-btn {
+        position: absolute;
+        top: 12px;
+        left: calc(50% + 44px);
+        transform: translateX(-50%);
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.5);
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        z-index: 25;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .photo-empty-room-btn svg {
+        width: 18px;
+        height: 18px;
+        stroke: white;
+        fill: none;
+        transform: translateY(-1px);
+    }
+
+    .photo-empty-room-btn:hover {
+        background: rgba(0, 0, 0, 0.7);
+        transform: translateX(-50%) scale(1.1);
+    }
+
+    .photo-empty-room-btn:active {
+        background: rgba(0, 0, 0, 0.8);
+    }
+
+    /* Empty Room Progress Modal */
+    .empty-room-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .empty-room-modal.active {
+        display: flex;
+    }
+
+    .empty-room-modal-content {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        max-width: 400px;
+        width: 90%;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    }
+
+    .empty-room-modal h3 {
+        margin: 0 0 1.5rem 0;
+        color: #333;
+        font-size: 1.5rem;
+    }
+
+    .progress-circle-container {
+        position: relative;
+        width: 150px;
+        height: 150px;
+        margin: 1rem auto;
+    }
+
+    .progress-circle {
+        width: 100%;
+        height: 100%;
+        transform: rotate(-90deg);
+    }
+
+    .progress-circle-bg {
+        fill: none;
+        stroke: #e5e7eb;
+        stroke-width: 8;
+    }
+
+    .progress-circle-fill {
+        fill: none;
+        stroke: #667eea;
+        stroke-width: 8;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.3s ease;
+    }
+
+    .progress-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #667eea;
+    }
+
+    .credits-info {
+        margin-top: 1.5rem;
+        padding: 1rem;
+        background: #f3f4f6;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        color: #666;
+    }
+
+    .credits-info strong {
+        color: #333;
+        font-size: 1.1rem;
+    }
+
+    .empty-room-status {
+        margin-top: 1rem;
+        color: #667eea;
+        font-size: 0.9rem;
+        min-height: 20px;
     }
 
     /* Photo Brightness Slider */
