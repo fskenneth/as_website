@@ -293,7 +293,8 @@ def register_test_routes(rt):
             elif method == 'triposr':
                 result = await convert_3d_triposr(image_bytes)
             elif method == 'tripo3d':
-                result = await convert_3d_tripo3d(
+                # Return task_id immediately for progress polling
+                task_result = await create_tripo3d_task(
                     image_bytes,
                     prompt=prompt,
                     negative_prompt=negative_prompt,
@@ -301,6 +302,14 @@ def register_test_routes(rt):
                     enable_image_autofix=enable_image_autofix,
                     orientation=orientation
                 )
+                if task_result.get('task_id'):
+                    return JSONResponse({
+                        'success': True,
+                        'task_id': task_result['task_id'],
+                        'requires_polling': True
+                    })
+                else:
+                    return JSONResponse({'success': False, 'error': 'Failed to create task'}, status_code=500)
             else:
                 return JSONResponse({'success': False, 'error': f'Unknown method: {method}'}, status_code=400)
 
@@ -715,7 +724,103 @@ def register_test_routes(rt):
             print(f"Error fetching Tripo3D balance: {e}")
             return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
 
-    print("Test API routes registered: /api/temp-image, /api/test-inpainting, /api/inpainting-history, /api/remove-background, /api/convert-to-3d, /api/model3d-history, /api/model-state, /api/models-for-background, /api/save-all-models, /api/tripo-balance")
+    @rt('/api/check-tripo-task/{task_id}')
+    async def check_tripo_task(task_id: str):
+        """Check the status and progress of a Tripo3D task"""
+        import os
+        import httpx
+
+        api_key = os.getenv('TRIPO_API_KEY')
+        if not api_key:
+            return JSONResponse({'success': False, 'error': 'API key not configured'}, status_code=500)
+
+        base_url = "https://api.tripo3d.ai/v2/openapi"
+        headers = {"Authorization": f"Bearer {api_key}"}
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                status_response = await client.get(
+                    f"{base_url}/task/{task_id}",
+                    headers=headers
+                )
+
+                status_data = status_response.json()
+                if status_data.get("code") != 0:
+                    return JSONResponse({'success': False, 'error': 'Failed to get task status'}, status_code=500)
+
+                task_info = status_data["data"]
+                status = task_info["status"]
+                progress = task_info.get("progress", 0)
+
+                return JSONResponse({
+                    'success': True,
+                    'status': status,
+                    'progress': progress
+                })
+        except Exception as e:
+            return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+
+    @rt('/api/download-tripo-model/{task_id}')
+    async def download_tripo_model(task_id: str):
+        """Download the completed 3D model from Tripo3D"""
+        import os
+        import httpx
+        import uuid
+
+        api_key = os.getenv('TRIPO_API_KEY')
+        if not api_key:
+            return JSONResponse({'success': False, 'error': 'API key not configured'}, status_code=500)
+
+        base_url = "https://api.tripo3d.ai/v2/openapi"
+        headers = {"Authorization": f"Bearer {api_key}"}
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                # Get task status
+                status_response = await client.get(
+                    f"{base_url}/task/{task_id}",
+                    headers=headers
+                )
+
+                status_data = status_response.json()
+                if status_data.get("code") != 0:
+                    return JSONResponse({'success': False, 'error': 'Failed to get task status'}, status_code=500)
+
+                task_info = status_data["data"]
+                status = task_info["status"]
+
+                if status != "success":
+                    return JSONResponse({'success': False, 'error': f'Task not completed: {status}'}, status_code=400)
+
+                # Download the model
+                output = task_info.get("output", {})
+                model_url = output.get("model") or output.get("mesh") or output.get("glb") or output.get("pbr_model") or output.get("base_model")
+
+                if not model_url:
+                    return JSONResponse({'success': False, 'error': 'No model URL in output'}, status_code=500)
+
+                model_response = await client.get(model_url)
+                if model_response.status_code != 200:
+                    return JSONResponse({'success': False, 'error': 'Failed to download model'}, status_code=500)
+
+                # Save model
+                model_id = str(uuid.uuid4())
+                model_dir = Path('static/models')
+                model_dir.mkdir(parents=True, exist_ok=True)
+                output_path = model_dir / f"{model_id}.glb"
+
+                with open(output_path, 'wb') as f:
+                    f.write(model_response.content)
+
+                return JSONResponse({
+                    'success': True,
+                    'model_url': f'/static/models/{model_id}.glb',
+                    'format': 'glb'
+                })
+        except Exception as e:
+            return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+
+    print("Test API routes registered: /api/temp-image, /api/test-inpainting, /api/inpainting-history, /api/remove-background, /api/convert-to-3d, /api/model3d-history, /api/model-state, /api/models-for-background, /api/save-all-models, /api/tripo-balance, /api/check-tripo-task, /api/download-tripo-model")
 
 
 # =========================================================================
@@ -1178,3 +1283,76 @@ async def convert_3d_tripo3d(image_bytes, prompt=None, negative_prompt=None, pbr
                 raise Exception("Tripo3D: Task was cancelled")
 
         raise Exception("Tripo3D: Task timed out after 3 minutes")
+
+
+async def create_tripo3d_task(image_bytes, prompt=None, negative_prompt=None, pbr=True, enable_image_autofix=True, orientation='align_image'):
+    """Create a Tripo3D task and return task_id immediately for frontend polling"""
+    import os
+    import httpx
+
+    api_key = os.getenv('TRIPO_API_KEY')
+    if not api_key:
+        raise Exception("TRIPO_API_KEY not set in environment")
+
+    base_url = "https://api.tripo3d.ai/v2/openapi"
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        # Step 1: Upload image
+        print("Tripo3D: Uploading image...")
+        upload_response = await client.post(
+            f"{base_url}/upload",
+            headers=headers,
+            files={"file": ("image.png", image_bytes, "image/png")}
+        )
+
+        if upload_response.status_code != 200:
+            raise Exception(f"Tripo3D upload error: {upload_response.status_code} - {upload_response.text}")
+
+        upload_data = upload_response.json()
+        if upload_data.get("code") != 0:
+            raise Exception(f"Tripo3D upload error: {upload_data}")
+
+        file_token = upload_data["data"]["image_token"]
+        print(f"Tripo3D: Image uploaded, token: {file_token[:20]}...")
+
+        # Step 2: Create task
+        task_payload = {
+            "type": "image_to_model",
+            "model_version": "v2.5-20250123",
+            "file": {
+                "type": "png",
+                "file_token": file_token
+            },
+        }
+
+        if pbr:
+            task_payload["pbr"] = True
+        if enable_image_autofix:
+            task_payload["enable_image_autofix"] = True
+        if orientation and orientation != 'default':
+            task_payload["orientation"] = orientation
+        if prompt:
+            task_payload["prompt"] = prompt
+        if negative_prompt:
+            task_payload["negative_prompt"] = negative_prompt
+
+        task_response = await client.post(
+            f"{base_url}/task",
+            headers={**headers, "Content-Type": "application/json"},
+            json=task_payload
+        )
+
+        if task_response.status_code != 200:
+            raise Exception(f"Tripo3D task creation error: {task_response.status_code}")
+
+        task_data = task_response.json()
+        if task_data.get("code") != 0:
+            raise Exception(f"Tripo3D task creation error: {task_data}")
+
+        task_id = task_data["data"]["task_id"]
+        print(f"Tripo3D: Task created, id: {task_id}")
+
+        return {"task_id": task_id}
+
+

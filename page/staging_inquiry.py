@@ -3627,6 +3627,36 @@ def property_type_selector():
                     const result = await response.json();
 
                     if (result.success) {
+                        // Update the model's frontRotation in userData
+                        currentLoadedModel.userData.frontRotation = rotation;
+                        currentLoadedModel.userData.yRotation = rotation;
+
+                        // Find and update the item button's dataset for future drags
+                        const itemName = currentLoadedModel.userData.itemName;
+                        document.querySelectorAll('.item-btn').forEach(btn => {
+                            if (btn.dataset.selectedName === itemName && btn.dataset.model3d === model3d) {
+                                btn.dataset.frontRotation = rotation;
+                                console.log(`Updated item button frontRotation for ${itemName} to ${rotation}`);
+                            }
+                        });
+
+                        // Update areaSelectedItems for persistence
+                        if (currentArea && areaSelectedItems[currentArea]) {
+                            Object.keys(areaSelectedItems[currentArea]).forEach(itemType => {
+                                const item = areaSelectedItems[currentArea][itemType];
+                                if (item.itemName === itemName && item.model3d === model3d) {
+                                    item.frontRotation = rotation;
+                                    console.log(`Updated areaSelectedItems frontRotation for ${itemName} to ${rotation}`);
+                                }
+                            });
+                        }
+
+                        // Save session storage with updated rotation
+                        saveStagingSession();
+
+                        // Save model states to persist the updated frontRotation
+                        await saveModelStates();
+
                         // Visual feedback
                         const btn = document.querySelector('#btn-set-default');
                         const originalColor = btn.style.backgroundColor;
@@ -3713,7 +3743,8 @@ def property_type_selector():
                     brightness: model.userData.brightness || 2.5,
                     width: model.userData.width || 0,
                     depth: model.userData.depth || 0,
-                    height: model.userData.height || 0
+                    height: model.userData.height || 0,
+                    frontRotation: model.userData.frontRotation ?? -Math.PI/2
                 }));
 
                 // Get staging_id from the page if available
@@ -3926,7 +3957,7 @@ def property_type_selector():
                             model3d: modelData.modelUrl,
                             itemName: modelData.itemName,
                             imageUrl: modelData.imageUrl,
-                            frontRotation: -Math.PI/2, // Default front rotation
+                            frontRotation: modelData.frontRotation ?? -Math.PI/2,
                             yRotation: modelData.rotationY || 0,
                             positionZone: currentZone, // Track zone for rotation changes
                             tilt: modelData.tilt ?? DEFAULT_TILT,

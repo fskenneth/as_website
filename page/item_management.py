@@ -1096,6 +1096,11 @@ async def get(request):
                         Div(
                             Div(style="width: 40px; height: 40px; border: 3px solid #f3f3f3; border-top: 3px solid #4caf50; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 12px;"),
                             Span("Starting conversion...", id="convert-status", style="color: #666;"),
+                            # Progress bar
+                            Div(
+                                Div(id="convert-progress-bar", style="width: 0%; height: 100%; background: #4caf50; border-radius: 4px; transition: width 0.3s ease;"),
+                                style="width: 100%; height: 20px; background: #e0e0e0; border-radius: 4px; margin-top: 12px; overflow: hidden;"
+                            ),
                             style="text-align: center;"
                         ),
                         id="convert-progress",
@@ -1972,7 +1977,7 @@ async def get(request):
                     const imageBase64 = proxyData.image_base64;
 
                     // Start conversion
-                    statusSpan.textContent = 'Uploading to Tripo3D... (this may take 60-90 seconds)';
+                    statusSpan.textContent = 'Uploading to Tripo3D...';
                     const response = await fetch('/api/convert-to-3d', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1987,6 +1992,51 @@ async def get(request):
                     });
 
                     const result = await response.json();
+
+                    if (result.success && result.requires_polling && result.task_id) {
+                        // Poll for progress
+                        const taskId = result.task_id;
+                        const progressBar = document.getElementById('convert-progress-bar');
+                        statusSpan.textContent = 'Converting to 3D (0%)...';
+                        if (progressBar) progressBar.style.width = '0%';
+
+                        let taskStatus = 'running';
+                        while (taskStatus === 'running' || taskStatus === 'queued') {
+                            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+
+                            const statusResponse = await fetch(`/api/check-tripo-task/${taskId}`);
+                            const statusData = await statusResponse.json();
+
+                            if (statusData.success) {
+                                taskStatus = statusData.status;
+                                const progress = statusData.progress || 0;
+
+                                statusSpan.textContent = `Converting to 3D (${progress}%)...`;
+                                if (progressBar) progressBar.style.width = `${progress}%`;
+
+                                if (taskStatus === 'success') {
+                                    // Download the completed model
+                                    statusSpan.textContent = 'Downloading model...';
+                                    if (progressBar) progressBar.style.width = '95%';
+
+                                    const downloadResponse = await fetch(`/api/download-tripo-model/${taskId}`);
+                                    const downloadData = await downloadResponse.json();
+
+                                    if (!downloadData.success) {
+                                        throw new Error(downloadData.error || 'Failed to download model');
+                                    }
+
+                                    // Use the downloaded model
+                                    result.model_url = downloadData.model_url;
+                                    break;
+                                } else if (taskStatus === 'failed' || taskStatus === 'banned' || taskStatus === 'cancelled') {
+                                    throw new Error(`Task ${taskStatus}`);
+                                }
+                            } else {
+                                throw new Error(statusData.error || 'Failed to check task status');
+                            }
+                        }
+                    }
 
                     if (result.success && result.model_url) {
                         statusSpan.textContent = 'Conversion successful! Renaming and saving model...';
