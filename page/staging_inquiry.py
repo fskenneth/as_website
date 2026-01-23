@@ -2400,7 +2400,7 @@ def property_type_selector():
             let threeRenderer = null;
             let currentLoadedModel = null;
             let allLoadedModels = [];
-            let modelBrightness = 5.0; // Default brightness (range: 0 to 10)
+            let modelBrightness = 3.0; // Default brightness (range: 0 to 10, 3.0 ≈ old intensity of 1.0)
             const MAX_MODEL_BRIGHTNESS = 10.0; // Maximum brightness for models
             let modelTilt = 0.1745; // ~10 degrees default tilt
             const DEFAULT_TILT = 0.1745;
@@ -2947,8 +2947,8 @@ def property_type_selector():
                     // Apply default tilt
                     model.rotation.x = DEFAULT_TILT;
 
-                    // Use default brightness (5.0 for good visibility)
-                    const modelBrightness = 5.0;
+                    // Use default brightness (3.0 matches old default, works for both light and dark models)
+                    const modelBrightness = 3.0;
 
                     // Store item data
                     model.userData = {
@@ -2994,7 +2994,7 @@ def property_type_selector():
                         materials.forEach(mat => {
                             if (mat.color) {
                                 // Map brightness (0-10) to intensity (0.2-3.0)
-                                // Default brightness of 5.0 gives intensity of 1.6
+                                // Default brightness of 3.0 gives intensity of ~1.0 (same as old default)
                                 const intensity = 0.2 + (brightness / MAX_MODEL_BRIGHTNESS) * 2.8;
                                 mat.color.setScalar(intensity);
                             }
@@ -3010,7 +3010,7 @@ def property_type_selector():
 
                 if (slider && buttonGroup && btnBrightness) {
                     if (show && currentLoadedModel) {
-                        const brightness = currentLoadedModel.userData.brightness ?? 5.0;
+                        const brightness = currentLoadedModel.userData.brightness ?? 3.0;
                         const thumbPercent = brightness / MAX_MODEL_BRIGHTNESS; // 0 to 1
 
                         // Get button center position BEFORE hiding the button group
@@ -3743,7 +3743,7 @@ def property_type_selector():
                     scale: model.scale.x,
                     rotationY: model.userData.yRotation || 0,
                     tilt: model.userData.tilt ?? DEFAULT_TILT,
-                    brightness: model.userData.brightness || 5.0,
+                    brightness: model.userData.brightness || 3.0,
                     width: model.userData.width || 0,
                     depth: model.userData.depth || 0,
                     height: model.userData.height || 0,
@@ -3964,7 +3964,7 @@ def property_type_selector():
                             yRotation: modelData.rotationY || 0,
                             positionZone: currentZone, // Track zone for rotation changes
                             tilt: modelData.tilt ?? DEFAULT_TILT,
-                            brightness: modelData.brightness || 5.0,
+                            brightness: modelData.brightness || 3.0,
                             baseScale: modelData.scale || 1,
                             instanceId: allLoadedModels.length
                         };
@@ -3975,7 +3975,7 @@ def property_type_selector():
 
                         // Set render order based on Z position (higher Z = in front)
                         updateModelDepthFromY(model);
-                        updateModelBrightness(model, modelData.brightness || 5.0);
+                        updateModelBrightness(model, modelData.brightness || 3.0);
                         resolve();
                     }, undefined, (error) => {
                         console.error('Error loading saved model:', error);
