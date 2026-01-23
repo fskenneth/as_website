@@ -167,6 +167,37 @@ def register_test_routes(rt):
             print(f"Error loading history: {e}")
             return JSONResponse({'error': str(e)}, status_code=500)
 
+    @rt('/api/decor8-credits')
+    async def get_decor8_credits():
+        """Get remaining Decor8.ai API credits"""
+        try:
+            import requests
+            import os
+
+            decor8_key = os.getenv('DECOR8_API_KEY', '')
+            if not decor8_key:
+                return JSONResponse({'error': 'DECOR8_API_KEY not set', 'credits': 0})
+
+            # Call Decor8.ai API to get credits
+            response = requests.get(
+                'https://api.decor8.ai/credits',
+                headers={
+                    'Authorization': f'Bearer {decor8_key}'
+                },
+                timeout=10
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                credits = data.get('credits', 0)
+                return JSONResponse({'credits': credits})
+            else:
+                return JSONResponse({'error': f'API returned status {response.status_code}', 'credits': 0})
+
+        except Exception as e:
+            print(f"Error fetching Decor8.ai credits: {e}")
+            return JSONResponse({'error': str(e), 'credits': 0})
+
     # =========================================================================
     # BACKGROUND REMOVAL ENDPOINTS
     # =========================================================================
