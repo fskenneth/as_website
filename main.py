@@ -601,7 +601,7 @@ def get_inventory_items(item_type: str = ""):
 
         query = """
             SELECT Item_Name, Item_Type, Item_Image, Resized_Image, Item_Color, Item_Style, Model_3D,
-                   Item_Width, Item_Depth, Item_Height
+                   Item_Width, Item_Depth, Item_Height, COUNT(*) as Item_Count
             FROM Item_Report
             WHERE Item_Name IS NOT NULL AND Item_Name != ''
         """
@@ -613,7 +613,8 @@ def get_inventory_items(item_type: str = ""):
             params.append(item_type)
             params.append(f"{item_type}%")
 
-        query += " ORDER BY Item_Name"
+        # Group by Item_Name to show only one item per Item_Name and get count
+        query += " GROUP BY Item_Name ORDER BY Item_Name"
 
         cursor.execute(query, params)
         items = cursor.fetchall()
@@ -686,7 +687,8 @@ def get_inventory_items(item_type: str = ""):
                     'model_3d': model_3d,
                     'width': width,
                     'depth': depth,
-                    'height': height
+                    'height': height,
+                    'count': item['Item_Count']
                 }
             elif model_3d and not items_data[name].get('model_3d'):
                 # Update model_3d if this record has one and previous didn't

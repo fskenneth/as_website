@@ -2074,7 +2074,8 @@ def property_type_selector():
                                         width: width,
                                         depth: depth,
                                         height: height,
-                                        front_rotation: front_rotation
+                                        front_rotation: front_rotation,
+                                        count: item.count || 1
                                     });
                                 });
                             }
@@ -2096,13 +2097,25 @@ def property_type_selector():
                             img.alt = imageData.name;
                             img.loading = 'lazy';
 
+                            // Add top-right container for icons and count
+                            const topRightContainer = document.createElement('div');
+                            topRightContainer.className = 'item-3d-icon-container';
+
                             // Add 3D icon if item has a 3D model
                             if (imageData.model_3d) {
                                 const icon3d = document.createElement('div');
                                 icon3d.className = 'item-3d-icon';
                                 icon3d.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>';
-                                card.appendChild(icon3d);
+                                topRightContainer.appendChild(icon3d);
                             }
+
+                            // Always add count label
+                            const countLabel = document.createElement('div');
+                            countLabel.className = 'item-count-label';
+                            countLabel.textContent = imageData.count;
+                            topRightContainer.appendChild(countLabel);
+
+                            card.appendChild(topRightContainer);
 
                             const nameLabel = document.createElement('div');
                             nameLabel.className = 'item-select-name';
@@ -5985,10 +5998,17 @@ def get_property_selector_styles():
         text-overflow: ellipsis;
     }
 
-    .item-3d-icon {
+    .item-3d-icon-container {
         position: absolute;
         top: 6px;
         right: 6px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        z-index: 2;
+    }
+
+    .item-3d-icon {
         width: 28px;
         height: 28px;
         background: none;
@@ -5996,7 +6016,20 @@ def get_property_selector_styles():
         align-items: center;
         justify-content: center;
         color: #000000;
-        z-index: 2;
+    }
+
+    .item-count-label {
+        background: #ffffff;
+        color: #000000;
+        font-size: 12px;
+        font-weight: 700;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #000000;
     }
 
     .item-3d-icon svg {
