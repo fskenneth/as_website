@@ -2889,6 +2889,20 @@ def property_type_selector():
                 if (!threeScene) return;
 
                 const modelUrl = '/static/models/' + itemData.model3d;
+
+                // Fetch saved defaults for this model (rotation, brightness, tilt)
+                let savedDefaults = null;
+                try {
+                    const response = await fetch(`/api/get-default-rotation/${encodeURIComponent(itemData.model3d)}`);
+                    const result = await response.json();
+                    if (result.success) {
+                        savedDefaults = result;
+                        console.log(`Loaded saved defaults for ${itemData.model3d}:`, savedDefaults);
+                    }
+                } catch (error) {
+                    console.log('No saved defaults found for model:', itemData.model3d);
+                }
+
                 const loader = new THREE.GLTFLoader();
 
                 loader.load(modelUrl, (gltf) => {
@@ -2936,19 +2950,20 @@ def property_type_selector():
                     model.position.set(worldX, worldY, 0);
 
                     // Apply front rotation so model faces the user
-                    // Use the model's specific frontRotation, defaulting to -Math.PI/2
-                    let frontRotation = itemData.frontRotation ?? -Math.PI/2;
+                    // Use saved rotation if available, otherwise use itemData or default
+                    let frontRotation = savedDefaults?.rotation ?? itemData.frontRotation ?? -Math.PI/2;
 
                     // Get initial zone and rotation based on drop position
                     const initialZone = getPositionZone(worldX);
                     const initialRotation = getRotationForZone(initialZone, frontRotation);
                     model.rotation.y = initialRotation;
 
-                    // Apply default tilt
-                    model.rotation.x = DEFAULT_TILT;
+                    // Apply tilt - use saved value if available
+                    const modelTilt = savedDefaults?.tilt ?? itemData.tilt ?? DEFAULT_TILT;
+                    model.rotation.x = modelTilt;
 
-                    // Use default brightness (3.0 matches old default, works for both light and dark models)
-                    const modelBrightness = 3.0;
+                    // Use saved brightness if available, otherwise default to 3.0
+                    const modelBrightness = savedDefaults?.brightness ?? itemData.brightness ?? 3.0;
 
                     // Store item data
                     model.userData = {
@@ -2961,7 +2976,7 @@ def property_type_selector():
                         frontRotation: frontRotation,
                         yRotation: initialRotation, // Start from position-based rotation
                         positionZone: initialZone, // Track current zone for rotation changes
-                        tilt: DEFAULT_TILT,
+                        tilt: modelTilt,
                         brightness: modelBrightness,
                         baseScale: targetScale,
                         instanceId: allLoadedModels.length
@@ -3169,7 +3184,7 @@ def property_type_selector():
                                 <polyline points="21 15 16 10 5 21"/>
                             </svg>
                         </button>
-                        <button class="model-control-btn" id="btn-set-default" title="Set as default rotation">
+                        <button class="model-control-btn" id="btn-set-default" title="Save as default (rotation, brightness, tilt)">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
                             </svg>
@@ -3611,6 +3626,8 @@ def property_type_selector():
 
                 const model3d = currentLoadedModel.userData.model3d;
                 const rotation = currentLoadedModel.rotation.y;
+                const brightness = currentLoadedModel.userData.brightness || 3.0;
+                const tilt = currentLoadedModel.userData.tilt || DEFAULT_TILT;
 
                 if (!model3d) {
                     alert('Unable to identify model');
@@ -3623,7 +3640,9 @@ def property_type_selector():
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             model3d: model3d,
-                            rotation: rotation
+                            rotation: rotation,
+                            brightness: brightness,
+                            tilt: tilt
                         })
                     });
 
@@ -3639,7 +3658,9 @@ def property_type_selector():
                         document.querySelectorAll('.item-btn').forEach(btn => {
                             if (btn.dataset.selectedName === itemName && btn.dataset.model3d === model3d) {
                                 btn.dataset.frontRotation = rotation;
-                                console.log(`Updated item button frontRotation for ${itemName} to ${rotation}`);
+                                btn.dataset.brightness = brightness;
+                                btn.dataset.tilt = tilt;
+                                console.log(`Updated item button properties for ${itemName} - rotation: ${rotation}, brightness: ${brightness}, tilt: ${tilt}`);
                             }
                         });
 
@@ -3649,7 +3670,9 @@ def property_type_selector():
                                 const item = areaSelectedItems[currentArea][itemType];
                                 if (item.itemName === itemName && item.model3d === model3d) {
                                     item.frontRotation = rotation;
-                                    console.log(`Updated areaSelectedItems frontRotation for ${itemName} to ${rotation}`);
+                                    item.brightness = brightness;
+                                    item.tilt = tilt;
+                                    console.log(`Updated areaSelectedItems properties for ${itemName}`);
                                 }
                             });
                         }
@@ -3668,13 +3691,13 @@ def property_type_selector():
                             btn.style.backgroundColor = originalColor;
                         }, 500);
 
-                        console.log(`Saved default rotation for ${model3d}: ${rotation} radians`);
+                        console.log(`Saved default properties for ${model3d} - rotation: ${rotation}, brightness: ${brightness}, tilt: ${tilt}`);
                     } else {
-                        alert('Failed to save default rotation');
+                        alert('Failed to save default properties');
                     }
                 } catch (error) {
-                    console.error('Error saving default rotation:', error);
-                    alert('Error saving default rotation');
+                    console.error('Error saving default properties:', error);
+                    alert('Error saving default properties');
                 }
             }
 

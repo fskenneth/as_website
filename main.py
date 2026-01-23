@@ -719,39 +719,45 @@ def get_inventory_items(item_type: str = ""):
 
 @rt('/api/save-default-rotation', methods=['POST'])
 async def save_default_rotation(request: Request):
-    """Save default rotation for a 3D model"""
+    """Save default properties (rotation, brightness, tilt) for a 3D model"""
     try:
         data = await request.json()
         model3d = data.get('model3d')
         rotation = data.get('rotation')
+        brightness = data.get('brightness', 3.0)  # Default brightness
+        tilt = data.get('tilt', 0.1745)  # Default tilt (~10 degrees)
 
         if not model3d or rotation is None:
             return JSONResponse({'success': False, 'error': 'Missing model3d or rotation'}, status_code=400)
 
-        # Create table if it doesn't exist
+        # Create table if it doesn't exist (with brightness and tilt columns)
         async with zoho_db._connection.cursor() as cursor:
             await cursor.execute('''
                 CREATE TABLE IF NOT EXISTS model_default_rotations (
                     model3d TEXT PRIMARY KEY,
                     rotation REAL NOT NULL,
+                    brightness REAL DEFAULT 3.0,
+                    tilt REAL DEFAULT 0.1745,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
 
-            # Insert or update the rotation
+            # Insert or update all properties
             await cursor.execute('''
-                INSERT INTO model_default_rotations (model3d, rotation, updated_at)
-                VALUES (?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO model_default_rotations (model3d, rotation, brightness, tilt, updated_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT(model3d) DO UPDATE SET
                     rotation = excluded.rotation,
+                    brightness = excluded.brightness,
+                    tilt = excluded.tilt,
                     updated_at = CURRENT_TIMESTAMP
-            ''', (model3d, rotation))
+            ''', (model3d, rotation, brightness, tilt))
 
         await zoho_db._connection.commit()
 
-        return JSONResponse({'success': True, 'model3d': model3d, 'rotation': rotation})
+        return JSONResponse({'success': True, 'model3d': model3d, 'rotation': rotation, 'brightness': brightness, 'tilt': tilt})
     except Exception as e:
-        print(f"Error saving default rotation: {e}")
+        print(f"Error saving default properties: {e}")
         import traceback
         traceback.print_exc()
         return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
@@ -759,20 +765,25 @@ async def save_default_rotation(request: Request):
 
 @rt('/api/get-default-rotation/{model3d}')
 async def get_default_rotation(model3d: str):
-    """Get default rotation for a 3D model"""
+    """Get default properties (rotation, brightness, tilt) for a 3D model"""
     try:
         async with zoho_db._connection.cursor() as cursor:
             await cursor.execute('''
-                SELECT rotation FROM model_default_rotations WHERE model3d = ?
+                SELECT rotation, brightness, tilt FROM model_default_rotations WHERE model3d = ?
             ''', (model3d,))
             result = await cursor.fetchone()
 
         if result:
-            return JSONResponse({'success': True, 'rotation': result[0]})
+            return JSONResponse({
+                'success': True,
+                'rotation': result[0],
+                'brightness': result[1] if result[1] is not None else 3.0,
+                'tilt': result[2] if result[2] is not None else 0.1745
+            })
         else:
-            return JSONResponse({'success': False, 'error': 'No default rotation found'}, status_code=404)
+            return JSONResponse({'success': False, 'error': 'No default properties found'}, status_code=404)
     except Exception as e:
-        print(f"Error getting default rotation: {e}")
+        print(f"Error getting default properties: {e}")
         return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
 
 
@@ -1455,10 +1466,13 @@ def design(req: Request):
     return design_page(req, staging_id=staging_id)
 
 
-@rt('/test')
+@app.get('/test')
 def test():
-    """Test page for comparing inpainting methods"""
-    return test_inpainting_page()
+    """Test page for comparing inpainting methods - live reload disabled"""
+    from fasthtml.common import to_xml
+    content = test_inpainting_page()
+    # Return response without live reload
+    return Response(content=to_xml(content), media_type="text/html")
 
 
 # =============================================================================
