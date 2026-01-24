@@ -5517,41 +5517,14 @@ def property_type_selector():
                 modal.classList.add('active');
 
                 const statusEl = document.getElementById('empty-room-status');
-                const progressText = document.getElementById('progress-text');
-                const progressFill = document.getElementById('progress-circle-fill');
-                const creditsEl = document.getElementById('credits-remaining');
 
-                statusEl.textContent = 'Fetching credits...';
-                progressText.textContent = '0%';
-                progressFill.style.strokeDashoffset = '408.4';
+                statusEl.textContent = 'Preparing image...';
 
                 try {
-                    // Fetch remaining credits
-                    const creditsResponse = await fetch('/api/decor8-credits');
-                    const creditsData = await creditsResponse.json();
+                    // Use the image directly (already base64 data URL)
+                    const base64Image = currentPhotoSrc;
 
-                    if (creditsData.credits !== undefined) {
-                        creditsEl.textContent = creditsData.credits;
-                    } else {
-                        creditsEl.textContent = 'Unknown';
-                    }
-
-                    // Convert image to base64
-                    statusEl.textContent = 'Preparing image...';
-                    updateProgress(10);
-
-                    const response = await fetch(currentPhotoSrc);
-                    const blob = await response.blob();
-                    const reader = new FileReader();
-
-                    const base64Image = await new Promise((resolve, reject) => {
-                        reader.onloadend = () => resolve(reader.result);
-                        reader.onerror = reject;
-                        reader.readAsDataURL(blob);
-                    });
-
-                    statusEl.textContent = 'Removing furniture... (1-2 minutes)';
-                    updateProgress(20);
+                    statusEl.textContent = 'Removing furniture...';
 
                     // Call API to remove furniture
                     const inpaintResponse = await fetch('/api/test-inpainting', {
@@ -5565,16 +5538,19 @@ def property_type_selector():
                         })
                     });
 
-                    updateProgress(90);
-
                     const result = await inpaintResponse.json();
 
-                    if (result.success && result.result.result_base64) {
-                        statusEl.textContent = 'Adding to carousel...';
-                        updateProgress(95);
+                    console.log('API Response:', result);
+
+                    if (result.success && result.result && result.result.result_base64) {
+                        statusEl.textContent = 'Complete!';
 
                         // Add the empty room image to photos array
-                        const emptyRoomImage = result.result.result_base64;
+                        let emptyRoomImage = result.result.result_base64;
+                        // Add data URL prefix if not already present
+                        if (!emptyRoomImage.startsWith('data:image')) {
+                            emptyRoomImage = 'data:image/png;base64,' + emptyRoomImage;
+                        }
                         areaPhotos[currentArea].push(emptyRoomImage);
 
                         // Navigate to the new image
@@ -5584,61 +5560,42 @@ def property_type_selector():
                         updateAreaCarousel(currentArea);
                         saveStagingSession();
 
-                        statusEl.textContent = 'Complete!';
-                        updateProgress(100);
-
                         // Close modal after success
                         setTimeout(() => {
                             modal.classList.remove('active');
                         }, 1500);
                     } else {
-                        throw new Error(result.error || 'Failed to remove furniture');
+                        const errorMsg = result.error || result.message || 'API processing failed';
+                        console.error('API Error:', errorMsg, result);
+                        throw new Error(errorMsg);
                     }
                 } catch (error) {
                     console.error('Empty room error:', error);
-                    statusEl.textContent = 'Error: ' + error.message;
+                    console.error('Error details:', error.message, error.stack);
+                    const displayError = error.message || 'Connection error - please check console for details';
+                    statusEl.textContent = 'Error: ' + displayError;
                     statusEl.style.color = '#dc2626';
 
                     // Close modal after error
                     setTimeout(() => {
                         modal.classList.remove('active');
-                        alert('Failed to remove furniture: ' + error.message);
-                    }, 2000);
+                        alert(displayError + '\n\nCheck browser console for details.');
+                    }, 3000);
                 }
             }
 
-            function updateProgress(percent) {
-                const progressText = document.getElementById('progress-text');
-                const progressFill = document.getElementById('progress-circle-fill');
-
-                progressText.textContent = Math.round(percent) + '%';
-
-                // Calculate stroke-dashoffset (408.4 is full circle, 0 is complete)
-                const offset = 408.4 - (408.4 * percent / 100);
-                progressFill.style.strokeDashoffset = offset;
-            }
         """),
-        # Empty Room Progress Modal
+        # Empty Room Loading Modal
         Div(
             Div(
                 H3("Removing Furniture..."),
                 Div(
-                    Div(
-                        f'<svg class="progress-circle" width="150" height="150" viewBox="0 0 150 150">',
-                        f'<circle class="progress-circle-bg" cx="75" cy="75" r="65"></circle>',
-                        f'<circle class="progress-circle-fill" cx="75" cy="75" r="65" '
-                        f'stroke-dasharray="408.4" stroke-dashoffset="408.4" id="progress-circle-fill"></circle>',
-                        f'</svg>',
-                        NotStr=True
+                    NotStr(
+                        '<div class="loading-spinner"></div>'
                     ),
-                    Div("0%", id="progress-text", cls="progress-text"),
-                    cls="progress-circle-container"
+                    cls="loading-spinner-container"
                 ),
                 Div("Initializing...", id="empty-room-status", cls="empty-room-status"),
-                Div(
-                    Div("Remaining Credits: ", Strong("Loading...", id="credits-remaining")),
-                    cls="credits-info"
-                ),
                 cls="empty-room-modal-content"
             ),
             id="empty-room-modal",
@@ -7409,41 +7366,28 @@ def get_property_selector_styles():
         font-size: 1.5rem;
     }
 
-    .progress-circle-container {
-        position: relative;
+    .loading-spinner-container {
         width: 150px;
         height: 150px;
         margin: 1rem auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
-    .progress-circle {
-        width: 100%;
-        height: 100%;
-        transform: rotate(-90deg);
+    .loading-spinner {
+        width: 60px;
+        height: 60px;
+        border: 6px solid #e5e7eb;
+        border-top-color: #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
     }
 
-    .progress-circle-bg {
-        fill: none;
-        stroke: #e5e7eb;
-        stroke-width: 8;
-    }
-
-    .progress-circle-fill {
-        fill: none;
-        stroke: #667eea;
-        stroke-width: 8;
-        stroke-linecap: round;
-        transition: stroke-dashoffset 0.3s ease;
-    }
-
-    .progress-text {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 1.5rem;
-        font-weight: bold;
-        color: #667eea;
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
     }
 
     .credits-info {
