@@ -6532,8 +6532,8 @@ def get_property_selector_styles():
     /* Photo Thumbnail Preview */
     .photo-thumbnail-preview {
         position: absolute;
-        bottom: calc(80px + env(safe-area-inset-bottom, 0px));
-        left: 30px;
+        bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+        left: 20px;
         width: 50px;
         height: 50px;
         border-radius: 8px;
@@ -6748,7 +6748,7 @@ def get_property_selector_styles():
     /* Shutter Button */
     .shutter-btn {
         position: absolute;
-        bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+        bottom: calc(20px + env(safe-area-inset-bottom, 0px));
         left: 50%;
         transform: translateX(-50%);
         width: 70px;
