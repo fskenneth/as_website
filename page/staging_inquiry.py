@@ -2041,8 +2041,12 @@ def property_type_selector():
                 // Stop items camera if running and hide camera section
                 stopItemsCamera();
                 const cameraSection = document.getElementById('items-camera-section');
+                const carouselWrapper = document.getElementById('items-photos-preview-grid');
                 if (cameraSection) {
                     cameraSection.style.display = 'none';
+                }
+                if (carouselWrapper) {
+                    carouselWrapper.style.display = 'block';
                 }
 
                 currentArea = null;
@@ -4693,17 +4697,26 @@ def property_type_selector():
 
             function scrollToItemsCamera() {
                 const cameraSection = document.getElementById('items-camera-section');
-                if (cameraSection) {
-                    // Show the camera section as full screen modal
-                    cameraSection.style.display = 'flex';
+                const carouselWrapper = document.getElementById('items-photos-preview-grid');
+                if (cameraSection && carouselWrapper) {
+                    // Hide carousel, show camera inline
+                    carouselWrapper.style.display = 'none';
+                    cameraSection.style.display = 'block';
                     startItemsCamera();
+                    // Scroll to top of items modal
+                    const itemsPhotosSection = document.getElementById('items-photos-section');
+                    if (itemsPhotosSection) {
+                        itemsPhotosSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
                 }
             }
 
             function closeCameraView() {
                 const cameraSection = document.getElementById('items-camera-section');
-                if (cameraSection) {
+                const carouselWrapper = document.getElementById('items-photos-preview-grid');
+                if (cameraSection && carouselWrapper) {
                     cameraSection.style.display = 'none';
+                    carouselWrapper.style.display = 'block';
                     stopItemsCamera();
                 }
             }
@@ -6165,10 +6178,6 @@ def get_property_selector_styles():
         padding: 0;
     }
 
-    .items-modal .items-photos-section .camera-section {
-        display: none;
-    }
-
     .items-modal .items-photos-section .photos-carousel-wrapper {
         width: 100%;
         margin-left: 0;
@@ -6431,26 +6440,17 @@ def get_property_selector_styles():
         color: rgba(255, 255, 255, 0.6);
     }
 
-    /* Camera Section - hidden by default */
+    /* Camera Section - hidden by default, inline in modal */
     .camera-section {
         display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        width: 100vw;
-        height: 100vh;
+        position: relative;
+        width: 100%;
         background: #000;
-        z-index: 10000;
-        align-items: center;
-        justify-content: center;
+        margin: 0;
+        padding: 0;
     }
 
     @media (max-width: 767px) {
-        .camera-section {
-            display: none;
-        }
         .upload-section {
             display: none !important;
         }
@@ -6499,8 +6499,7 @@ def get_property_selector_styles():
     }
 
     .camera-preview-container {
-        width: 100vw;
-        max-width: 100vw;
+        width: 100%;
         aspect-ratio: 3/4;
         background: #000;
         border-radius: 0;
@@ -6509,7 +6508,7 @@ def get_property_selector_styles():
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: auto;
+        margin: 0;
     }
 
     .camera-preview {
@@ -6546,7 +6545,7 @@ def get_property_selector_styles():
         transition: all 0.3s ease;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         opacity: 1;
-        z-index: 10002;
+        z-index: 10;
     }
 
     .photo-thumbnail-preview.hidden {
@@ -6586,8 +6585,8 @@ def get_property_selector_styles():
     /* Camera Close Button */
     .camera-close-btn {
         position: absolute;
-        top: 20px;
-        right: 20px;
+        top: 10px;
+        right: 10px;
         width: 44px;
         height: 44px;
         border-radius: 50%;
@@ -6601,7 +6600,7 @@ def get_property_selector_styles():
         align-items: center;
         justify-content: center;
         transition: all 0.2s ease;
-        z-index: 10002;
+        z-index: 10;
         padding: 0;
     }
 
@@ -6764,7 +6763,7 @@ def get_property_selector_styles():
         transition: all 0.2s ease;
         box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
         opacity: 1;
-        z-index: 10002;
+        z-index: 10;
     }
 
     .shutter-btn.hidden {
