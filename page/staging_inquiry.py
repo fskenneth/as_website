@@ -5504,7 +5504,7 @@ def property_type_selector():
 
             // Empty Room - Remove furniture from background
             async function emptyRoomBackground() {
-                const photos = window.itemsPhotos || [];
+                const photos = areaPhotos[currentArea] || [];
                 if (photos.length === 0 || currentItemsPhotoIndex === null) {
                     alert('No photo available to process');
                     return;
@@ -5575,11 +5575,14 @@ def property_type_selector():
 
                         // Add the empty room image to photos array
                         const emptyRoomImage = result.result.result_base64;
-                        window.itemsPhotos.push(emptyRoomImage);
+                        areaPhotos[currentArea].push(emptyRoomImage);
 
                         // Navigate to the new image
-                        currentItemsPhotoIndex = window.itemsPhotos.length - 1;
-                        updateItemsPhotoDisplay();
+                        currentItemsPhotoIndex = areaPhotos[currentArea].length - 1;
+                        renderItemsPhotosGrid();
+                        updateItemsThumbnail();
+                        updateAreaCarousel(currentArea);
+                        saveStagingSession();
 
                         statusEl.textContent = 'Complete!';
                         updateProgress(100);
