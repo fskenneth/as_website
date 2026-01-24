@@ -664,11 +664,19 @@ def items_modal():
                         Div(
                             Video(id="items-camera-preview", autoplay=True, playsinline=True, cls="camera-preview"),
                             Canvas(id="items-camera-canvas", cls="camera-canvas hidden"),
-                            # Photo thumbnail preview (left of shutter)
+                            # Close button at top right
                             Button(
+                                "×",
+                                cls="camera-close-btn",
+                                id="items-camera-close-btn",
+                                onclick="closeCameraView()"
+                            ),
+                            # Photo thumbnail preview at bottom left
+                            Button(
+                                Span(id="items-photo-count-badge", cls="photo-count-badge hidden"),
                                 id="items-photo-thumbnail-preview",
                                 cls="photo-thumbnail-preview hidden",
-                                onclick="scrollToItemsPhotosCarousel()"
+                                onclick="openPhotosGallery()"
                             ),
                             # Shutter button at bottom center
                             Button(
@@ -681,6 +689,22 @@ def items_modal():
                         ),
                         id="items-camera-section",
                         cls="camera-section"
+                    ),
+                    # Photos Gallery Modal
+                    Div(
+                        Div(
+                            Div(
+                                H3("Taken Photos", cls="photos-gallery-title"),
+                                Button("×", cls="photos-gallery-close-btn", onclick="closePhotosGallery()"),
+                                cls="photos-gallery-header"
+                            ),
+                            Div(id="photos-gallery-grid", cls="photos-gallery-grid"),
+                            cls="photos-gallery-content",
+                            onclick="event.stopPropagation()"
+                        ),
+                        id="photos-gallery-modal",
+                        cls="photos-gallery-modal hidden",
+                        onclick="closePhotosGallery()"
                     ),
                     # Photos carousel
                     Div(
@@ -4010,7 +4034,7 @@ def property_type_selector():
                 cameraSection.style.display = 'none';
 
                 navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+                    video: { facingMode: 'environment', width: { ideal: 3840 }, height: { ideal: 2880 }, aspectRatio: { ideal: 4/3 } },
                     audio: false
                 }).then(stream => {
                     itemsCameraStream = stream;
@@ -4640,15 +4664,23 @@ def property_type_selector():
 
             function updateItemsThumbnail() {
                 const thumbnail = document.getElementById('items-photo-thumbnail-preview');
+                const badge = document.getElementById('items-photo-count-badge');
                 if (!thumbnail) return;
 
                 const photos = areaPhotos[currentArea] || [];
                 if (photos.length > 0) {
                     thumbnail.style.backgroundImage = `url(${photos[photos.length - 1]})`;
                     thumbnail.classList.remove('hidden');
+                    if (badge) {
+                        badge.textContent = photos.length;
+                        badge.classList.remove('hidden');
+                    }
                 } else {
                     thumbnail.style.backgroundImage = '';
                     thumbnail.classList.add('hidden');
+                    if (badge) {
+                        badge.classList.add('hidden');
+                    }
                 }
             }
 
@@ -4662,10 +4694,75 @@ def property_type_selector():
             function scrollToItemsCamera() {
                 const cameraSection = document.getElementById('items-camera-section');
                 if (cameraSection) {
-                    // Show the camera section first
-                    cameraSection.style.display = 'block';
-                    cameraSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    // Show the camera section as full screen modal
+                    cameraSection.style.display = 'flex';
                     startItemsCamera();
+                }
+            }
+
+            function closeCameraView() {
+                const cameraSection = document.getElementById('items-camera-section');
+                if (cameraSection) {
+                    cameraSection.style.display = 'none';
+                    stopItemsCamera();
+                }
+            }
+
+            function openPhotosGallery() {
+                hapticFeedback();
+                const modal = document.getElementById('photos-gallery-modal');
+                const grid = document.getElementById('photos-gallery-grid');
+                if (!modal || !grid) return;
+
+                const photos = areaPhotos[currentArea] || [];
+                if (photos.length === 0) return;
+
+                // Render photo grid
+                grid.innerHTML = photos.map((photo, index) => `
+                    <div class="photos-gallery-item">
+                        <img src="${photo}" alt="Photo ${index + 1}">
+                        <button class="photos-gallery-delete-btn" onclick="deletePhotoFromGallery(${index})">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                            </svg>
+                        </button>
+                    </div>
+                `).join('');
+
+                modal.classList.remove('hidden');
+            }
+
+            function closePhotosGallery() {
+                hapticFeedback();
+                const modal = document.getElementById('photos-gallery-modal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                }
+            }
+
+            function deletePhotoFromGallery(index) {
+                hapticFeedback();
+                if (!areaPhotos[currentArea]) return;
+
+                if (confirm('Delete this photo?')) {
+                    areaPhotos[currentArea].splice(index, 1);
+
+                    if (currentItemsPhotoIndex >= areaPhotos[currentArea].length) {
+                        currentItemsPhotoIndex = Math.max(0, areaPhotos[currentArea].length - 1);
+                    }
+
+                    // Refresh gallery
+                    if (areaPhotos[currentArea].length === 0) {
+                        closePhotosGallery();
+                    } else {
+                        openPhotosGallery();
+                    }
+
+                    // Update other UI elements
+                    renderItemsPhotosGrid();
+                    updateItemsThumbnail();
+                    updateAreaCarousel(currentArea);
+                    saveStagingSession();
                 }
             }
 
@@ -6337,13 +6434,22 @@ def get_property_selector_styles():
     /* Camera Section - hidden by default */
     .camera-section {
         display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #000;
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
     }
 
     @media (max-width: 767px) {
         .camera-section {
             display: none;
-            scroll-snap-align: start;
-            scroll-snap-stop: always;
         }
         .upload-section {
             display: none !important;
@@ -6393,17 +6499,17 @@ def get_property_selector_styles():
     }
 
     .camera-preview-container {
-        width: calc(100% + 30px);
-        margin-left: -15px;
-        margin-right: -15px;
-        height: calc(100vh - 120px);
-        background: transparent;
+        width: 100vw;
+        max-width: 100vw;
+        aspect-ratio: 3/4;
+        background: #000;
         border-radius: 0;
         overflow: hidden;
         position: relative;
         display: flex;
         align-items: center;
         justify-content: center;
+        margin: auto;
     }
 
     .camera-preview {
@@ -6427,13 +6533,12 @@ def get_property_selector_styles():
     /* Photo Thumbnail Preview */
     .photo-thumbnail-preview {
         position: absolute;
-        bottom: 20px;
-        left: 25%;
-        transform: translateX(-50%);
-        width: 70px;
-        height: 70px;
-        border-radius: 50%;
-        border: 4px solid white;
+        bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+        left: 30px;
+        width: 50px;
+        height: 50px;
+        border-radius: 8px;
+        border: 3px solid white;
         cursor: pointer;
         background-size: cover;
         background-position: center;
@@ -6441,7 +6546,7 @@ def get_property_selector_styles():
         transition: all 0.3s ease;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         opacity: 1;
-        z-index: 5;
+        z-index: 10002;
     }
 
     .photo-thumbnail-preview.hidden {
@@ -6450,28 +6555,216 @@ def get_property_selector_styles():
     }
 
     .photo-thumbnail-preview:active {
-        transform: translateX(-50%) scale(0.9);
+        transform: scale(0.9);
     }
 
-    /* Shutter Button */
-    .shutter-btn {
+    /* Photo Count Badge */
+    .photo-count-badge {
         position: absolute;
-        top: 12px;
-        left: calc(50% - 88px);
-        transform: translateX(-50%);
+        top: -8px;
+        right: -8px;
+        min-width: 24px;
+        height: 24px;
+        padding: 0 6px;
+        background: #dc2626;
+        color: white;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #000;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        z-index: 1;
+    }
+
+    .photo-count-badge.hidden {
+        display: none;
+    }
+
+    /* Camera Close Button */
+    .camera-close-btn {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.5);
+        color: white;
+        border: none;
+        font-size: 32px;
+        line-height: 1;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        z-index: 10002;
+        padding: 0;
+    }
+
+    .camera-close-btn:hover {
+        background: rgba(0, 0, 0, 0.7);
+        transform: scale(1.1);
+    }
+
+    .camera-close-btn:active {
+        transform: scale(0.9);
+    }
+
+    /* Photos Gallery Modal */
+    .photos-gallery-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.95);
+        z-index: 10001;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .photos-gallery-modal.hidden {
+        display: none;
+    }
+
+    .photos-gallery-content {
+        width: 100%;
+        max-width: 600px;
+        max-height: 80vh;
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .photos-gallery-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .photos-gallery-title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--color-primary);
+    }
+
+    .photos-gallery-close-btn {
         width: 36px;
         height: 36px;
         border-radius: 50%;
-        background: rgba(0, 0, 0, 0.5);
+        background: var(--bg-primary);
+        color: var(--color-primary);
+        border: none;
+        font-size: 28px;
+        line-height: 1;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        padding: 0;
+    }
+
+    .photos-gallery-close-btn:hover {
+        background: var(--border-color);
+    }
+
+    .photos-gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 15px;
+        padding: 20px;
+        overflow-y: auto;
+        max-height: calc(80vh - 70px);
+    }
+
+    .photos-gallery-item {
+        position: relative;
+        aspect-ratio: 1;
+        border-radius: 8px;
+        overflow: hidden;
+        background: var(--bg-primary);
+    }
+
+    .photos-gallery-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .photos-gallery-delete-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: rgba(220, 38, 38, 0.9);
+        color: white;
         border: none;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
         transition: all 0.2s ease;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        padding: 0;
+    }
+
+    .photos-gallery-delete-btn:hover {
+        background: rgba(185, 28, 28, 1);
+        transform: scale(1.1);
+    }
+
+    .photos-gallery-delete-btn:active {
+        transform: scale(0.9);
+    }
+
+    @media (max-width: 767px) {
+        .photos-gallery-content {
+            max-width: 100%;
+            max-height: 90vh;
+            border-radius: 0;
+        }
+
+        .photos-gallery-grid {
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
+            padding: 15px;
+        }
+    }
+
+    /* Shutter Button */
+    .shutter-btn {
+        position: absolute;
+        bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+        left: 50%;
+        transform: translateX(-50%);
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+        border: 4px solid white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
         opacity: 1;
-        z-index: 25;
+        z-index: 10002;
     }
 
     .shutter-btn.hidden {
@@ -6480,26 +6773,26 @@ def get_property_selector_styles():
     }
 
     .shutter-btn:hover {
-        background: rgba(0, 0, 0, 0.7);
-        transform: translateX(-50%) scale(1.1);
+        background: rgba(255, 255, 255, 0.4);
+        transform: translateX(-50%) scale(1.05);
     }
 
     .shutter-btn:focus {
         outline: none;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
         -webkit-tap-highlight-color: transparent;
     }
 
     .shutter-btn:active {
-        transform: translateX(-50%) scale(0.9);
+        transform: translateX(-50%) scale(0.95);
     }
 
     .shutter-inner {
-        width: 20px;
-        height: 20px;
+        width: 54px;
+        height: 54px;
         border-radius: 50%;
         background: white;
-        border: 2px solid white;
+        border: none;
         transition: all 0.15s ease;
     }
 
