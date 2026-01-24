@@ -75,8 +75,26 @@ def register_test_routes(rt):
             # Initialize tester
             tester = InpaintingTester()
 
-            # Set the public base URL (use public IP instead of localhost)
-            tester.base_url = 'http://174.89.176.147:5001'
+            # Get public base URL from environment or request
+            import os
+            public_url = os.getenv('PUBLIC_BASE_URL')
+
+            if not public_url:
+                # Try to construct from request
+                host = request.headers.get('host', 'localhost:5001')
+                scheme = 'https' if request.headers.get('x-forwarded-proto') == 'https' else 'http'
+                public_url = f"{scheme}://{host}"
+
+                # Warn if using localhost (won't work with Decor8.ai)
+                if 'localhost' in host or '127.0.0.1' in host:
+                    raise Exception(
+                        "Decor8.ai requires a publicly accessible URL. "
+                        "Please set PUBLIC_BASE_URL environment variable to your public domain "
+                        "(e.g., https://yourdomain.com) or use ngrok to expose localhost."
+                    )
+
+            tester.base_url = public_url
+            print(f"Using base URL for Decor8.ai: {tester.base_url}")
 
             # Run Decor8.ai method
             result = tester.method_5_decor8ai(image)
