@@ -5579,7 +5579,7 @@ def property_type_selector():
                     // Close modal after error
                     setTimeout(() => {
                         modal.classList.remove('active');
-                        alert(displayError + '\n\nCheck browser console for details.');
+                        alert(displayError + '\\n\\nCheck browser console for details.');
                     }, 3000);
                 }
             }
