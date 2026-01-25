@@ -1219,7 +1219,10 @@ def property_type_selector():
                     // Check if user is logged in
                     const authResponse = await fetch('/api/auth/check');
                     const authResult = await authResponse.json();
-                    if (!authResult.authenticated) return;
+                    if (!authResult.authenticated) {
+                        debugLog('saveToServer: User not authenticated, skipping server save');
+                        return;
+                    }
 
                     const serverData = {
                         status: 'quote',
@@ -1232,6 +1235,7 @@ def property_type_selector():
                         area_carousel_indices: JSON.stringify(sessionData.areaCarouselIndices || {}),
                         total_fee: sessionData.totalFee || ''
                     };
+                    debugLog('saveToServer: Sending data with carousel indices:', sessionData.areaCarouselIndices);
 
                     // Include staging ID if updating existing
                     if (currentStagingId) {
