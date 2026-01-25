@@ -58,6 +58,9 @@ static/images/areas/
 # AI-vacated photos (generated images)
 static/images/vacated/
 
+# Temporary images
+static/temp_images/
+
 # Test folder (temporary testing)
 tools/test/
 static/models/
