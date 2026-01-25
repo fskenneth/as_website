@@ -1183,6 +1183,7 @@ def property_type_selector():
                     areaItemsData: typeof areaItemsData !== 'undefined' ? areaItemsData : {},
                     areaPhotos: typeof areaPhotos !== 'undefined' ? areaPhotos : {},
                     areaSelectedItems: typeof areaSelectedItems !== 'undefined' ? areaSelectedItems : {},
+                    areaCarouselIndices: typeof areaCarouselIndices !== 'undefined' ? areaCarouselIndices : {},
                     totalFee: totalFee,
                     timestamp: Date.now()
                 };
@@ -1334,7 +1335,15 @@ def property_type_selector():
                                 // Restore photos
                                 if (data.areaPhotos && typeof areaPhotos !== 'undefined') {
                                     Object.assign(areaPhotos, data.areaPhotos);
-                                    // Update carousels for each area with photos
+                                }
+
+                                // Restore carousel indices before updating carousels
+                                if (data.areaCarouselIndices && typeof areaCarouselIndices !== 'undefined') {
+                                    Object.assign(areaCarouselIndices, data.areaCarouselIndices);
+                                }
+
+                                // Update carousels for each area with photos
+                                if (data.areaPhotos) {
                                     Object.keys(data.areaPhotos).forEach(area => {
                                         if (data.areaPhotos[area] && data.areaPhotos[area].length > 0) {
                                             updateAreaCarousel(area);
@@ -2014,8 +2023,8 @@ def property_type_selector():
                     areaPhotos[currentArea] = [];
                 }
 
-                // Reset carousel to first photo
-                currentItemsPhotoIndex = 0;
+                // Set current photo index to match the area carousel position
+                currentItemsPhotoIndex = areaCarouselIndices[currentArea] || 0;
 
                 // Render photos in items modal
                 renderItemsPhotosGrid();
@@ -4940,6 +4949,7 @@ def property_type_selector():
                                 setTimeout(() => {
                                     areaCarouselIndices[area]++;
                                     renderAreaCarousel(area, areaBtn, carousel);
+                                    saveStagingSession();
                                     isAnimating = false;
                                 }, 250);
                             } else if (diff < 0 && currentIndex > 0) {
@@ -4949,6 +4959,7 @@ def property_type_selector():
                                 setTimeout(() => {
                                     areaCarouselIndices[area]--;
                                     renderAreaCarousel(area, areaBtn, carousel);
+                                    saveStagingSession();
                                     isAnimating = false;
                                 }, 250);
                             } else {
@@ -5014,6 +5025,7 @@ def property_type_selector():
                             setTimeout(() => {
                                 areaCarouselIndices[area]--;
                                 renderAreaCarousel(area, areaBtn, carousel);
+                                saveStagingSession();
                                 isAnimating = false;
                             }, 250);
                         }
@@ -5032,6 +5044,7 @@ def property_type_selector():
                             setTimeout(() => {
                                 areaCarouselIndices[area]++;
                                 renderAreaCarousel(area, areaBtn, carousel);
+                                saveStagingSession();
                                 isAnimating = false;
                             }, 250);
                         }
