@@ -1188,6 +1188,11 @@ def property_type_selector():
                     totalFee = bannerSubtitle.textContent;
                 }
 
+                // Deep copy carousel indices to avoid reference issues
+                const carouselIndicesCopy = typeof areaCarouselIndices !== 'undefined'
+                    ? JSON.parse(JSON.stringify(areaCarouselIndices))
+                    : {};
+
                 const sessionData = {
                     propertyType: propertyType || null,
                     propertySize: propertySize || null,
@@ -1195,7 +1200,7 @@ def property_type_selector():
                     areaItemsData: typeof areaItemsData !== 'undefined' ? areaItemsData : {},
                     areaPhotos: typeof areaPhotos !== 'undefined' ? areaPhotos : {},
                     areaSelectedItems: typeof areaSelectedItems !== 'undefined' ? areaSelectedItems : {},
-                    areaCarouselIndices: typeof areaCarouselIndices !== 'undefined' ? areaCarouselIndices : {},
+                    areaCarouselIndices: carouselIndicesCopy,
                     totalFee: totalFee,
                     timestamp: Date.now()
                 };
