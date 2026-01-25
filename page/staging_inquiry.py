@@ -1216,6 +1216,7 @@ def property_type_selector():
                         selected_items: JSON.stringify(sessionData.areaItemsData || {}),
                         area_photos: JSON.stringify(sessionData.areaPhotos || {}),
                         area_selected_items: JSON.stringify(sessionData.areaSelectedItems || {}),
+                        area_carousel_indices: JSON.stringify(sessionData.areaCarouselIndices || {}),
                         total_fee: sessionData.totalFee || ''
                     };
 
@@ -1259,6 +1260,7 @@ def property_type_selector():
 
                         // Always replace sessionStorage with fresh server data to ensure sync across devices
                         const serverSelectedItems = staging.area_selected_items ? JSON.parse(staging.area_selected_items) : {};
+                        const serverCarouselIndices = staging.area_carousel_indices ? JSON.parse(staging.area_carousel_indices) : {};
                         const serverSessionData = {
                             propertyType: staging.property_type,
                             propertySize: staging.property_size,
@@ -1266,6 +1268,7 @@ def property_type_selector():
                             areaItemsData: staging.selected_items ? JSON.parse(staging.selected_items) : {},
                             areaPhotos: serverPhotos,
                             areaSelectedItems: serverSelectedItems,
+                            areaCarouselIndices: serverCarouselIndices,
                             totalFee: staging.total_fee,
                             timestamp: Date.now()
                         };

@@ -104,6 +104,12 @@ def init_db():
     except:
         pass  # Column already exists
 
+    # Migration: Add area_carousel_indices column if it doesn't exist (for existing databases)
+    try:
+        cursor.execute('ALTER TABLE stagings ADD COLUMN area_carousel_indices TEXT')
+    except:
+        pass  # Column already exists
+
     # Design models table - stores 3D model placement state for staging designs
     # Supports multiple instances of same model via instance_id
     cursor.execute('''
@@ -526,6 +532,7 @@ def save_staging(user_id: int, staging_data: dict) -> dict:
                     stripe_customer_id = ?,
                     area_photos = ?,
                     area_selected_items = ?,
+                    area_carousel_indices = ?,
                     updated_at = ?
                 WHERE id = ? AND user_id = ?
             ''', (
@@ -552,6 +559,7 @@ def save_staging(user_id: int, staging_data: dict) -> dict:
                 staging_data.get('stripe_customer_id'),
                 staging_data.get('area_photos'),
                 staging_data.get('area_selected_items'),
+                staging_data.get('area_carousel_indices'),
                 datetime.now(),
                 staging_id,
                 user_id
@@ -565,8 +573,8 @@ def save_staging(user_id: int, staging_data: dict) -> dict:
                     property_status, user_type, pets_status, referral_source, referral_other,
                     guest_first_name, guest_last_name, guest_email, guest_phone,
                     special_requests, stripe_payment_id, stripe_customer_id, area_photos,
-                    area_selected_items
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    area_selected_items, area_carousel_indices
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 user_id,
                 staging_data.get('status', 'quote'),
@@ -591,7 +599,8 @@ def save_staging(user_id: int, staging_data: dict) -> dict:
                 staging_data.get('stripe_payment_id'),
                 staging_data.get('stripe_customer_id'),
                 staging_data.get('area_photos'),
-                staging_data.get('area_selected_items')
+                staging_data.get('area_selected_items'),
+                staging_data.get('area_carousel_indices')
             ))
             staging_id = cursor.lastrowid
             print(f"[save_staging] Created new staging with id={staging_id}")
