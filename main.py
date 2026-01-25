@@ -1189,6 +1189,65 @@ async def confirm_reservation(req: Request):
 
 
 # =============================================================================
+# CLIENT LOGGING FOR DEBUGGING
+# =============================================================================
+
+from datetime import datetime
+from pathlib import Path
+
+DEBUG_LOG_FILE = Path(__file__).parent / "data" / "client_debug.log"
+
+@rt('/api/client-log', methods=['POST'])
+async def client_log(req: Request):
+    """Receive and store client-side debug logs"""
+    try:
+        data = await req.json()
+        message = data.get('message', '')
+        level = data.get('level', 'info')
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
+        # Ensure log file directory exists
+        DEBUG_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+        # Append to log file
+        with open(DEBUG_LOG_FILE, 'a') as f:
+            f.write(f"[{timestamp}] [{level.upper()}] {message}\n")
+
+        return JSONResponse({'success': True})
+    except Exception as e:
+        print(f"Client log error: {e}")
+        return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+
+
+@rt('/api/client-log')
+def get_client_log(req: Request):
+    """Read the client debug log (last 100 lines)"""
+    try:
+        if not DEBUG_LOG_FILE.exists():
+            return Response("No logs yet", media_type="text/plain")
+
+        # Read last 100 lines
+        with open(DEBUG_LOG_FILE, 'r') as f:
+            lines = f.readlines()
+            last_lines = lines[-100:] if len(lines) > 100 else lines
+
+        return Response(''.join(last_lines), media_type="text/plain")
+    except Exception as e:
+        return Response(f"Error reading logs: {e}", media_type="text/plain")
+
+
+@rt('/api/client-log/clear', methods=['POST'])
+def clear_client_log(req: Request):
+    """Clear the client debug log"""
+    try:
+        if DEBUG_LOG_FILE.exists():
+            DEBUG_LOG_FILE.unlink()
+        return JSONResponse({'success': True})
+    except Exception as e:
+        return JSONResponse({'success': False, 'error': str(e)}, status_code=500)
+
+
+# =============================================================================
 # ROUTES
 # =============================================================================
 

@@ -1150,6 +1150,18 @@ def property_type_selector():
             // Session Storage Key
             const STAGING_SESSION_KEY = 'astra_staging_data';
 
+            // Debug logging function that sends to server
+            function debugLog(message, data = null) {
+                const logMessage = data ? `${message} ${JSON.stringify(data)}` : message;
+                console.log(logMessage);
+                // Send to server for debugging
+                fetch('/api/client-log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: logMessage, level: 'info' })
+                }).catch(err => console.error('Log send failed:', err));
+            }
+
             // Save staging data to session storage
             // Track current staging ID for updates
             let currentStagingId = null;
@@ -1187,6 +1199,7 @@ def property_type_selector():
                     totalFee: totalFee,
                     timestamp: Date.now()
                 };
+                debugLog('Saving session data, carousel indices:', sessionData.areaCarouselIndices);
 
                 try {
                     sessionStorage.setItem(STAGING_SESSION_KEY, JSON.stringify(sessionData));
@@ -1342,7 +1355,9 @@ def property_type_selector():
 
                                 // Restore carousel indices before updating carousels
                                 if (data.areaCarouselIndices && typeof areaCarouselIndices !== 'undefined') {
+                                    debugLog('Restoring carousel indices:', data.areaCarouselIndices);
                                     Object.assign(areaCarouselIndices, data.areaCarouselIndices);
+                                    debugLog('After restore, areaCarouselIndices:', areaCarouselIndices);
                                 }
 
                                 // Update carousels for each area with photos
@@ -4841,6 +4856,7 @@ def property_type_selector():
                 }
 
                 const currentIndex = areaCarouselIndices[area];
+                debugLog(`updateAreaCarousel(${area}): currentIndex=${currentIndex}, total photos=${photos.length}`);
 
                 // Reset index if out of bounds
                 if (currentIndex >= photos.length) {
@@ -4951,6 +4967,7 @@ def property_type_selector():
                                 track.style.transform = `translateX(-${containerWidth}px)`;
                                 setTimeout(() => {
                                     areaCarouselIndices[area]++;
+                                    debugLog(`Swipe left: ${area} index now ${areaCarouselIndices[area]}`);
                                     renderAreaCarousel(area, areaBtn, carousel);
                                     saveStagingSession();
                                     isAnimating = false;
@@ -4961,6 +4978,7 @@ def property_type_selector():
                                 track.style.transform = `translateX(${containerWidth}px)`;
                                 setTimeout(() => {
                                     areaCarouselIndices[area]--;
+                                    debugLog(`Swipe right: ${area} index now ${areaCarouselIndices[area]}`);
                                     renderAreaCarousel(area, areaBtn, carousel);
                                     saveStagingSession();
                                     isAnimating = false;
