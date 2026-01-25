@@ -4341,7 +4341,10 @@ def property_type_selector():
                             track.style.transform = `translateX(-${containerWidth + gap}px)`;
                             setTimeout(() => {
                                 currentItemsPhotoIndex++;
+                                areaCarouselIndices[currentArea] = currentItemsPhotoIndex;
                                 renderItemsPhotosGrid();
+                                updateAreaCarousel(currentArea);
+                                saveStagingSession();
                                 itemsIsAnimating = false;
                             }, 250);
                         }
@@ -4351,7 +4354,10 @@ def property_type_selector():
                             track.style.transform = `translateX(${containerWidth + gap}px)`;
                             setTimeout(() => {
                                 currentItemsPhotoIndex--;
+                                areaCarouselIndices[currentArea] = currentItemsPhotoIndex;
                                 renderItemsPhotosGrid();
+                                updateAreaCarousel(currentArea);
+                                saveStagingSession();
                                 itemsIsAnimating = false;
                             }, 250);
                         }
@@ -4387,7 +4393,10 @@ def property_type_selector():
 
                 setTimeout(() => {
                     currentItemsPhotoIndex--;
+                    areaCarouselIndices[currentArea] = currentItemsPhotoIndex;
                     renderItemsPhotosGrid('prev');
+                    updateAreaCarousel(currentArea);
+                    saveStagingSession();
                     itemsIsAnimating = false;
                 }, 250);
             }
@@ -4409,7 +4418,10 @@ def property_type_selector():
 
                 setTimeout(() => {
                     currentItemsPhotoIndex++;
+                    areaCarouselIndices[currentArea] = currentItemsPhotoIndex;
                     renderItemsPhotosGrid('next');
+                    updateAreaCarousel(currentArea);
+                    saveStagingSession();
                     itemsIsAnimating = false;
                 }, 250);
             }
