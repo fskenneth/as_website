@@ -359,8 +359,8 @@ class InpaintingTester:
             temp_dir.mkdir(parents=True, exist_ok=True)
 
             # Resize image if too large (Decor8.ai works better with smaller images)
-            # Reduced to 1024px to prevent 504 gateway timeout on Decor8.ai's servers
-            max_dimension = 1024
+            # Reduced to 768px to prevent 504 gateway timeout on Decor8.ai's servers
+            max_dimension = 768
             if image.width > max_dimension or image.height > max_dimension:
                 print(f"Resizing image from {image.width}x{image.height}...")
                 ratio = min(max_dimension / image.width, max_dimension / image.height)
@@ -394,13 +394,7 @@ class InpaintingTester:
                 if mask.mode != 'L':
                     mask = mask.convert('L')
 
-                # INVERT mask for Decor8.ai (expects black = remove, white = keep)
-                import numpy as np
-                mask_array = np.array(mask)
-                inverted_array = 255 - mask_array
-                mask = Image.fromarray(inverted_array.astype('uint8'), mode='L')
-                print("Mask inverted for Decor8.ai (black = remove, white = keep)")
-
+                # Standard mask format: white = remove, black = keep
                 # Save mask with unique hash
                 mask_bytes = io.BytesIO()
                 mask.save(mask_bytes, format='PNG')
@@ -412,7 +406,7 @@ class InpaintingTester:
                     mask.save(mask_path, format='PNG')
 
                 mask_url = f"{self.base_url}/api/temp-image/{mask_hash}_mask"
-                print(f"Mask saved (inverted), URL: {mask_url}")
+                print(f"Mask saved, URL: {mask_url}")
 
             # Build API request payload
             api_payload = {'input_image_url': image_url}
