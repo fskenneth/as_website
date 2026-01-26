@@ -78,6 +78,7 @@ def register_test_routes(rt):
             # Get public base URL from environment or request
             import os
             public_url = os.getenv('PUBLIC_BASE_URL')
+            use_fallback = False
 
             if not public_url:
                 # Try to construct from request
@@ -85,19 +86,22 @@ def register_test_routes(rt):
                 scheme = 'https' if request.headers.get('x-forwarded-proto') == 'https' else 'http'
                 public_url = f"{scheme}://{host}"
 
-                # Warn if using localhost (won't work with Decor8.ai)
+                # Check if using localhost - use fallback method
                 if 'localhost' in host or '127.0.0.1' in host:
-                    raise Exception(
-                        "Decor8.ai requires a publicly accessible URL. "
-                        "Please set PUBLIC_BASE_URL environment variable to your public domain "
-                        "(e.g., https://yourdomain.com) or use ngrok to expose localhost."
-                    )
+                    print("⚠️  Running on localhost - using fallback Simple LaMa instead of Decor8.ai")
+                    use_fallback = True
 
-            tester.base_url = public_url
-            print(f"Using base URL for Decor8.ai: {tester.base_url}")
+            tester.base_url = public_url if not use_fallback else None
 
-            # Run Decor8.ai method
-            result = tester.method_5_decor8ai(image)
+            # Run appropriate method based on availability
+            if use_fallback:
+                # Use Simple LaMa (local, free) as fallback for localhost
+                print("Using Simple LaMa (local) for furniture removal...")
+                result = tester.method_4_simple_lama(image)
+            else:
+                # Use Decor8.ai (cloud API) for production
+                print(f"Using Decor8.ai with base URL: {tester.base_url}")
+                result = tester.method_5_decor8ai(image)
 
             # Convert PIL image to base64 for response
             result_base64 = None
