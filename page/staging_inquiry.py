@@ -5567,97 +5567,322 @@ def property_type_selector():
 
                 const currentPhotoSrc = photos[currentItemsPhotoIndex];
 
-                // Show progress modal
-                const modal = document.getElementById('empty-room-modal');
-                modal.classList.add('active');
+                // Show mask drawing modal
+                const maskModal = document.getElementById('mask-drawing-modal');
+                maskModal.classList.add('active');
 
-                const statusEl = document.getElementById('empty-room-status');
+                // Load image into canvas
+                const maskCanvas = document.getElementById('mask-canvas');
+                const maskCtx = maskCanvas.getContext('2d');
+                const photoImg = new Image();
 
-                statusEl.textContent = 'Checking history...';
+                photoImg.onload = () => {
+                    // Set canvas size to match image
+                    maskCanvas.width = photoImg.width;
+                    maskCanvas.height = photoImg.height;
 
-                try {
-                    // Use the image directly (already base64 data URL)
-                    const base64Image = currentPhotoSrc;
+                    // Draw the photo as background
+                    maskCtx.drawImage(photoImg, 0, 0);
 
-                    // First, check if we have this image in history
-                    const historyResponse = await fetch('/api/inpainting-history');
-                    const historyData = await historyResponse.json();
+                    // Setup drawing
+                    setupMaskDrawing(maskCanvas, maskCtx, photoImg, currentPhotoSrc);
+                };
 
-                    let emptyRoomImage = null;
+                photoImg.src = currentPhotoSrc;
+            }
 
-                    if (historyData.history && historyData.history.length > 0) {
-                        // Try to find matching input image in history
-                        // Compare image content by fetching and comparing base64
-                        for (const item of historyData.history) {
-                            if (item.input_url) {
-                                try {
-                                    const historicalInputResponse = await fetch(item.input_url);
-                                    const historicalInputBlob = await historicalInputResponse.blob();
-                                    const historicalInputBase64 = await new Promise((resolve) => {
-                                        const reader = new FileReader();
-                                        reader.onloadend = () => resolve(reader.result);
-                                        reader.readAsDataURL(historicalInputBlob);
-                                    });
+            // Setup mask drawing functionality
+            function setupMaskDrawing(canvas, ctx, photoImg, originalPhoto) {
+                let isDrawing = false;
+                let brushSize = 30;
 
-                                    // Compare base64 strings (strip data URL prefix for comparison)
-                                    const current = base64Image.split(',')[1] || base64Image;
-                                    const historical = historicalInputBase64.split(',')[1] || historicalInputBase64;
+                // Initialize brush size display
+                document.getElementById('mask-brush-size').textContent = brushSize;
 
-                                    if (current === historical) {
-                                        // Found matching image! Use the cached result
-                                        statusEl.textContent = 'Found in history! (0 API calls)';
-                                        console.log('Using cached result from history:', item.timestamp);
+                // Create cursor canvas overlay
+                const cursorCanvas = document.createElement('canvas');
+                cursorCanvas.id = 'cursor-preview';
+                cursorCanvas.width = canvas.width;
+                cursorCanvas.height = canvas.height;
+                cursorCanvas.style.position = 'absolute';
+                cursorCanvas.style.pointerEvents = 'none';
+                cursorCanvas.style.top = '0';
+                cursorCanvas.style.left = '0';
+                canvas.parentElement.style.position = 'relative';
+                canvas.parentElement.appendChild(cursorCanvas);
+                const cursorCtx = cursorCanvas.getContext('2d');
 
-                                        // Fetch the output image
-                                        const outputResponse = await fetch(item.output_url);
-                                        const outputBlob = await outputResponse.blob();
-                                        emptyRoomImage = await new Promise((resolve) => {
-                                            const reader = new FileReader();
-                                            reader.onloadend = () => resolve(reader.result);
-                                            reader.readAsDataURL(outputBlob);
-                                        });
-                                        break;
-                                    }
-                                } catch (err) {
-                                    console.warn('Error checking history item:', err);
-                                }
-                            }
+                // Create mask layer (starts as all black = keep everything)
+                const maskCanvas = document.createElement('canvas');
+                maskCanvas.width = canvas.width;
+                maskCanvas.height = canvas.height;
+                const maskCtx = maskCanvas.getContext('2d');
+                maskCtx.fillStyle = 'black';
+                maskCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+                let lastX = null;
+                let lastY = null;
+
+                // Redraw with mask overlay
+                function redrawCanvas() {
+                    // Clear and draw original photo
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(photoImg, 0, 0);
+
+                    // Draw red overlay where mask is white
+                    ctx.globalAlpha = 0.4;
+                    ctx.globalCompositeOperation = 'source-over';
+
+                    // Use the mask as a clipping path
+                    const maskData = maskCtx.getImageData(0, 0, canvas.width, canvas.height);
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = canvas.width;
+                    tempCanvas.height = canvas.height;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCtx.putImageData(maskData, 0, 0);
+
+                    // Draw red overlay
+                    ctx.fillStyle = 'rgba(255, 0, 0, 1)';
+                    ctx.globalCompositeOperation = 'source-atop';
+                    ctx.drawImage(tempCanvas, 0, 0);
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.globalAlpha = 1.0;
+                }
+
+                // Drawing functions
+                function startDrawing(e) {
+                    isDrawing = true;
+                    const coords = getCoords(e);
+                    lastX = coords.x;
+                    lastY = coords.y;
+                    drawCircle(coords.x, coords.y);
+                }
+
+                function stopDrawing() {
+                    isDrawing = false;
+                    lastX = null;
+                    lastY = null;
+                }
+
+                function getCoords(e) {
+                    const rect = canvas.getBoundingClientRect();
+                    const scaleX = canvas.width / rect.width;
+                    const scaleY = canvas.height / rect.height;
+                    return {
+                        x: (e.clientX - rect.left) * scaleX,
+                        y: (e.clientY - rect.top) * scaleY
+                    };
+                }
+
+                function drawCircle(x, y) {
+                    // Draw white circle on mask
+                    maskCtx.fillStyle = 'white';
+                    maskCtx.beginPath();
+                    maskCtx.arc(x, y, brushSize, 0, Math.PI * 2);
+                    maskCtx.fill();
+
+                    // Draw red circle on display canvas
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.4)';
+                    ctx.beginPath();
+                    ctx.arc(x, y, brushSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                function draw(e) {
+                    if (!isDrawing) return;
+
+                    const coords = getCoords(e);
+                    const x = coords.x;
+                    const y = coords.y;
+
+                    // Draw line from last position for smooth strokes
+                    if (lastX !== null && lastY !== null) {
+                        const dist = Math.hypot(x - lastX, y - lastY);
+                        const steps = Math.max(1, Math.floor(dist / (brushSize / 4)));
+
+                        for (let i = 0; i <= steps; i++) {
+                            const t = i / steps;
+                            const ix = lastX + (x - lastX) * t;
+                            const iy = lastY + (y - lastY) * t;
+                            drawCircle(ix, iy);
                         }
+                    } else {
+                        drawCircle(x, y);
                     }
 
-                    // If not found in history, call the API
-                    if (!emptyRoomImage) {
-                        statusEl.textContent = 'Removing furniture...';
+                    lastX = x;
+                    lastY = y;
+                }
 
-                        // Call API to remove furniture
-                        const inpaintResponse = await fetch('/api/test-inpainting', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                image: base64Image,
-                                method: 5
-                            })
-                        });
+                // Combined mousemove handler for drawing and cursor preview
+                canvas.addEventListener('mousemove', (e) => {
+                    const coords = getCoords(e);
+                    updateCursorPreview(coords.x, coords.y);
+                    draw(e);
+                });
 
-                        const result = await inpaintResponse.json();
+                // Event listeners
+                canvas.addEventListener('mousedown', startDrawing);
+                canvas.addEventListener('mouseup', stopDrawing);
+                canvas.addEventListener('mouseleave', () => {
+                    stopDrawing();
+                    updateCursorPreview(null, null);
+                });
 
-                        console.log('API Response:', result);
+                // Touch support
+                canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('mousedown', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY
+                    });
+                    canvas.dispatchEvent(mouseEvent);
+                });
 
-                        if (result.success && result.result && result.result.result_base64) {
-                            statusEl.textContent = 'Complete!';
+                canvas.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('mousemove', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY
+                    });
+                    canvas.dispatchEvent(mouseEvent);
+                });
 
-                            emptyRoomImage = result.result.result_base64;
-                            // Add data URL prefix if not already present
-                            if (!emptyRoomImage.startsWith('data:image')) {
-                                emptyRoomImage = 'data:image/png;base64,' + emptyRoomImage;
-                            }
-                        } else {
-                            const errorMsg = result.error || result.message || 'API processing failed';
-                            console.error('API Error:', errorMsg, result);
-                            throw new Error(errorMsg);
+                canvas.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    const mouseEvent = new MouseEvent('mouseup', {});
+                    canvas.dispatchEvent(mouseEvent);
+                });
+
+                // Brush size slider control
+                const brushSlider = document.getElementById('mask-brush-slider');
+                brushSlider.addEventListener('input', (e) => {
+                    brushSize = parseInt(e.target.value);
+                    document.getElementById('mask-brush-size').textContent = brushSize;
+                });
+
+                // Mouse wheel to adjust brush size
+                canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const delta = e.deltaY > 0 ? -10 : 10;
+                    brushSize = Math.max(10, Math.min(300, brushSize + delta));
+                    document.getElementById('mask-brush-size').textContent = brushSize;
+                    document.getElementById('mask-brush-slider').value = brushSize;
+
+                    // Update cursor preview with new size
+                    const coords = getCoords(e);
+                    updateCursorPreview(coords.x, coords.y);
+                });
+
+                // Cursor preview with contrasting color
+                function updateCursorPreview(x, y) {
+                    cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
+
+                    if (x !== null && y !== null) {
+                        // Sample pixel color under cursor to determine contrast
+                        const imageData = ctx.getImageData(Math.floor(x), Math.floor(y), 1, 1);
+                        const [r, g, b] = imageData.data;
+
+                        // Calculate luminance (perceived brightness)
+                        const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+
+                        // Use white cursor on dark areas, black on light areas
+                        const cursorColor = luminance > 128 ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.8)';
+                        const centerColor = luminance > 128 ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.5)';
+
+                        // Draw brush preview circle
+                        cursorCtx.strokeStyle = cursorColor;
+                        cursorCtx.lineWidth = 2;
+                        cursorCtx.beginPath();
+                        cursorCtx.arc(x, y, brushSize, 0, Math.PI * 2);
+                        cursorCtx.stroke();
+
+                        // Draw center dot
+                        cursorCtx.fillStyle = centerColor;
+                        cursorCtx.beginPath();
+                        cursorCtx.arc(x, y, 2, 0, Math.PI * 2);
+                        cursorCtx.fill();
+                    }
+                }
+
+                // Clear mask
+                document.getElementById('mask-clear').onclick = () => {
+                    maskCtx.fillStyle = 'black';
+                    maskCtx.fillRect(0, 0, canvas.width, canvas.height);
+                    // Redraw just the photo
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(photoImg, 0, 0);
+                };
+
+                // Cancel
+                document.getElementById('mask-cancel').onclick = () => {
+                    document.getElementById('mask-drawing-modal').classList.remove('active');
+                };
+
+                // Process with mask
+                document.getElementById('mask-process').onclick = async () => {
+                    // Hide drawing modal, show progress modal
+                    document.getElementById('mask-drawing-modal').classList.remove('active');
+                    const modal = document.getElementById('empty-room-modal');
+                    modal.classList.add('active');
+
+                const statusEl = document.getElementById('empty-room-status');
+                const timerEl = document.getElementById('empty-room-timer');
+
+                // Start timer
+                let elapsedSeconds = 0;
+                timerEl.textContent = 'Time elapsed: 0s';
+                const timerInterval = setInterval(() => {
+                    elapsedSeconds++;
+                    timerEl.textContent = `Time elapsed: ${elapsedSeconds}s`;
+                }, 1000);
+
+                statusEl.textContent = 'Removing furniture...';
+
+                try {
+                    // Convert mask to base64
+                    const maskBase64 = maskCanvas.toDataURL('image/png');
+
+                    // Use the original photo
+                    const base64Image = originalPhoto;
+                    let emptyRoomImage = null;
+
+                    // Call API to remove furniture with custom mask
+                    console.log('Calling API to remove furniture with custom mask...');
+                    const inpaintResponse = await fetch('/api/test-inpainting', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            image: base64Image,
+                            mask: maskBase64,
+                            method: 5  // Use Decor8.ai (cloud API)
+                        })
+                    });
+
+                    console.log('API call completed, parsing response...');
+                    const result = await inpaintResponse.json();
+
+                    console.log('API Response:', result);
+
+                    if (result.success && result.result && result.result.result_base64) {
+                        // Stop timer
+                        clearInterval(timerInterval);
+                        statusEl.textContent = `Complete! (${elapsedSeconds}s)`;
+
+                        emptyRoomImage = result.result.result_base64;
+                        // Add data URL prefix if not already present
+                        if (!emptyRoomImage.startsWith('data:image')) {
+                            emptyRoomImage = 'data:image/png;base64,' + emptyRoomImage;
                         }
+                    } else {
+                        clearInterval(timerInterval);
+                        const errorMsg = result.error || result.message || 'API processing failed';
+                        console.error('API Error:', errorMsg, result);
+                        throw new Error(errorMsg);
                     }
 
                     // Add the empty room image to photos array
@@ -5676,13 +5901,17 @@ def property_type_selector():
                             modal.classList.remove('active');
                         }, 1500);
                     } else {
+                        clearInterval(timerInterval);
                         throw new Error('No result image obtained');
                     }
                 } catch (error) {
+                    // Stop timer on error
+                    clearInterval(timerInterval);
+
                     console.error('Empty room error:', error);
                     console.error('Error details:', error.message, error.stack);
                     const displayError = error.message || 'Connection error - please check console for details';
-                    statusEl.textContent = 'Error: ' + displayError;
+                    statusEl.textContent = `Error: ${displayError} (${elapsedSeconds}s)`;
                     statusEl.style.color = '#dc2626';
 
                     // Close modal after error
@@ -5691,9 +5920,34 @@ def property_type_selector():
                         alert(displayError + '\\n\\nCheck browser console for details.');
                     }, 3000);
                 }
-            }
+                };  // End of mask-process onclick handler
+            }  // End of setupMaskDrawing function
 
         """),
+        # Mask Drawing Modal
+        Div(
+            Div(
+                H3("Draw areas to remove (red = remove)"),
+                Div(
+                    NotStr('<canvas id="mask-canvas"></canvas>'),
+                    cls="mask-canvas-container"
+                ),
+                Div(
+                    Span("Brush Size: ", Span("30", id="mask-brush-size"), "px", cls="mask-brush-label"),
+                    NotStr('<input type="range" id="mask-brush-slider" min="10" max="300" value="30" step="10" style="width: 300px; cursor: pointer;">'),
+                    cls="mask-controls"
+                ),
+                Div(
+                    Button("Clear", id="mask-clear", cls="mask-btn mask-btn-secondary"),
+                    Button("Cancel", id="mask-cancel", cls="mask-btn mask-btn-secondary"),
+                    Button("Process", id="mask-process", cls="mask-btn mask-btn-primary"),
+                    cls="mask-actions"
+                ),
+                cls="mask-modal-content"
+            ),
+            id="mask-drawing-modal",
+            cls="mask-drawing-modal"
+        ),
         # Empty Room Loading Modal
         Div(
             Div(
@@ -5705,6 +5959,7 @@ def property_type_selector():
                     cls="loading-spinner-container"
                 ),
                 Div("Initializing...", id="empty-room-status", cls="empty-room-status"),
+                Div("Time elapsed: 0s", id="empty-room-timer", cls="empty-room-timer"),
                 cls="empty-room-modal-content"
             ),
             id="empty-room-modal",
@@ -7441,6 +7696,165 @@ def get_property_selector_styles():
         background: rgba(0, 0, 0, 0.8);
     }
 
+    /* Mask Drawing Modal */
+    .mask-drawing-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+
+    .mask-drawing-modal.active {
+        display: flex;
+    }
+
+    .mask-modal-content {
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem;
+        max-width: 95%;
+        max-height: 95%;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .mask-modal-content h3 {
+        margin: 0;
+        color: #333;
+        font-size: 1.25rem;
+        text-align: center;
+    }
+
+    .mask-canvas-container {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: auto;
+        background: #f5f5f5;
+        border-radius: 8px;
+        min-height: 300px;
+    }
+
+    #mask-canvas {
+        max-width: 100%;
+        max-height: 70vh;
+        cursor: none;
+        display: block;
+    }
+
+    #cursor-preview {
+        position: absolute;
+        top: 0;
+        left: 0;
+        max-width: 100%;
+        max-height: 70vh;
+        cursor: none;
+        display: block;
+        pointer-events: none;
+    }
+
+    .mask-controls {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .mask-brush-label {
+        color: #666;
+        font-size: 0.9rem;
+    }
+
+    #mask-brush-size {
+        font-weight: 600;
+        color: #667eea;
+        min-width: 40px;
+        display: inline-block;
+        text-align: center;
+    }
+
+    #mask-brush-slider {
+        -webkit-appearance: none;
+        appearance: none;
+        height: 6px;
+        background: #e2e8f0;
+        border-radius: 3px;
+        outline: none;
+    }
+
+    #mask-brush-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        background: #667eea;
+        border-radius: 50%;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    #mask-brush-slider::-webkit-slider-thumb:hover {
+        background: #5568d3;
+    }
+
+    #mask-brush-slider::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        background: #667eea;
+        border-radius: 50%;
+        cursor: pointer;
+        border: none;
+        transition: background 0.2s;
+    }
+
+    #mask-brush-slider::-moz-range-thumb:hover {
+        background: #5568d3;
+    }
+
+    .mask-actions {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: center;
+    }
+
+    .mask-btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 500;
+    }
+
+    .mask-btn-primary {
+        background: #667eea;
+        color: white;
+    }
+
+    .mask-btn-primary:hover {
+        background: #5568d3;
+    }
+
+    .mask-btn-secondary {
+        background: #e2e8f0;
+        color: #333;
+    }
+
+    .mask-btn-secondary:hover {
+        background: #cbd5e0;
+    }
+
     /* Empty Room Progress Modal */
     .empty-room-modal {
         display: none;
@@ -7518,6 +7932,14 @@ def get_property_selector_styles():
         color: #667eea;
         font-size: 0.9rem;
         min-height: 20px;
+    }
+
+    .empty-room-timer {
+        margin-top: 0.5rem;
+        color: #999;
+        font-size: 0.85rem;
+        font-family: 'Courier New', monospace;
+        font-weight: 500;
     }
 
     /* Photo Brightness Slider */

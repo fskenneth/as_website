@@ -64,6 +64,7 @@ def register_test_routes(rt):
         try:
             data = await request.json()
             image_data = data.get('image', '')
+            mask_data = data.get('mask', None)
 
             # Decode base64 image
             if image_data.startswith('data:image'):
@@ -72,13 +73,21 @@ def register_test_routes(rt):
             image_bytes = base64.b64decode(image_data)
             image = Image.open(io.BytesIO(image_bytes))
 
+            # Decode mask if provided
+            mask = None
+            if mask_data:
+                if mask_data.startswith('data:image'):
+                    mask_data = mask_data.split(',')[1]
+                mask_bytes = base64.b64decode(mask_data)
+                mask = Image.open(io.BytesIO(mask_bytes))
+                print("Custom mask provided")
+
             # Initialize tester
             tester = InpaintingTester()
 
             # Get public base URL from environment or request
             import os
             public_url = os.getenv('PUBLIC_BASE_URL')
-            use_fallback = False
 
             if not public_url:
                 # Try to construct from request
@@ -86,22 +95,26 @@ def register_test_routes(rt):
                 scheme = 'https' if request.headers.get('x-forwarded-proto') == 'https' else 'http'
                 public_url = f"{scheme}://{host}"
 
-                # Check if using localhost - use fallback method
+                # Use public IP for localhost development
                 if 'localhost' in host or '127.0.0.1' in host:
-                    print("⚠️  Running on localhost - using fallback Simple LaMa instead of Decor8.ai")
-                    use_fallback = True
+                    public_url = 'http://76.66.120.147:5001'
+                    print(f"⚠️  Running on localhost - using public IP: {public_url}")
 
-            tester.base_url = public_url if not use_fallback else None
+            tester.base_url = public_url
+            print(f"Using Decor8.ai with base URL: {tester.base_url}")
 
-            # Run appropriate method based on availability
-            if use_fallback:
-                # Use Simple LaMa (local, free) as fallback for localhost
-                print("Using Simple LaMa (local) for furniture removal...")
-                result = tester.method_4_simple_lama(image)
-            else:
-                # Use Decor8.ai (cloud API) for production
-                print(f"Using Decor8.ai with base URL: {tester.base_url}")
-                result = tester.method_5_decor8ai(image)
+            # Run Decor8.ai method with optional mask
+            result = tester.method_5_decor8ai(image, mask)
+
+            # Check if the method returned an error
+            if 'error' in result:
+                error_msg = result.get('error', 'Unknown error')
+                print(f"Decor8.ai API error: {error_msg}")
+                return JSONResponse({
+                    'success': False,
+                    'error': error_msg,
+                    'method': 5
+                }, status_code=500)
 
             # Convert PIL image to base64 for response
             result_base64 = None
@@ -160,6 +173,14 @@ def register_test_routes(rt):
                     print(f"Failed to save history: {e}")
                     import traceback
                     traceback.print_exc()
+            else:
+                # No result and no error - unexpected response
+                print(f"Unexpected Decor8.ai response (no result): {result}")
+                return JSONResponse({
+                    'success': False,
+                    'error': 'Decor8.ai returned unexpected response (no result image)',
+                    'method': 5
+                }, status_code=500)
 
             return JSONResponse({
                 'success': True,
