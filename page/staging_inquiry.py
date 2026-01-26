@@ -5598,6 +5598,21 @@ def property_type_selector():
                 const allPaths = [];
                 const lineWidth = 6;
                 const closeThreshold = 30; // Distance to close path
+                let cursorX = null;
+                let cursorY = null;
+
+                // Create cursor canvas overlay
+                const cursorCanvas = document.createElement('canvas');
+                cursorCanvas.id = 'cursor-preview';
+                cursorCanvas.width = canvas.width;
+                cursorCanvas.height = canvas.height;
+                cursorCanvas.style.position = 'absolute';
+                cursorCanvas.style.pointerEvents = 'none';
+                cursorCanvas.style.top = '0';
+                cursorCanvas.style.left = '0';
+                canvas.parentElement.style.position = 'relative';
+                canvas.parentElement.appendChild(cursorCanvas);
+                const cursorCtx = cursorCanvas.getContext('2d');
 
                 // Create mask layer (starts as all black = keep everything)
                 const maskCanvas = document.createElement('canvas');
@@ -5706,6 +5721,32 @@ def property_type_selector():
                     }
                 }
 
+                // Update cursor preview
+                function updateCursor(e) {
+                    const coords = getCoords(e);
+                    cursorX = coords.x;
+                    cursorY = coords.y;
+
+                    cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
+
+                    // Draw cursor dot
+                    cursorCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    cursorCtx.beginPath();
+                    cursorCtx.arc(cursorX, cursorY, 8, 0, Math.PI * 2);
+                    cursorCtx.fill();
+
+                    // Draw white outline
+                    cursorCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                    cursorCtx.lineWidth = 2;
+                    cursorCtx.stroke();
+                }
+
+                function clearCursor() {
+                    cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
+                    cursorX = null;
+                    cursorY = null;
+                }
+
                 function stopDrawing(e) {
                     if (!isDrawing || currentPath.length < 3) {
                         isDrawing = false;
@@ -5745,9 +5786,13 @@ def property_type_selector():
 
                 // Event listeners
                 canvas.addEventListener('mousedown', startDrawing);
-                canvas.addEventListener('mousemove', draw);
+                canvas.addEventListener('mousemove', (e) => {
+                    updateCursor(e);
+                    draw(e);
+                });
                 canvas.addEventListener('mouseup', stopDrawing);
                 canvas.addEventListener('mouseleave', () => {
+                    clearCursor();
                     if (isDrawing) {
                         stopDrawing();
                     }
