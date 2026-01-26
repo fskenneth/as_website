@@ -5700,10 +5700,26 @@ def property_type_selector():
                     };
                 }
 
+                // Clamp coordinates to canvas bounds
+                function clampToCanvas(coords) {
+                    return {
+                        x: Math.max(0, Math.min(canvas.width, coords.x)),
+                        y: Math.max(0, Math.min(canvas.height, coords.y))
+                    };
+                }
+
+                // Check if point is outside canvas
+                function isOutside(coords) {
+                    return coords.x < 0 || coords.x > canvas.width ||
+                           coords.y < 0 || coords.y > canvas.height;
+                }
+
                 function startDrawing(e) {
                     isDrawing = true;
                     const coords = getCoords(e);
-                    currentPath = [coords];
+                    // Clamp start point to canvas edge if outside
+                    const clampedCoords = clampToCanvas(coords);
+                    currentPath = [clampedCoords];
                     redrawCanvas();
                 }
 
@@ -5713,10 +5729,13 @@ def property_type_selector():
                     const coords = getCoords(e);
                     const lastPoint = currentPath[currentPath.length - 1];
 
+                    // Clamp to canvas bounds
+                    const clampedCoords = clampToCanvas(coords);
+
                     // Only add point if moved enough
-                    const dist = Math.hypot(coords.x - lastPoint.x, coords.y - lastPoint.y);
+                    const dist = Math.hypot(clampedCoords.x - lastPoint.x, clampedCoords.y - lastPoint.y);
                     if (dist > 5) {
-                        currentPath.push(coords);
+                        currentPath.push(clampedCoords);
                         redrawCanvas();
                     }
                 }
@@ -5791,10 +5810,27 @@ def property_type_selector():
                     draw(e);
                 });
                 canvas.addEventListener('mouseup', stopDrawing);
-                canvas.addEventListener('mouseleave', () => {
+                canvas.addEventListener('mouseleave', (e) => {
                     clearCursor();
+                    // If drawing and leaving, add edge point before stopping
                     if (isDrawing) {
-                        stopDrawing();
+                        const coords = getCoords(e);
+                        const clampedCoords = clampToCanvas(coords);
+                        const lastPoint = currentPath[currentPath.length - 1];
+
+                        // Add edge point if different from last point
+                        const dist = Math.hypot(clampedCoords.x - lastPoint.x, clampedCoords.y - lastPoint.y);
+                        if (dist > 2) {
+                            currentPath.push(clampedCoords);
+                        }
+
+                        stopDrawing(e);
+                    }
+                });
+                canvas.addEventListener('mouseenter', (e) => {
+                    // If mouse enters while button is still down, resume drawing
+                    if (e.buttons === 1 && !isDrawing && currentPath.length === 0) {
+                        startDrawing(e);
                     }
                 });
 
