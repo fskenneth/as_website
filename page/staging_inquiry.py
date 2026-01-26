@@ -5591,26 +5591,13 @@ def property_type_selector():
                 photoImg.src = currentPhotoSrc;
             }
 
-            // Setup mask drawing functionality
+            // Setup mask drawing functionality with polygon/lasso tool
             function setupMaskDrawing(canvas, ctx, photoImg, originalPhoto) {
                 let isDrawing = false;
-                let brushSize = 30;
-
-                // Initialize brush size display
-                document.getElementById('mask-brush-size').textContent = brushSize;
-
-                // Create cursor canvas overlay
-                const cursorCanvas = document.createElement('canvas');
-                cursorCanvas.id = 'cursor-preview';
-                cursorCanvas.width = canvas.width;
-                cursorCanvas.height = canvas.height;
-                cursorCanvas.style.position = 'absolute';
-                cursorCanvas.style.pointerEvents = 'none';
-                cursorCanvas.style.top = '0';
-                cursorCanvas.style.left = '0';
-                canvas.parentElement.style.position = 'relative';
-                canvas.parentElement.appendChild(cursorCanvas);
-                const cursorCtx = cursorCanvas.getContext('2d');
+                let currentPath = [];
+                const allPaths = [];
+                const lineWidth = 6;
+                const closeThreshold = 30; // Distance to close path
 
                 // Create mask layer (starts as all black = keep everything)
                 const maskCanvas = document.createElement('canvas');
@@ -5620,46 +5607,72 @@ def property_type_selector():
                 maskCtx.fillStyle = 'black';
                 maskCtx.fillRect(0, 0, canvas.width, canvas.height);
 
-                let lastX = null;
-                let lastY = null;
-
-                // Redraw with mask overlay
+                // Redraw canvas with all paths
                 function redrawCanvas() {
                     // Clear and draw original photo
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
                     ctx.drawImage(photoImg, 0, 0);
 
-                    // Draw semi-transparent red overlay where mask is white
-                    const maskData = maskCtx.getImageData(0, 0, canvas.width, canvas.height);
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    // Draw all completed filled paths
+                    allPaths.forEach(path => {
+                        if (path.length > 2) {
+                            // Fill area with transparent red
+                            ctx.fillStyle = 'rgba(255, 0, 0, 0.25)';
+                            ctx.beginPath();
+                            ctx.moveTo(path[0].x, path[0].y);
+                            for (let i = 1; i < path.length; i++) {
+                                ctx.lineTo(path[i].x, path[i].y);
+                            }
+                            ctx.closePath();
+                            ctx.fill();
 
-                    // Overlay red on pixels where mask is white
-                    for (let i = 0; i < maskData.data.length; i += 4) {
-                        if (maskData.data[i] > 128) {  // If mask pixel is white
-                            // Blend with semi-transparent red (0.25 opacity)
-                            const alpha = 0.25;
-                            imageData.data[i] = imageData.data[i] * (1 - alpha) + 255 * alpha;     // R
-                            imageData.data[i + 1] = imageData.data[i + 1] * (1 - alpha) + 0 * alpha; // G
-                            imageData.data[i + 2] = imageData.data[i + 2] * (1 - alpha) + 0 * alpha; // B
+                            // Draw outline
+                            ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+                            ctx.lineWidth = 2;
+                            ctx.stroke();
                         }
+                    });
+
+                    // Draw current path being drawn
+                    if (currentPath.length > 0) {
+                        ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+                        ctx.lineWidth = lineWidth;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+                        ctx.beginPath();
+                        ctx.moveTo(currentPath[0].x, currentPath[0].y);
+                        for (let i = 1; i < currentPath.length; i++) {
+                            ctx.lineTo(currentPath[i].x, currentPath[i].y);
+                        }
+                        ctx.stroke();
+
+                        // Draw start point indicator (green dot)
+                        if (currentPath.length > 1) {
+                            ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
+                            ctx.beginPath();
+                            ctx.arc(currentPath[0].x, currentPath[0].y, 10, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+
+                        // Draw current point (red dot)
+                        const lastPoint = currentPath[currentPath.length - 1];
+                        ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+                        ctx.beginPath();
+                        ctx.arc(lastPoint.x, lastPoint.y, 6, 0, Math.PI * 2);
+                        ctx.fill();
                     }
-
-                    ctx.putImageData(imageData, 0, 0);
                 }
 
-                // Drawing functions
-                function startDrawing(e) {
-                    isDrawing = true;
-                    const coords = getCoords(e);
-                    lastX = coords.x;
-                    lastY = coords.y;
-                    drawCircle(coords.x, coords.y);
-                }
-
-                function stopDrawing() {
-                    isDrawing = false;
-                    lastX = null;
-                    lastY = null;
+                // Update mask canvas with filled path
+                function updateMask(path) {
+                    maskCtx.fillStyle = 'white';
+                    maskCtx.beginPath();
+                    maskCtx.moveTo(path[0].x, path[0].y);
+                    for (let i = 1; i < path.length; i++) {
+                        maskCtx.lineTo(path[i].x, path[i].y);
+                    }
+                    maskCtx.closePath();
+                    maskCtx.fill();
                 }
 
                 function getCoords(e) {
@@ -5672,14 +5685,10 @@ def property_type_selector():
                     };
                 }
 
-                function drawCircle(x, y) {
-                    // Draw white circle on mask
-                    maskCtx.fillStyle = 'white';
-                    maskCtx.beginPath();
-                    maskCtx.arc(x, y, brushSize, 0, Math.PI * 2);
-                    maskCtx.fill();
-
-                    // Redraw entire canvas with proper transparency
+                function startDrawing(e) {
+                    isDrawing = true;
+                    const coords = getCoords(e);
+                    currentPath = [coords];
                     redrawCanvas();
                 }
 
@@ -5687,41 +5696,61 @@ def property_type_selector():
                     if (!isDrawing) return;
 
                     const coords = getCoords(e);
-                    const x = coords.x;
-                    const y = coords.y;
+                    const lastPoint = currentPath[currentPath.length - 1];
 
-                    // Draw line from last position for smooth strokes
-                    if (lastX !== null && lastY !== null) {
-                        const dist = Math.hypot(x - lastX, y - lastY);
-                        const steps = Math.max(1, Math.floor(dist / (brushSize / 4)));
-
-                        for (let i = 0; i <= steps; i++) {
-                            const t = i / steps;
-                            const ix = lastX + (x - lastX) * t;
-                            const iy = lastY + (y - lastY) * t;
-                            drawCircle(ix, iy);
-                        }
-                    } else {
-                        drawCircle(x, y);
+                    // Only add point if moved enough
+                    const dist = Math.hypot(coords.x - lastPoint.x, coords.y - lastPoint.y);
+                    if (dist > 5) {
+                        currentPath.push(coords);
+                        redrawCanvas();
                     }
-
-                    lastX = x;
-                    lastY = y;
                 }
 
-                // Combined mousemove handler for drawing and cursor preview
-                canvas.addEventListener('mousemove', (e) => {
-                    const coords = getCoords(e);
-                    updateCursorPreview(coords.x, coords.y);
-                    draw(e);
-                });
+                function stopDrawing(e) {
+                    if (!isDrawing || currentPath.length < 3) {
+                        isDrawing = false;
+                        currentPath = [];
+                        redrawCanvas();
+                        return;
+                    }
+
+                    isDrawing = false;
+
+                    const firstPoint = currentPath[0];
+                    const lastPoint = currentPath[currentPath.length - 1];
+
+                    // Check if path closes (last point near first point)
+                    const dist = Math.hypot(lastPoint.x - firstPoint.x, lastPoint.y - firstPoint.y);
+
+                    if (dist < closeThreshold) {
+                        // Path closes - fill it
+                        allPaths.push([...currentPath]);
+                        updateMask(currentPath);
+                    } else {
+                        // Path doesn't close - check if it goes outside canvas
+                        const touchesEdge = currentPath.some(p =>
+                            p.x <= 1 || p.x >= canvas.width - 1 || p.y <= 1 || p.y >= canvas.height - 1
+                        );
+
+                        if (touchesEdge) {
+                            // Close path along canvas edge
+                            allPaths.push([...currentPath]);
+                            updateMask(currentPath);
+                        }
+                    }
+
+                    currentPath = [];
+                    redrawCanvas();
+                }
 
                 // Event listeners
                 canvas.addEventListener('mousedown', startDrawing);
+                canvas.addEventListener('mousemove', draw);
                 canvas.addEventListener('mouseup', stopDrawing);
                 canvas.addEventListener('mouseleave', () => {
-                    stopDrawing();
-                    updateCursorPreview(null, null);
+                    if (isDrawing) {
+                        stopDrawing();
+                    }
                 });
 
                 // Touch support
@@ -5751,53 +5780,13 @@ def property_type_selector():
                     canvas.dispatchEvent(mouseEvent);
                 });
 
-                // Brush size slider control
-                const brushSlider = document.getElementById('mask-brush-slider');
-                brushSlider.addEventListener('input', (e) => {
-                    brushSize = parseInt(e.target.value);
-                    document.getElementById('mask-brush-size').textContent = brushSize;
-                });
-
-                // Mouse wheel to adjust brush size
-                canvas.addEventListener('wheel', (e) => {
-                    e.preventDefault();
-                    const delta = e.deltaY > 0 ? -10 : 10;
-                    brushSize = Math.max(10, Math.min(300, brushSize + delta));
-                    document.getElementById('mask-brush-size').textContent = brushSize;
-                    document.getElementById('mask-brush-slider').value = brushSize;
-
-                    // Update cursor preview with new size
-                    const coords = getCoords(e);
-                    updateCursorPreview(coords.x, coords.y);
-                });
-
-                // Cursor preview with solid black
-                function updateCursorPreview(x, y) {
-                    cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
-
-                    if (x !== null && y !== null) {
-                        // Draw brush preview circle in solid black
-                        cursorCtx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-                        cursorCtx.lineWidth = 6;
-                        cursorCtx.beginPath();
-                        cursorCtx.arc(x, y, brushSize, 0, Math.PI * 2);
-                        cursorCtx.stroke();
-
-                        // Draw center dot
-                        cursorCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-                        cursorCtx.beginPath();
-                        cursorCtx.arc(x, y, 2, 0, Math.PI * 2);
-                        cursorCtx.fill();
-                    }
-                }
-
                 // Clear mask
                 document.getElementById('mask-clear').onclick = () => {
+                    allPaths.length = 0;
                     maskCtx.fillStyle = 'black';
                     maskCtx.fillRect(0, 0, canvas.width, canvas.height);
-                    // Redraw just the photo
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(photoImg, 0, 0);
+                    currentPath = [];
+                    redrawCanvas();
                 };
 
                 // Cancel
@@ -5911,15 +5900,11 @@ def property_type_selector():
         # Mask Drawing Modal
         Div(
             Div(
-                H3("Draw areas to remove (red = remove)"),
+                H3("Draw outline around items to remove"),
+                P("Draw around items and close the loop to mark for removal", style="margin: 10px 0; color: #666; font-size: 14px;"),
                 Div(
                     NotStr('<canvas id="mask-canvas"></canvas>'),
                     cls="mask-canvas-container"
-                ),
-                Div(
-                    Span("Brush Size: ", Span("30", id="mask-brush-size"), "px", cls="mask-brush-label"),
-                    NotStr('<input type="range" id="mask-brush-slider" min="10" max="300" value="30" step="10" style="width: 300px; cursor: pointer;">'),
-                    cls="mask-controls"
                 ),
                 Div(
                     Button("Clear", id="mask-clear", cls="mask-btn mask-btn-secondary"),
