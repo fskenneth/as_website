@@ -5682,7 +5682,7 @@ def property_type_selector():
                     maskCtx.fill();
 
                     // Draw red circle on display canvas
-                    ctx.fillStyle = 'rgba(255, 0, 0, 0.4)';
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.25)';
                     ctx.beginPath();
                     ctx.arc(x, y, brushSize, 0, Math.PI * 2);
                     ctx.fill();
@@ -5794,7 +5794,7 @@ def property_type_selector():
 
                         // Draw brush preview circle
                         cursorCtx.strokeStyle = cursorColor;
-                        cursorCtx.lineWidth = 2;
+                        cursorCtx.lineWidth = 3;
                         cursorCtx.beginPath();
                         cursorCtx.arc(x, y, brushSize, 0, Math.PI * 2);
                         cursorCtx.stroke();

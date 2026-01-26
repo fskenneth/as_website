@@ -359,7 +359,8 @@ class InpaintingTester:
             temp_dir.mkdir(parents=True, exist_ok=True)
 
             # Resize image if too large (Decor8.ai works better with smaller images)
-            max_dimension = 1920
+            # Reduced to 1024px to prevent 504 gateway timeout on Decor8.ai's servers
+            max_dimension = 1024
             if image.width > max_dimension or image.height > max_dimension:
                 print(f"Resizing image from {image.width}x{image.height}...")
                 ratio = min(max_dimension / image.width, max_dimension / image.height)
