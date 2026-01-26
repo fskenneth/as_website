@@ -5679,11 +5679,8 @@ def property_type_selector():
                     maskCtx.arc(x, y, brushSize, 0, Math.PI * 2);
                     maskCtx.fill();
 
-                    // Draw red circle on display canvas
-                    ctx.fillStyle = 'rgba(255, 0, 0, 0.25)';
-                    ctx.beginPath();
-                    ctx.arc(x, y, brushSize, 0, Math.PI * 2);
-                    ctx.fill();
+                    // Redraw entire canvas with proper transparency
+                    redrawCanvas();
                 }
 
                 function draw(e) {
@@ -5774,31 +5771,20 @@ def property_type_selector():
                     updateCursorPreview(coords.x, coords.y);
                 });
 
-                // Cursor preview with contrasting color
+                // Cursor preview with solid black
                 function updateCursorPreview(x, y) {
                     cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
 
                     if (x !== null && y !== null) {
-                        // Sample pixel color under cursor to determine contrast
-                        const imageData = ctx.getImageData(Math.floor(x), Math.floor(y), 1, 1);
-                        const [r, g, b] = imageData.data;
-
-                        // Calculate luminance (perceived brightness)
-                        const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-
-                        // Use white cursor on dark areas, black on light areas
-                        const cursorColor = luminance > 128 ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.8)';
-                        const centerColor = luminance > 128 ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.5)';
-
-                        // Draw brush preview circle
-                        cursorCtx.strokeStyle = cursorColor;
+                        // Draw brush preview circle in solid black
+                        cursorCtx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
                         cursorCtx.lineWidth = 6;
                         cursorCtx.beginPath();
                         cursorCtx.arc(x, y, brushSize, 0, Math.PI * 2);
                         cursorCtx.stroke();
 
                         // Draw center dot
-                        cursorCtx.fillStyle = centerColor;
+                        cursorCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
                         cursorCtx.beginPath();
                         cursorCtx.arc(x, y, 2, 0, Math.PI * 2);
                         cursorCtx.fill();
