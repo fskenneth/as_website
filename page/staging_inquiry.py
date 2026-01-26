@@ -5573,39 +5573,95 @@ def property_type_selector():
 
                 const statusEl = document.getElementById('empty-room-status');
 
-                statusEl.textContent = 'Preparing image...';
+                statusEl.textContent = 'Checking history...';
 
                 try {
                     // Use the image directly (already base64 data URL)
                     const base64Image = currentPhotoSrc;
 
-                    statusEl.textContent = 'Removing furniture...';
+                    // First, check if we have this image in history
+                    const historyResponse = await fetch('/api/inpainting-history');
+                    const historyData = await historyResponse.json();
 
-                    // Call API to remove furniture
-                    const inpaintResponse = await fetch('/api/test-inpainting', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            image: base64Image,
-                            method: 5
-                        })
-                    });
+                    let emptyRoomImage = null;
 
-                    const result = await inpaintResponse.json();
+                    if (historyData.history && historyData.history.length > 0) {
+                        // Try to find matching input image in history
+                        // Compare image content by fetching and comparing base64
+                        for (const item of historyData.history) {
+                            if (item.input_url) {
+                                try {
+                                    const historicalInputResponse = await fetch(item.input_url);
+                                    const historicalInputBlob = await historicalInputResponse.blob();
+                                    const historicalInputBase64 = await new Promise((resolve) => {
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => resolve(reader.result);
+                                        reader.readAsDataURL(historicalInputBlob);
+                                    });
 
-                    console.log('API Response:', result);
+                                    // Compare base64 strings (strip data URL prefix for comparison)
+                                    const current = base64Image.split(',')[1] || base64Image;
+                                    const historical = historicalInputBase64.split(',')[1] || historicalInputBase64;
 
-                    if (result.success && result.result && result.result.result_base64) {
-                        statusEl.textContent = 'Complete!';
+                                    if (current === historical) {
+                                        // Found matching image! Use the cached result
+                                        statusEl.textContent = 'Found in history! (0 API calls)';
+                                        console.log('Using cached result from history:', item.timestamp);
 
-                        // Add the empty room image to photos array
-                        let emptyRoomImage = result.result.result_base64;
-                        // Add data URL prefix if not already present
-                        if (!emptyRoomImage.startsWith('data:image')) {
-                            emptyRoomImage = 'data:image/png;base64,' + emptyRoomImage;
+                                        // Fetch the output image
+                                        const outputResponse = await fetch(item.output_url);
+                                        const outputBlob = await outputResponse.blob();
+                                        emptyRoomImage = await new Promise((resolve) => {
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => resolve(reader.result);
+                                            reader.readAsDataURL(outputBlob);
+                                        });
+                                        break;
+                                    }
+                                } catch (err) {
+                                    console.warn('Error checking history item:', err);
+                                }
+                            }
                         }
+                    }
+
+                    // If not found in history, call the API
+                    if (!emptyRoomImage) {
+                        statusEl.textContent = 'Removing furniture...';
+
+                        // Call API to remove furniture
+                        const inpaintResponse = await fetch('/api/test-inpainting', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                image: base64Image,
+                                method: 5
+                            })
+                        });
+
+                        const result = await inpaintResponse.json();
+
+                        console.log('API Response:', result);
+
+                        if (result.success && result.result && result.result.result_base64) {
+                            statusEl.textContent = 'Complete!';
+
+                            emptyRoomImage = result.result.result_base64;
+                            // Add data URL prefix if not already present
+                            if (!emptyRoomImage.startsWith('data:image')) {
+                                emptyRoomImage = 'data:image/png;base64,' + emptyRoomImage;
+                            }
+                        } else {
+                            const errorMsg = result.error || result.message || 'API processing failed';
+                            console.error('API Error:', errorMsg, result);
+                            throw new Error(errorMsg);
+                        }
+                    }
+
+                    // Add the empty room image to photos array
+                    if (emptyRoomImage) {
                         areaPhotos[currentArea].push(emptyRoomImage);
 
                         // Navigate to the new image
@@ -5620,9 +5676,7 @@ def property_type_selector():
                             modal.classList.remove('active');
                         }, 1500);
                     } else {
-                        const errorMsg = result.error || result.message || 'API processing failed';
-                        console.error('API Error:', errorMsg, result);
-                        throw new Error(errorMsg);
+                        throw new Error('No result image obtained');
                     }
                 } catch (error) {
                     console.error('Empty room error:', error);
