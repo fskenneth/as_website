@@ -5730,7 +5730,17 @@ def property_type_selector():
                     const lastPoint = currentPath[currentPath.length - 1];
 
                     // Clamp to canvas bounds
-                    const clampedCoords = clampToCanvas(coords);
+                    let clampedCoords = clampToCanvas(coords);
+
+                    // Magnetic snap to start point if close
+                    if (currentPath.length > 2) {
+                        const firstPoint = currentPath[0];
+                        const distToStart = Math.hypot(clampedCoords.x - firstPoint.x, clampedCoords.y - firstPoint.y);
+
+                        if (distToStart < closeThreshold) {
+                            clampedCoords = firstPoint; // Snap to start point
+                        }
+                    }
 
                     // Only add point if moved enough
                     const dist = Math.hypot(clampedCoords.x - lastPoint.x, clampedCoords.y - lastPoint.y);
@@ -5743,13 +5753,30 @@ def property_type_selector():
                 // Update cursor preview
                 function updateCursor(e) {
                     const coords = getCoords(e);
-                    cursorX = coords.x;
-                    cursorY = coords.y;
+                    let displayX = coords.x;
+                    let displayY = coords.y;
+
+                    // Magnetic snap cursor to start point if close while drawing
+                    if (isDrawing && currentPath.length > 2) {
+                        const firstPoint = currentPath[0];
+                        const distToStart = Math.hypot(coords.x - firstPoint.x, coords.y - firstPoint.y);
+
+                        if (distToStart < closeThreshold) {
+                            displayX = firstPoint.x;
+                            displayY = firstPoint.y;
+                        }
+                    }
+
+                    cursorX = displayX;
+                    cursorY = displayY;
 
                     cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
 
-                    // Draw cursor dot
-                    cursorCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    // Draw cursor dot (green when snapping to start)
+                    const isSnapping = isDrawing && currentPath.length > 2 &&
+                                      Math.hypot(coords.x - currentPath[0].x, coords.y - currentPath[0].y) < closeThreshold;
+
+                    cursorCtx.fillStyle = isSnapping ? 'rgba(0, 255, 0, 0.8)' : 'rgba(0, 0, 0, 0.8)';
                     cursorCtx.beginPath();
                     cursorCtx.arc(cursorX, cursorY, 8, 0, Math.PI * 2);
                     cursorCtx.fill();
