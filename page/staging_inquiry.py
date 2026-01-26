@@ -5629,24 +5629,22 @@ def property_type_selector():
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
                     ctx.drawImage(photoImg, 0, 0);
 
-                    // Draw red overlay where mask is white
-                    ctx.globalAlpha = 0.4;
-                    ctx.globalCompositeOperation = 'source-over';
-
-                    // Use the mask as a clipping path
+                    // Draw semi-transparent red overlay where mask is white
                     const maskData = maskCtx.getImageData(0, 0, canvas.width, canvas.height);
-                    const tempCanvas = document.createElement('canvas');
-                    tempCanvas.width = canvas.width;
-                    tempCanvas.height = canvas.height;
-                    const tempCtx = tempCanvas.getContext('2d');
-                    tempCtx.putImageData(maskData, 0, 0);
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-                    // Draw red overlay
-                    ctx.fillStyle = 'rgba(255, 0, 0, 1)';
-                    ctx.globalCompositeOperation = 'source-atop';
-                    ctx.drawImage(tempCanvas, 0, 0);
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.globalAlpha = 1.0;
+                    // Overlay red on pixels where mask is white
+                    for (let i = 0; i < maskData.data.length; i += 4) {
+                        if (maskData.data[i] > 128) {  // If mask pixel is white
+                            // Blend with semi-transparent red (0.25 opacity)
+                            const alpha = 0.25;
+                            imageData.data[i] = imageData.data[i] * (1 - alpha) + 255 * alpha;     // R
+                            imageData.data[i + 1] = imageData.data[i + 1] * (1 - alpha) + 0 * alpha; // G
+                            imageData.data[i + 2] = imageData.data[i + 2] * (1 - alpha) + 0 * alpha; // B
+                        }
+                    }
+
+                    ctx.putImageData(imageData, 0, 0);
                 }
 
                 // Drawing functions
@@ -5794,7 +5792,7 @@ def property_type_selector():
 
                         // Draw brush preview circle
                         cursorCtx.strokeStyle = cursorColor;
-                        cursorCtx.lineWidth = 3;
+                        cursorCtx.lineWidth = 6;
                         cursorCtx.beginPath();
                         cursorCtx.arc(x, y, brushSize, 0, Math.PI * 2);
                         cursorCtx.stroke();
