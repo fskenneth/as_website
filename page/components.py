@@ -2762,7 +2762,7 @@ def create_page(title, content, additional_styles="", additional_scripts="",
             Meta(name='description', content=description),
             Meta(name='keywords', content=keywords),
             Link(href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500&family=Barlow+Condensed:wght@400;500;600;700&display=swap', rel='stylesheet'),
-            Link(rel='icon', type='image/x-icon', href='/static/favicon.ico'),
+            Link(rel='icon', type='image/x-icon', href='/static/images/favicon.ico'),
             Style(get_shared_styles() + get_footer_styles() + additional_styles),
             Script(src=google_maps_script, defer=True, **{"async": True}),
             NotStr(theme_init_script)
