@@ -5923,25 +5923,34 @@ def property_type_selector():
                 statusEl.textContent = 'Removing furniture...';
 
                 try {
-                    // Convert mask to base64
-                    const maskBase64 = maskCanvas.toDataURL('image/png');
-
                     // Use the original photo
                     const base64Image = originalPhoto;
                     let emptyRoomImage = null;
 
-                    // Call API to remove furniture with custom mask
-                    console.log('Calling API to remove furniture with custom mask...');
+                    // Check if any paths were drawn
+                    const hasMask = allPaths.length > 0;
+
+                    // Build request body - only include mask if paths were drawn
+                    const requestBody = {
+                        image: base64Image,
+                        method: 5  // Use Decor8.ai (cloud API)
+                    };
+
+                    if (hasMask) {
+                        // Convert mask to base64 only if we have drawings
+                        const maskBase64 = maskCanvas.toDataURL('image/png');
+                        requestBody.mask = maskBase64;
+                        console.log('Calling API to remove furniture with custom mask...');
+                    } else {
+                        console.log('Calling API to remove ALL furniture (no mask drawn)...');
+                    }
+
                     const inpaintResponse = await fetch('/api/test-inpainting', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({
-                            image: base64Image,
-                            mask: maskBase64,
-                            method: 5  // Use Decor8.ai (cloud API)
-                        })
+                        body: JSON.stringify(requestBody)
                     });
 
                     console.log('API call completed, parsing response...');
@@ -6008,8 +6017,9 @@ def property_type_selector():
         # Mask Drawing Modal
         Div(
             Div(
-                H3("Draw outline around items to remove"),
-                P("Draw around items and close the loop to mark for removal", style="margin: 10px 0; color: #666; font-size: 14px;"),
+                H3("Remove Furniture from Room"),
+                P("Draw around specific items to remove, or click Process without drawing to remove all furniture automatically.", style="margin: 10px 0; color: #666; font-size: 14px;"),
+                P("Tip: Wall art/paintings are preserved by default. Draw around them if you want them removed.", style="margin: 0 0 10px 0; color: #999; font-size: 12px; font-style: italic;"),
                 Div(
                     NotStr('<canvas id="mask-canvas"></canvas>'),
                     cls="mask-canvas-container"
