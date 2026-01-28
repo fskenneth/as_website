@@ -59,7 +59,7 @@ def register_test_routes(rt):
             }
         """
         from PIL import Image
-        from tools.test.image_vacate_test import InpaintingTester, image_to_base64
+        from tools.image_vacate import InpaintingTester, image_to_base64
 
         try:
             data = await request.json()
