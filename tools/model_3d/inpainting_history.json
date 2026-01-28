@@ -19,5 +19,33 @@
     "output_url": "/static/images/areas/66880_2026-01-03_after.png",
     "processing_time": 0,
     "source": "decor8_api_log"
+  },
+  {
+    "timestamp": "2026-01-27T13:45:16.378354",
+    "input_url": "/static/images/areas/flux_da944dc6_2026-01-27_13-45-16_before.png",
+    "output_url": "/static/images/areas/flux_da944dc6_2026-01-27_13-45-16_after.png",
+    "processing_time": 0,
+    "source": "flux_fill"
+  },
+  {
+    "timestamp": "2026-01-27T14:19:27.208755",
+    "input_url": "/static/images/areas/2a062478_2026-01-27_14-19-27_before.png",
+    "output_url": "/static/images/areas/2a062478_2026-01-27_14-19-27_after.png",
+    "processing_time": 304.6980941295624,
+    "source": "api_test"
+  },
+  {
+    "timestamp": "2026-01-27T14:48:46.530819",
+    "input_url": "/static/images/areas/1722e6b6_2026-01-27_14-48-46_before.png",
+    "output_url": "/static/images/areas/1722e6b6_2026-01-27_14-48-46_after.png",
+    "processing_time": 304.4332399368286,
+    "source": "api_test"
+  },
+  {
+    "timestamp": "2026-01-28T09:42:12.240988",
+    "input_url": "/static/images/areas/ea0f778e_2026-01-28_09-42-12_before.png",
+    "output_url": "/static/images/areas/ea0f778e_2026-01-28_09-42-12_after.png",
+    "processing_time": 306.96818113327026,
+    "source": "api_test"
   }
 ]
