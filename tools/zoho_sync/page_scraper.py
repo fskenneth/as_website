@@ -11,12 +11,6 @@ from datetime import datetime
 from typing import List, Dict, Optional
 import logging
 
-# Handle both relative and absolute imports
-try:
-    from .image_url_processor import image_url_processor
-except ImportError:
-    from image_url_processor import image_url_processor
-
 logger = logging.getLogger(__name__)
 
 # Report URL - filtered to show items modified in last 1 minute
@@ -243,30 +237,15 @@ class ZohoPageScraper:
         if not normalized.get('ID'):
             return None
 
-        # Transform files.zohopublic.com URLs to creatorexport.zoho.com format
-        report_name = "Item_Report"
-
-        # Transform Item_Image if present
-        if normalized.get('Item_Image') and 'files.zohopublic.com' in normalized['Item_Image']:
-            result = image_url_processor.transform_files_zohopublic_url(
-                normalized['Item_Image'],
-                'Item_Image',
-                report_name
-            )
-            if result['success']:
-                normalized['Item_Image'] = result['url']
-                logger.debug(f"Transformed Item_Image URL for record {normalized['ID']}")
-
-        # Transform Resized_Image if present
-        if normalized.get('Resized_Image') and 'files.zohopublic.com' in normalized['Resized_Image']:
-            result = image_url_processor.transform_files_zohopublic_url(
-                normalized['Resized_Image'],
-                'Resized_Image',
-                report_name
-            )
-            if result['success']:
-                normalized['Resized_Image'] = result['url']
-                logger.debug(f"Transformed Resized_Image URL for record {normalized['ID']}")
+        # Remove files.zohopublic.com URLs from image fields — these cannot be
+        # reliably transformed (the x-cli-msg privatekey is the report permalink
+        # key, not the image download key, and the filepath is an internal ID,
+        # not the actual filename). By excluding these fields from the upsert,
+        # existing correct creatorexport URLs in the database are preserved.
+        for img_field in ('Item_Image', 'Resized_Image'):
+            if normalized.get(img_field) and 'files.zohopublic.com' in str(normalized[img_field]):
+                del normalized[img_field]
+                logger.debug(f"Excluded {img_field} files.zohopublic.com URL for record {normalized['ID']} to preserve existing DB URL")
 
         return normalized
 
