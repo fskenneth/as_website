@@ -693,33 +693,6 @@ def create_item_card(item_name: str, items: List[sqlite3.Row]) -> Div:
     item_depth = first_item['Item_Depth'] or 0
 
     return Div(
-        # 3D Icon (top-left, shown if item has 3D model)
-        Div(
-            NotStr('''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                <line x1="12" y1="22.08" x2="12" y2="12"/>
-            </svg>'''),
-            cls="item-3d-icon",
-            onclick=f"show3DModal('{model_3d}', '{item_name}', {item_width}, {item_height}, {item_depth})",
-            title="View 3D Model"
-        ) if has_3d_model else None,
-
-        # Convert to 3D Icon (top-left, shown if item does NOT have 3D model)
-        Div(
-            NotStr('''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                <line x1="12" y1="22.08" x2="12" y2="12"/>
-                <line x1="7" y1="10" x2="17" y2="10"/>
-                <line x1="12" y1="5" x2="12" y2="15"/>
-            </svg>'''),
-            cls="item-3d-icon",
-            style="background: rgba(76, 175, 80, 0.9);",
-            onclick=f"showConvert3DModal('{first_item['ID']}', '{item_name}', '{get_item_image_url(first_item)}')",
-            title="Convert to 3D Model"
-        ) if not has_3d_model else None,
-
         # Count badges
         Div(
             Span(str(warehouse_count), cls="count-badge", style="background-color: green; color: white; margin-right: 4px;"),
@@ -944,7 +917,8 @@ async def get(request):
                          onclick="closeImageModal()",
                          style="position: absolute; top: 10px; right: 20px; font-size: 32px; cursor: pointer; color: var(--color-secondary);"),
                     Div(id="image-modal-content", style="display: flex; gap: 10px; justify-content: center; align-items: center;"),
-                    style="background: var(--bg-card); color: var(--color-primary); padding: 20px; border-radius: 8px; width: 95%; max-width: 95vw; position: relative;"
+                    Div(id="image-modal-3d-content"),
+                    style="background: var(--bg-card); color: var(--color-primary); padding: 20px; border-radius: 8px; width: 95%; max-width: 95vw; max-height: 95vh; overflow-y: auto; position: relative;"
                 ),
                 id="image-modal",
                 style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--modal-bg); display: none; z-index: 1001; justify-content: center; align-items: center;"
@@ -1056,6 +1030,8 @@ async def get(request):
                     Div(
                         Span("💰 Tripo3D Credits: ", style="font-weight: bold; color: #333;"),
                         Span("Loading...", id="tripo-balance", style="color: #4caf50;"),
+                        A("Add Credits", href="https://platform.tripo3d.ai/billing", target="_blank",
+                          style="margin-left: 10px; font-size: 13px; color: #fff; background: #4caf50; padding: 4px 12px; border-radius: 4px; text-decoration: none;"),
                         style="margin-bottom: 20px; padding: 12px; background: #f5f5f5; border-radius: 8px; text-align: center;"
                     ),
                     # Parameters
@@ -1180,7 +1156,7 @@ async def get(request):
                         <!-- Row 2: Basic Information -->
                         <div>
                             <h4 class="font-bold text-lg mb-2">Basic Information</h4>
-                            <div class="grid grid-cols-3 gap-4">
+                            <div class="grid grid-cols-4 gap-4">
                                 <div>
                                     <label class="block mb-1">Item Name:</label>
                                     <input type="text" id="edit_Item_Name" value="${item.Item_Name || ''}" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-700">
@@ -1192,6 +1168,10 @@ async def get(request):
                                 <div>
                                     <label class="block mb-1">QR Code:</label>
                                     <input type="text" id="edit_Barcode" value="${item.Barcode || ''}" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label class="block mb-1">3D Model:</label>
+                                    <input type="text" id="edit_Model_3D" value="${item.Model_3D || ''}" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-700" readonly style="cursor: default;">
                                 </div>
                             </div>
                         </div>
@@ -1326,8 +1306,172 @@ async def get(request):
                 currentItemId = null;
             }
 
+            // Image modal 3D viewer variables
+            let imgModal3DScene = null, imgModal3DCamera = null, imgModal3DRenderer = null, imgModal3DControls = null, imgModal3DAnimId = null;
+
             function closeImageModal() {
                 document.getElementById('image-modal').style.display = 'none';
+                // Clean up 3D resources
+                if (imgModal3DAnimId) { cancelAnimationFrame(imgModal3DAnimId); imgModal3DAnimId = null; }
+                if (imgModal3DRenderer) { imgModal3DRenderer.dispose(); imgModal3DRenderer = null; }
+                imgModal3DScene = null; imgModal3DCamera = null; imgModal3DControls = null;
+                const threeDContent = document.getElementById('image-modal-3d-content');
+                if (threeDContent) threeDContent.innerHTML = '';
+            }
+
+            function initImageModal3DScene(container) {
+                const width = container.clientWidth;
+                const height = container.clientHeight || 400;
+                imgModal3DScene = new THREE.Scene();
+                imgModal3DScene.background = new THREE.Color(0xf5f5f5);
+                imgModal3DCamera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
+                imgModal3DCamera.position.set(0, 1, 3);
+                imgModal3DRenderer = new THREE.WebGLRenderer({ antialias: true });
+                imgModal3DRenderer.setSize(width, height);
+                imgModal3DRenderer.setPixelRatio(window.devicePixelRatio);
+                container.appendChild(imgModal3DRenderer.domElement);
+                imgModal3DControls = new THREE.OrbitControls(imgModal3DCamera, imgModal3DRenderer.domElement);
+                imgModal3DControls.enableDamping = true;
+                const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+                imgModal3DScene.add(ambientLight);
+                const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+                dirLight.position.set(5, 10, 7);
+                imgModal3DScene.add(dirLight);
+                function animate() {
+                    imgModal3DAnimId = requestAnimationFrame(animate);
+                    imgModal3DControls.update();
+                    imgModal3DRenderer.render(imgModal3DScene, imgModal3DCamera);
+                }
+                animate();
+            }
+
+            function loadImageModal3DModel(modelFile, w, h, d) {
+                const loader = new THREE.GLTFLoader();
+                loader.load('/static/models/' + modelFile, function(gltf) {
+                    const model = gltf.scene;
+                    const box = new THREE.Box3().setFromObject(model);
+                    const center = box.getCenter(new THREE.Vector3());
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    const scale = 2 / maxDim;
+                    model.scale.set(scale, scale, scale);
+                    model.position.sub(center.multiplyScalar(scale));
+                    imgModal3DScene.add(model);
+                    imgModal3DCamera.position.set(0, 1, 3);
+                    imgModal3DControls.target.set(0, 0, 0);
+                    imgModal3DControls.update();
+                }, undefined, function(err) {
+                    console.error('Error loading 3D model:', err);
+                });
+            }
+
+            function resetImageModal3DView() {
+                if (imgModal3DCamera && imgModal3DControls) {
+                    imgModal3DCamera.position.set(0, 1, 3);
+                    imgModal3DControls.target.set(0, 0, 0);
+                    imgModal3DControls.update();
+                }
+            }
+            function zoomInImageModal3D() {
+                if (imgModal3DCamera) imgModal3DCamera.position.multiplyScalar(0.8);
+            }
+            function zoomOutImageModal3D() {
+                if (imgModal3DCamera) imgModal3DCamera.position.multiplyScalar(1.25);
+            }
+
+            async function startImageModalConversion() {
+                const btn = document.getElementById('img-convert-btn');
+                const progressDiv = document.getElementById('img-convert-progress');
+                const statusSpan = document.getElementById('img-convert-status');
+                const progressBar = document.getElementById('img-convert-progress-bar');
+
+                btn.disabled = true;
+                btn.textContent = 'Converting...';
+                progressDiv.style.display = 'block';
+                statusSpan.textContent = 'Starting conversion...';
+                progressBar.style.width = '0%';
+
+                try {
+                    const pbr = document.getElementById('img-convert-pbr').checked;
+                    const autofix = document.getElementById('img-convert-autofix').checked;
+                    const orientation = document.getElementById('img-convert-orientation').checked ? 'align_image' : 'default';
+                    const prompt = document.getElementById('img-convert-prompt').value;
+
+                    statusSpan.textContent = 'Fetching image...';
+                    progressBar.style.width = '10%';
+                    const proxyResponse = await fetch('/item_management/fetch_image_base64', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image_url: currentConvertImageUrl })
+                    });
+                    const proxyData = await proxyResponse.json();
+                    if (!proxyData.success) throw new Error(proxyData.error || 'Failed to fetch image');
+
+                    statusSpan.textContent = 'Uploading to Tripo3D...';
+                    progressBar.style.width = '20%';
+                    const convertResponse = await fetch('/api/convert-to-3d', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            image_data: proxyData.image_base64,
+                            item_id: currentConvertItemId,
+                            item_name: currentConvertItemName,
+                            pbr: pbr,
+                            autofix: autofix,
+                            face_limit: 50000,
+                            orientation: orientation,
+                            prompt: prompt
+                        })
+                    });
+                    const convertData = await convertResponse.json();
+                    if (!convertData.success) throw new Error(convertData.error || 'Conversion failed');
+
+                    const taskId = convertData.task_id;
+                    statusSpan.textContent = 'Processing... (this may take a minute)';
+                    progressBar.style.width = '30%';
+
+                    // Poll for completion
+                    let attempts = 0;
+                    const maxAttempts = 120;
+                    while (attempts < maxAttempts) {
+                        await new Promise(r => setTimeout(r, 3000));
+                        attempts++;
+                        const checkResp = await fetch('/api/check-tripo-task?task_id=' + taskId);
+                        const checkData = await checkResp.json();
+                        if (checkData.success && checkData.status === 'success') {
+                            progressBar.style.width = '90%';
+                            statusSpan.textContent = 'Downloading model...';
+                            const dlResp = await fetch('/api/download-tripo-model', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ task_id: taskId, item_id: currentConvertItemId, item_name: currentConvertItemName })
+                            });
+                            const dlData = await dlResp.json();
+                            if (dlData.success) {
+                                progressBar.style.width = '100%';
+                                statusSpan.textContent = 'Conversion complete!';
+                                btn.textContent = 'Done!';
+                                btn.style.backgroundColor = '#2196f3';
+                                // Reload page after short delay to show updated 3D model
+                                setTimeout(() => { location.reload(); }, 1500);
+                                return;
+                            } else {
+                                throw new Error(dlData.error || 'Failed to download model');
+                            }
+                        } else if (checkData.status === 'failed') {
+                            throw new Error('Tripo3D conversion failed');
+                        }
+                        const progress = Math.min(30 + (attempts / maxAttempts) * 55, 85);
+                        progressBar.style.width = progress + '%';
+                    }
+                    throw new Error('Conversion timed out');
+                } catch (error) {
+                    console.error('Conversion error:', error);
+                    statusSpan.textContent = 'Error: ' + error.message;
+                    statusSpan.style.color = '#f44336';
+                    btn.disabled = false;
+                    btn.textContent = 'Try Again';
+                }
             }
 
             async function downloadImage(imageUrl, filename) {
@@ -1423,6 +1567,7 @@ async def get(request):
                     }
 
                     const imageModalContent = document.getElementById('image-modal-content');
+                    const threeDContent = document.getElementById('image-modal-3d-content');
                     // Transform only Item_Image URL (files.zohopublic.com returns 403 for Item_Image but 200 for Resized_Image)
                     const originalUrl = transformZohoImageUrl(item.Item_Image, 'Item_Image');
                     const resizedUrl = item.Resized_Image; // Resized_Image works directly without transformation
@@ -1434,11 +1579,11 @@ async def get(request):
                         imageModalContent.innerHTML = `
                             <div id="original-image-container" style="flex: 1; text-align: center;">
                                 <label class="block font-bold mb-2">Original Image</label>
-                                <img id="original-image" src="${originalUrl}" style="max-width: 100%; max-height: 80vh; background-color: white; border-radius: 4px;" onerror="handleOriginalImageError(this)">
+                                <img id="original-image" src="${originalUrl}" style="max-width: 100%; max-height: 50vh; background-color: white; border-radius: 4px;" onerror="handleOriginalImageError(this)">
                             </div>
                             <div id="resized-image-container" style="flex: 1; text-align: center;">
                                 <label class="block font-bold mb-2">Resized Image</label>
-                                <img id="resized-image" src="${resizedUrl}" style="max-width: 100%; max-height: 80vh; background-color: white; border-radius: 4px;" onerror="handleResizedImageError(this)">
+                                <img id="resized-image" src="${resizedUrl}" style="max-width: 100%; max-height: 50vh; background-color: white; border-radius: 4px;" onerror="handleResizedImageError(this)">
                             </div>
                         `;
                     } else {
@@ -1446,9 +1591,100 @@ async def get(request):
                         const imageUrl = resizedUrl || originalUrl;
                         imageModalContent.innerHTML = `
                             <div style="width: 100%; display: flex; justify-content: center;">
-                                <img src="${imageUrl}" style="max-width: 100%; max-height: 80vh; background-color: white; border-radius: 4px;">
+                                <img src="${imageUrl}" style="max-width: 100%; max-height: 50vh; background-color: white; border-radius: 4px;">
                             </div>
                         `;
+                    }
+
+                    // Render 3D section below images
+                    const model3d = item.Model_3D && item.Model_3D.trim();
+                    if (model3d) {
+                        // Item has a 3D model - show viewer
+                        threeDContent.innerHTML = `
+                            <div style="margin-top: 16px; border-top: 1px solid var(--border-color, #e0e0e0); padding-top: 16px;">
+                                <h4 style="margin: 0 0 12px 0; text-align: center;">3D Model</h4>
+                                <div id="image-modal-3d-canvas" style="width: 100%; height: 400px; background: #f5f5f5; border-radius: 8px;"></div>
+                                <div style="display: flex; justify-content: center; gap: 8px; margin-top: 8px;">
+                                    <button onclick="resetImageModal3DView()" style="padding: 6px 16px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; background: var(--bg-card, white);">Reset View</button>
+                                    <button onclick="zoomInImageModal3D()" style="padding: 6px 16px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; background: var(--bg-card, white);">Zoom In</button>
+                                    <button onclick="zoomOutImageModal3D()" style="padding: 6px 16px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; background: var(--bg-card, white);">Zoom Out</button>
+                                </div>
+                            </div>
+                        `;
+                        // Load and display 3D model
+                        try {
+                            await loadThreeJs();
+                            initImageModal3DScene(document.getElementById('image-modal-3d-canvas'));
+                            loadImageModal3DModel(model3d, item.Item_Width || 0, item.Item_Height || 0, item.Item_Depth || 0);
+                        } catch (err) {
+                            console.error('Error loading 3D model in image modal:', err);
+                            document.getElementById('image-modal-3d-canvas').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999;">Error loading 3D model</div>';
+                        }
+                    } else {
+                        // No 3D model - show convert option
+                        const imageUrl = resizedUrl || originalUrl;
+                        currentConvertItemId = item.ID;
+                        currentConvertItemName = item.Item_Name;
+                        currentConvertImageUrl = imageUrl;
+                        threeDContent.innerHTML = `
+                            <div style="margin-top: 16px; border-top: 1px solid var(--border-color, #e0e0e0); padding-top: 16px;">
+                                <h4 style="margin: 0 0 12px 0; text-align: center;">2D to 3D Conversion</h4>
+                                <div style="display: flex; gap: 16px; align-items: flex-start;">
+                                    <div style="flex: 1; padding: 16px; background: var(--bg-secondary, #f5f5f5); border-radius: 8px;">
+                                        <div style="margin-bottom: 12px; text-align: center;">
+                                            <span style="font-weight: bold;">Tripo3D Credits: </span>
+                                            <span id="img-modal-tripo-balance" style="color: #4caf50;">Loading...</span>
+                                            <a href="https://platform.tripo3d.ai/billing" target="_blank" style="margin-left: 10px; font-size: 13px; color: #fff; background: #4caf50; padding: 4px 12px; border-radius: 4px; text-decoration: none;">Add Credits</a>
+                                        </div>
+                                        <div style="margin-bottom: 12px;">
+                                            <label style="cursor: pointer; display: inline-flex; align-items: center;">
+                                                <input type="checkbox" id="img-convert-pbr" checked style="margin-right: 4px;"> PBR Materials
+                                            </label>
+                                            <label style="cursor: pointer; margin-left: 16px; display: inline-flex; align-items: center;">
+                                                <input type="checkbox" id="img-convert-autofix" checked style="margin-right: 4px;"> Image Autofix
+                                            </label>
+                                            <label style="cursor: pointer; margin-left: 16px; display: inline-flex; align-items: center;">
+                                                <input type="checkbox" id="img-convert-orientation" checked style="margin-right: 4px;"> Align Orientation
+                                            </label>
+                                        </div>
+                                        <div style="margin-bottom: 12px;">
+                                            <label style="display: block; margin-bottom: 4px;">Prompt:</label>
+                                            <input type="text" id="img-convert-prompt" value="Front facing, legs touching floor level." style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                                        </div>
+                                        <div id="img-convert-progress" style="display: none; margin-bottom: 12px; padding: 12px; background: #e8f5e9; border-radius: 8px; text-align: center;">
+                                            <div style="width: 30px; height: 30px; border: 3px solid #f3f3f3; border-top: 3px solid #4caf50; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 8px;"></div>
+                                            <span id="img-convert-status">Starting conversion...</span>
+                                            <div style="width: 100%; height: 16px; background: #e0e0e0; border-radius: 4px; margin-top: 8px; overflow: hidden;">
+                                                <div id="img-convert-progress-bar" style="width: 0%; height: 100%; background: #4caf50; border-radius: 4px; transition: width 0.3s ease;"></div>
+                                            </div>
+                                        </div>
+                                        <div id="img-convert-result" style="display: none; height: 300px; background: white; border-radius: 8px; margin-bottom: 12px;">
+                                            <div id="img-convert-result-canvas"></div>
+                                        </div>
+                                        <button id="img-convert-btn" onclick="startImageModalConversion()" style="background-color: #4caf50; color: white; padding: 10px 24px; border: none; border-radius: 4px; font-size: 14px; cursor: pointer; width: 100%;">
+                                            Convert to 3D
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        // Load balance
+                        try {
+                            const balResp = await fetch('/api/tripo-balance');
+                            const balData = await balResp.json();
+                            const balSpan = document.getElementById('img-modal-tripo-balance');
+                            if (balData.success && balData.balance) {
+                                const balanceAmount = balData.balance.balance || 0;
+                                const currency = balData.balance.currency || '';
+                                balSpan.textContent = currency ? balanceAmount + ' ' + currency : balanceAmount + ' credits';
+                            } else {
+                                balSpan.textContent = 'Unable to load';
+                                balSpan.style.color = '#f44336';
+                            }
+                        } catch (e) {
+                            const balSpan = document.getElementById('img-modal-tripo-balance');
+                            if (balSpan) { balSpan.textContent = 'Error'; balSpan.style.color = '#f44336'; }
+                        }
                     }
 
                     document.getElementById('image-modal').style.display = 'flex';
