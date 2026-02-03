@@ -693,6 +693,17 @@ def create_item_card(item_name: str, items: List[sqlite3.Row]) -> Div:
     item_depth = first_item['Item_Depth'] or 0
 
     return Div(
+        # 3D Icon indicator (top-left, shown if item has 3D model)
+        Div(
+            NotStr('''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>'''),
+            cls="item-3d-icon",
+            title="Has 3D Model"
+        ) if has_3d_model else None,
+
         # Count badges
         Div(
             Span(str(warehouse_count), cls="count-badge", style="background-color: green; color: white; margin-right: 4px;"),
@@ -1171,7 +1182,7 @@ async def get(request):
                                 </div>
                                 <div>
                                     <label class="block mb-1">3D Model:</label>
-                                    <input type="text" id="edit_Model_3D" value="${item.Model_3D || ''}" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-700" readonly style="cursor: default;">
+                                    <input type="text" id="edit_Model_3D" value="${item.Model_3D || ''}" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-700">
                                 </div>
                             </div>
                         </div>
@@ -1248,7 +1259,8 @@ async def get(request):
                     Item_Color: document.getElementById('edit_Item_Color').value,
                     Item_Tone: document.getElementById('edit_Item_Tone').value,
                     Item_Material: document.getElementById('edit_Item_Material').value,
-                    Item_Size: document.getElementById('edit_Item_Size').value
+                    Item_Size: document.getElementById('edit_Item_Size').value,
+                    Model_3D: document.getElementById('edit_Model_3D').value
                 };
 
                 try {
@@ -1308,6 +1320,7 @@ async def get(request):
 
             // Image modal 3D viewer variables
             let imgModal3DScene = null, imgModal3DCamera = null, imgModal3DRenderer = null, imgModal3DControls = null, imgModal3DAnimId = null;
+            let imgModal3DInitialCamPos = null, imgModal3DInitialCamTarget = null;
 
             function closeImageModal() {
                 document.getElementById('image-modal').style.display = 'none';
@@ -1315,30 +1328,50 @@ async def get(request):
                 if (imgModal3DAnimId) { cancelAnimationFrame(imgModal3DAnimId); imgModal3DAnimId = null; }
                 if (imgModal3DRenderer) { imgModal3DRenderer.dispose(); imgModal3DRenderer = null; }
                 imgModal3DScene = null; imgModal3DCamera = null; imgModal3DControls = null;
+                imgModal3DInitialCamPos = null; imgModal3DInitialCamTarget = null;
                 const threeDContent = document.getElementById('image-modal-3d-content');
                 if (threeDContent) threeDContent.innerHTML = '';
             }
 
             function initImageModal3DScene(container) {
-                const width = container.clientWidth;
-                const height = container.clientHeight || 400;
+                const rect = container.getBoundingClientRect();
+                const width = rect.width || container.parentElement.clientWidth || 800;
+                const height = 400;
                 imgModal3DScene = new THREE.Scene();
-                imgModal3DScene.background = new THREE.Color(0xf5f5f5);
-                imgModal3DCamera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
+                imgModal3DScene.background = new THREE.Color(0xffffff);
+                imgModal3DCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
                 imgModal3DCamera.position.set(0, 1, 3);
                 imgModal3DRenderer = new THREE.WebGLRenderer({ antialias: true });
                 imgModal3DRenderer.setSize(width, height);
                 imgModal3DRenderer.setPixelRatio(window.devicePixelRatio);
+                imgModal3DRenderer.outputEncoding = THREE.sRGBEncoding;
+                imgModal3DRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+                imgModal3DRenderer.toneMappingExposure = 1.5;
                 container.appendChild(imgModal3DRenderer.domElement);
                 imgModal3DControls = new THREE.OrbitControls(imgModal3DCamera, imgModal3DRenderer.domElement);
                 imgModal3DControls.enableDamping = true;
-                const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+                imgModal3DControls.dampingFactor = 0.05;
+                imgModal3DControls.minDistance = 0.5;
+                imgModal3DControls.maxDistance = 10;
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
                 imgModal3DScene.add(ambientLight);
-                const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
-                dirLight.position.set(5, 10, 7);
-                imgModal3DScene.add(dirLight);
+                const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+                dirLight1.position.set(5, 10, 7.5);
+                imgModal3DScene.add(dirLight1);
+                const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+                dirLight2.position.set(-5, 5, -5);
+                imgModal3DScene.add(dirLight2);
+                let lastWidth = width;
                 function animate() {
                     imgModal3DAnimId = requestAnimationFrame(animate);
+                    // Auto-resize if container width changed (e.g. initial layout)
+                    const curWidth = container.clientWidth;
+                    if (curWidth > 0 && curWidth !== lastWidth) {
+                        lastWidth = curWidth;
+                        imgModal3DCamera.aspect = curWidth / height;
+                        imgModal3DCamera.updateProjectionMatrix();
+                        imgModal3DRenderer.setSize(curWidth, height);
+                    }
                     imgModal3DControls.update();
                     imgModal3DRenderer.render(imgModal3DScene, imgModal3DCamera);
                 }
@@ -1349,26 +1382,46 @@ async def get(request):
                 const loader = new THREE.GLTFLoader();
                 loader.load('/static/models/' + modelFile, function(gltf) {
                     const model = gltf.scene;
+                    // Make materials double-sided with proper encoding
+                    model.traverse(function(child) {
+                        if (child.isMesh) {
+                            child.material.side = THREE.DoubleSide;
+                            if (child.material.map) {
+                                child.material.map.encoding = THREE.sRGBEncoding;
+                            }
+                        }
+                    });
                     const box = new THREE.Box3().setFromObject(model);
-                    const center = box.getCenter(new THREE.Vector3());
                     const size = box.getSize(new THREE.Vector3());
+                    const center = box.getCenter(new THREE.Vector3());
                     const maxDim = Math.max(size.x, size.y, size.z);
                     const scale = 2 / maxDim;
-                    model.scale.set(scale, scale, scale);
-                    model.position.sub(center.multiplyScalar(scale));
+                    model.scale.multiplyScalar(scale);
+                    // Center horizontally, bottom at floor level
+                    model.position.x = -center.x * scale;
+                    model.position.y = -box.min.y * scale;
+                    model.position.z = -center.z * scale;
+                    const modelCenterY = (size.y * scale) / 2;
+                    // Rotate to face front
+                    model.rotation.y = -Math.PI / 2;
                     imgModal3DScene.add(model);
-                    imgModal3DCamera.position.set(0, 1, 3);
-                    imgModal3DControls.target.set(0, 0, 0);
+                    imgModal3DCamera.position.set(0, modelCenterY, 4.5);
+                    imgModal3DControls.target.set(0, modelCenterY, 0);
                     imgModal3DControls.update();
+                    // Store initial view for reset
+                    imgModal3DInitialCamPos = imgModal3DCamera.position.clone();
+                    imgModal3DInitialCamTarget = imgModal3DControls.target.clone();
                 }, undefined, function(err) {
                     console.error('Error loading 3D model:', err);
+                    const canvas = document.getElementById('image-modal-3d-canvas');
+                    if (canvas) canvas.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999;">Error loading 3D model</div>';
                 });
             }
 
             function resetImageModal3DView() {
-                if (imgModal3DCamera && imgModal3DControls) {
-                    imgModal3DCamera.position.set(0, 1, 3);
-                    imgModal3DControls.target.set(0, 0, 0);
+                if (imgModal3DCamera && imgModal3DControls && imgModal3DInitialCamPos && imgModal3DInitialCamTarget) {
+                    imgModal3DCamera.position.copy(imgModal3DInitialCamPos);
+                    imgModal3DControls.target.copy(imgModal3DInitialCamTarget);
                     imgModal3DControls.update();
                 }
             }
@@ -1596,6 +1649,9 @@ async def get(request):
                         `;
                     }
 
+                    // Show modal first so containers have layout dimensions
+                    document.getElementById('image-modal').style.display = 'flex';
+
                     // Render 3D section below images
                     const model3d = item.Model_3D && item.Model_3D.trim();
                     if (model3d) {
@@ -1686,8 +1742,6 @@ async def get(request):
                             if (balSpan) { balSpan.textContent = 'Error'; balSpan.style.color = '#f44336'; }
                         }
                     }
-
-                    document.getElementById('image-modal').style.display = 'flex';
                 } catch (error) {
                     console.error('Error loading item images:', error);
                     alert('Error loading item images');
@@ -2377,6 +2431,7 @@ async def get(request):
                     conversionModel.position.x = -center.x * scale;
                     conversionModel.position.y = -box.min.y * scale;
                     conversionModel.position.z = -center.z * scale;
+                    conversionModel.rotation.y = -Math.PI / 2;
 
                     conversionScene.add(conversionModel);
 
@@ -2496,7 +2551,7 @@ async def update_item(item_id: str, request):
 
         # Define which fields can be updated
         updateable_fields = [
-            'Item_Name', 'Item_Type', 'Barcode',
+            'Item_Name', 'Item_Type', 'Barcode', 'Model_3D',
             'Item_Width', 'Item_Height', 'Item_Depth',
             'Item_Style', 'Item_Color', 'Item_Tone', 'Item_Material', 'Item_Size'
         ]
