@@ -496,7 +496,7 @@ class InpaintingTester:
                         log_input_url = input_details.get('input_image_url', '')
 
                         # Check if this log entry matches our input image
-                        if image_url in log_input_url or log_input_url.endswith(image_hash):
+                        if image_url in log_input_url or log_input_url.endswith(image_id):
                             output_details = log_entry.get('output_details', [])
                             if output_details:
                                 result_url = output_details[0].get('image_url')

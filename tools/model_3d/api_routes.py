@@ -16,6 +16,35 @@ from starlette.responses import Response, JSONResponse
 from starlette.requests import Request
 
 
+def get_public_ip():
+    """Fetch public IP dynamically using ipify.org, with caching"""
+    import requests
+    import time
+
+    # Cache the IP for 5 minutes to avoid excessive API calls
+    cache_duration = 300  # seconds
+
+    if not hasattr(get_public_ip, '_cache'):
+        get_public_ip._cache = {'ip': None, 'timestamp': 0}
+
+    current_time = time.time()
+    if get_public_ip._cache['ip'] and (current_time - get_public_ip._cache['timestamp']) < cache_duration:
+        return get_public_ip._cache['ip']
+
+    try:
+        response = requests.get('https://api.ipify.org', timeout=5)
+        if response.status_code == 200:
+            ip = response.text.strip()
+            get_public_ip._cache = {'ip': ip, 'timestamp': current_time}
+            print(f"Fetched public IP: {ip}")
+            return ip
+    except Exception as e:
+        print(f"Failed to fetch public IP: {e}")
+
+    # Return cached IP if fetch fails, or None
+    return get_public_ip._cache.get('ip')
+
+
 def register_test_routes(rt):
     """Register all test API routes with the FastHTML router"""
 
@@ -97,8 +126,12 @@ def register_test_routes(rt):
 
                 # Use public IP for localhost development
                 if 'localhost' in host or '127.0.0.1' in host:
-                    public_url = 'http://76.66.120.147:5001'
-                    print(f"⚠️  Running on localhost - using public IP: {public_url}")
+                    public_ip = get_public_ip()
+                    if public_ip:
+                        public_url = f'http://{public_ip}:5001'
+                        print(f"⚠️  Running on localhost - using public IP: {public_url}")
+                    else:
+                        print("⚠️  Could not determine public IP - Decor8.ai may fail")
 
             tester.base_url = public_url
             print(f"Using Decor8.ai with base URL: {tester.base_url}")
