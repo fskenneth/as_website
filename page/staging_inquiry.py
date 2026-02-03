@@ -4065,6 +4065,44 @@ def property_type_selector():
                 });
             }
 
+            // Device orientation tracking for thumbnail rotation
+            let currentDeviceRotation = 0;
+            let orientationListenerActive = false;
+
+            function handleDeviceOrientation(event) {
+                const thumbnail = document.getElementById('items-photo-thumbnail-preview');
+                if (!thumbnail || !orientationListenerActive) return;
+
+                // gamma is the left-to-right tilt in degrees (-90 to 90)
+                // beta is the front-to-back tilt in degrees (-180 to 180)
+                const gamma = event.gamma || 0;
+                const beta = event.beta || 0;
+
+                let rotationAngle = 0;
+
+                // Determine device orientation based on accelerometer data
+                if (Math.abs(gamma) > 45) {
+                    // Device is tilted sideways (landscape)
+                    if (gamma > 45) {
+                        // Tilted to the right - landscape with home button on right
+                        rotationAngle = -90;
+                    } else if (gamma < -45) {
+                        // Tilted to the left - landscape with home button on left
+                        rotationAngle = 90;
+                    }
+                } else if (beta < -45 && Math.abs(gamma) < 45) {
+                    // Device is upside down
+                    rotationAngle = 180;
+                }
+                // else: portrait mode, rotationAngle = 0
+
+                // Only update if rotation changed (avoid constant repaints)
+                if (rotationAngle !== currentDeviceRotation) {
+                    currentDeviceRotation = rotationAngle;
+                    thumbnail.style.transform = rotationAngle !== 0 ? `rotate(${rotationAngle}deg)` : '';
+                }
+            }
+
             function startItemsCamera() {
                 const video = document.getElementById('items-camera-preview');
                 const cameraSection = document.getElementById('items-camera-section');
@@ -4081,6 +4119,11 @@ def property_type_selector():
                     video.srcObject = stream;
                     // Show camera section only when camera successfully starts
                     cameraSection.style.display = 'block';
+
+                    // Start listening for device orientation (accelerometer-based)
+                    orientationListenerActive = true;
+                    currentDeviceRotation = 0;
+                    window.addEventListener('deviceorientation', handleDeviceOrientation);
                 }).catch(err => {
                     console.log('Camera access denied:', err);
                     // Keep camera section hidden if camera fails
@@ -4097,6 +4140,17 @@ def property_type_selector():
                 if (video) {
                     video.srcObject = null;
                 }
+
+                // Remove device orientation listener
+                orientationListenerActive = false;
+                window.removeEventListener('deviceorientation', handleDeviceOrientation);
+
+                // Reset thumbnail rotation
+                const thumbnail = document.getElementById('items-photo-thumbnail-preview');
+                if (thumbnail) {
+                    thumbnail.style.transform = '';
+                }
+                currentDeviceRotation = 0;
             }
 
             // Items Modal Photo Functions
@@ -4435,12 +4489,44 @@ def property_type_selector():
 
                 if (!video || !canvas || !itemsCameraStream) return;
 
-                const ctx = canvas.getContext('2d');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                ctx.drawImage(video, 0, 0);
+                // Use the currentDeviceRotation from accelerometer for orientation detection
+                // -90 = landscape right, 90 = landscape left, 0 = portrait
+                const isLandscapeRight = currentDeviceRotation === -90;
+                const isLandscapeLeft = currentDeviceRotation === 90;
 
-                const photoData = canvas.toDataURL('image/jpeg', 0.8);
+                let photoData;
+                if (isLandscapeRight) {
+                    // Phone tilted to the right - rotate image clockwise 90 degrees
+                    canvas.width = video.videoHeight;
+                    canvas.height = video.videoWidth;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.translate(canvas.width, 0);
+                    ctx.rotate(Math.PI / 2);
+                    ctx.drawImage(video, 0, 0);
+
+                    photoData = canvas.toDataURL('image/jpeg', 0.8);
+                } else if (isLandscapeLeft) {
+                    // Phone tilted to the left - rotate image counter-clockwise 90 degrees
+                    canvas.width = video.videoHeight;
+                    canvas.height = video.videoWidth;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.translate(0, canvas.height);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.drawImage(video, 0, 0);
+
+                    photoData = canvas.toDataURL('image/jpeg', 0.8);
+                } else {
+                    // Phone is vertical - capture normally
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0);
+
+                    photoData = canvas.toDataURL('image/jpeg', 0.8);
+                }
 
                 if (!areaPhotos[currentArea]) {
                     areaPhotos[currentArea] = [];
@@ -6945,10 +7031,10 @@ def get_property_selector_styles():
         position: absolute;
         bottom: calc(20px + env(safe-area-inset-bottom, 0px));
         left: 20px;
-        width: 50px;
-        height: 50px;
-        border-radius: 8px;
-        border: 3px solid white;
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        border: 4px solid white;
         cursor: pointer;
         background-size: cover;
         background-position: center;
@@ -6965,7 +7051,7 @@ def get_property_selector_styles():
     }
 
     .photo-thumbnail-preview:active {
-        transform: scale(0.9);
+        filter: brightness(0.8);
     }
 
     /* Photo Count Badge */
