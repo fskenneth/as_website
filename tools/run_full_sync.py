@@ -11,6 +11,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tools.zoho_sync.sync_service import sync_service
+from tools.zoho_sync.database import db
 
 async def main():
     """Run full sync"""
@@ -20,6 +21,10 @@ async def main():
     print("="*80)
 
     try:
+        # Initialize database connection
+        print("\nConnecting to database...")
+        await db.connect()
+
         # Sync Item_Report (main inventory table)
         print("\nSyncing Item_Report...")
         result = await sync_service.sync_report("Item_Report", sync_type="full")
@@ -39,6 +44,9 @@ async def main():
         print(f"\n❌ Error during sync: {e}")
         import traceback
         traceback.print_exc()
+    finally:
+        # Close database connection
+        await db.disconnect()
 
 if __name__ == "__main__":
     asyncio.run(main())
