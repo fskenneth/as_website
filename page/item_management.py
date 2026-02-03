@@ -2581,6 +2581,27 @@ async def update_item(item_id: str, request):
         update_query = f"UPDATE Item_Report SET {', '.join(fields_to_update)} WHERE ID = ?"
 
         cursor.execute(update_query, values)
+
+        # If Model_3D was changed, update all items with the same Item_Name
+        sibling_ids = []
+        if 'Model_3D' in changes_for_zoho:
+            item_name = old_values.get('Item_Name', '')
+            new_model_3d = data.get('Model_3D', '')
+            if item_name:
+                cursor.execute(
+                    "SELECT ID, Model_3D FROM Item_Report WHERE Item_Name = ? AND ID != ?",
+                    (item_name, item_id)
+                )
+                siblings = cursor.fetchall()
+                for sibling in siblings:
+                    sibling_ids.append({'ID': sibling[0], 'old_Model_3D': sibling[1]})
+                if siblings:
+                    cursor.execute(
+                        "UPDATE Item_Report SET Model_3D = ?, Modified_Time = ?, Modified_User = ? WHERE Item_Name = ? AND ID != ?",
+                        (new_model_3d, modified_time, "web_user", item_name, item_id)
+                    )
+                    print(f"Updated Model_3D to '{new_model_3d}' for {len(siblings)} sibling items of '{item_name}'")
+
         conn.commit()
         conn.close()
 
@@ -2594,8 +2615,26 @@ async def update_item(item_id: str, request):
                     old_values=old_values
                 )
             except Exception as sync_error:
-                # Log but don't fail the request if queue fails
                 print(f"Warning: Failed to queue Zoho sync for {item_id}: {sync_error}")
+
+            # Queue Zoho sync for sibling items if Model_3D changed
+            if 'Model_3D' in changes_for_zoho and sibling_ids:
+                for sibling in sibling_ids:
+                    try:
+                        sibling_changes = {
+                            'Model_3D': changes_for_zoho['Model_3D'],
+                            'Modified_Time': modified_time,
+                            'Modified_User': 'web_user'
+                        }
+                        sibling_old = {'Model_3D': sibling['old_Model_3D']}
+                        await write_service.queue_update(
+                            record_id=sibling['ID'],
+                            report_name='Item_Report',
+                            changes=sibling_changes,
+                            old_values=sibling_old
+                        )
+                    except Exception as sync_error:
+                        print(f"Warning: Failed to queue Zoho sync for sibling {sibling['ID']}: {sync_error}")
 
         # Get pending sync count for this record
         pending_count = await write_service.get_pending_for_record(item_id)
@@ -2603,6 +2642,7 @@ async def update_item(item_id: str, request):
         return JSONResponse({
             "success": True,
             "message": "Item updated successfully",
+            "siblings_updated": len(sibling_ids),
             "sync_status": "queued" if pending_count > 0 else "synced"
         })
 
