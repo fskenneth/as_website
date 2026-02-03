@@ -4068,38 +4068,70 @@ def property_type_selector():
             // Device orientation tracking for thumbnail rotation
             let currentDeviceRotation = 0;
             let orientationListenerActive = false;
+            let gammaHistory = [];
+            let pendingRotation = null;
+            let rotationDebounceTimer = null;
+            const GAMMA_HISTORY_SIZE = 5;  // Number of samples to average
+            const ENTER_LANDSCAPE_THRESHOLD = 70;  // Degrees to enter landscape mode
+            const EXIT_LANDSCAPE_THRESHOLD = 50;   // Degrees to exit landscape mode (hysteresis)
+            const ROTATION_DEBOUNCE_MS = 300;      // Milliseconds to wait before changing rotation
 
             function handleDeviceOrientation(event) {
                 const thumbnail = document.getElementById('items-photo-thumbnail-preview');
                 if (!thumbnail || !orientationListenerActive) return;
 
                 // gamma is the left-to-right tilt in degrees (-90 to 90)
-                // beta is the front-to-back tilt in degrees (-180 to 180)
                 const gamma = event.gamma || 0;
-                const beta = event.beta || 0;
+
+                // Smooth gamma with moving average
+                gammaHistory.push(gamma);
+                if (gammaHistory.length > GAMMA_HISTORY_SIZE) {
+                    gammaHistory.shift();
+                }
+                const smoothedGamma = gammaHistory.reduce((a, b) => a + b, 0) / gammaHistory.length;
 
                 let rotationAngle = 0;
 
-                // Determine device orientation based on accelerometer data
-                if (Math.abs(gamma) > 45) {
-                    // Device is tilted sideways (landscape)
-                    if (gamma > 45) {
-                        // Tilted to the right - landscape with home button on right
-                        rotationAngle = -90;
-                    } else if (gamma < -45) {
-                        // Tilted to the left - landscape with home button on left
-                        rotationAngle = 90;
-                    }
-                } else if (beta < -45 && Math.abs(gamma) < 45) {
-                    // Device is upside down
-                    rotationAngle = 180;
-                }
-                // else: portrait mode, rotationAngle = 0
+                // Use hysteresis to prevent flickering at threshold boundaries
+                const absGamma = Math.abs(smoothedGamma);
 
-                // Only update if rotation changed (avoid constant repaints)
+                if (currentDeviceRotation === 0) {
+                    // Currently in portrait - need to cross higher threshold to enter landscape
+                    if (absGamma > ENTER_LANDSCAPE_THRESHOLD) {
+                        rotationAngle = smoothedGamma > 0 ? -90 : 90;
+                    }
+                } else {
+                    // Currently in landscape - stay in landscape until below lower threshold
+                    if (absGamma > EXIT_LANDSCAPE_THRESHOLD) {
+                        rotationAngle = smoothedGamma > 0 ? -90 : 90;
+                    }
+                    // else rotationAngle stays 0, returning to portrait
+                }
+
+                // Debounce rotation changes
                 if (rotationAngle !== currentDeviceRotation) {
-                    currentDeviceRotation = rotationAngle;
-                    thumbnail.style.transform = rotationAngle !== 0 ? `rotate(${rotationAngle}deg)` : '';
+                    if (pendingRotation !== rotationAngle) {
+                        // New rotation detected, start debounce timer
+                        pendingRotation = rotationAngle;
+                        if (rotationDebounceTimer) {
+                            clearTimeout(rotationDebounceTimer);
+                        }
+                        rotationDebounceTimer = setTimeout(() => {
+                            if (pendingRotation !== null && pendingRotation !== currentDeviceRotation) {
+                                currentDeviceRotation = pendingRotation;
+                                thumbnail.style.transform = currentDeviceRotation !== 0 ? `rotate(${currentDeviceRotation}deg)` : '';
+                            }
+                            pendingRotation = null;
+                            rotationDebounceTimer = null;
+                        }, ROTATION_DEBOUNCE_MS);
+                    }
+                } else {
+                    // Rotation matches current, cancel any pending change
+                    if (rotationDebounceTimer) {
+                        clearTimeout(rotationDebounceTimer);
+                        rotationDebounceTimer = null;
+                    }
+                    pendingRotation = null;
                 }
             }
 
@@ -4123,6 +4155,12 @@ def property_type_selector():
                     // Start listening for device orientation (accelerometer-based)
                     orientationListenerActive = true;
                     currentDeviceRotation = 0;
+                    gammaHistory = [];  // Reset smoothing history
+                    pendingRotation = null;
+                    if (rotationDebounceTimer) {
+                        clearTimeout(rotationDebounceTimer);
+                        rotationDebounceTimer = null;
+                    }
                     window.addEventListener('deviceorientation', handleDeviceOrientation);
                 }).catch(err => {
                     console.log('Camera access denied:', err);
@@ -4144,6 +4182,14 @@ def property_type_selector():
                 // Remove device orientation listener
                 orientationListenerActive = false;
                 window.removeEventListener('deviceorientation', handleDeviceOrientation);
+
+                // Clear any pending rotation debounce
+                if (rotationDebounceTimer) {
+                    clearTimeout(rotationDebounceTimer);
+                    rotationDebounceTimer = null;
+                }
+                pendingRotation = null;
+                gammaHistory = [];
 
                 // Reset thumbnail rotation
                 const thumbnail = document.getElementById('items-photo-thumbnail-preview');
