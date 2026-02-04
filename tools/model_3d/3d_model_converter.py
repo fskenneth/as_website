@@ -126,6 +126,12 @@ def download_image(image_url, save_path):
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
+    # URL-encode non-ASCII characters in the URL path
+    from urllib.parse import urlsplit, urlunsplit, quote
+    parts = urlsplit(image_url)
+    encoded_path = quote(parts.path, safe='/:@!$&\'()*+,;=')
+    encoded_query = quote(parts.query, safe='/:@!$&\'()*+,;=?')
+    image_url = urlunsplit((parts.scheme, parts.netloc, encoded_path, encoded_query, parts.fragment))
     req = urllib.request.Request(image_url)
     with urllib.request.urlopen(req, context=ctx) as response:
         with open(str(save_path), "wb") as f:
@@ -521,6 +527,78 @@ def update_database(item_name, model_filename):
     return updated
 
 
+def delete_model_from_tripo(window_id):
+    """Delete the most recent model from Tripo3D assets to free storage.
+
+    Navigates to the generate page, clicks the 3-dot menu on the first model,
+    clicks Delete, and confirms the deletion.
+    """
+    print(f"  Navigating to assets page...")
+
+    # Navigate to the generate page to access the assets panel
+    chrome_js(window_id, f"window.location.href = '{TRIPO_URL}'")
+    time.sleep(5)
+
+    # Wait for the assets panel to load with model cards
+    for attempt in range(15):
+        result = chrome_js(window_id, """
+            var dots = document.querySelectorAll('.i-tripo\\\\:more-horizontal');
+            dots.length > 0 ? 'ready:' + dots.length : 'loading'
+        """.replace("\n", " "))
+        if result and result.startswith("ready"):
+            print(f"  Assets loaded. ({result})")
+            break
+        time.sleep(1)
+    else:
+        print(f"  WARNING: Could not find model cards in assets panel.")
+        return False
+
+    # Click the first 3-dot menu
+    chrome_js(window_id, """
+        var dots = document.querySelectorAll('.i-tripo\\\\:more-horizontal');
+        if (dots.length > 0) dots[0].click();
+    """.replace("\n", " "))
+    time.sleep(1)
+
+    # Click Delete from the dropdown menu
+    chrome_js(window_id, """
+        var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+        while (walker.nextNode()) {
+            if (walker.currentNode.textContent.trim() === 'Delete') {
+                var parent = walker.currentNode.parentElement;
+                var btn = parent.closest('button');
+                if (btn && btn.className.indexOf('hover:bg-white-5') >= 0) {
+                    btn.click();
+                    break;
+                }
+            }
+        }
+    """.replace("\n", " "))
+    time.sleep(1)
+
+    # Click the confirmation Delete button in the modal
+    result = chrome_js(window_id, """
+        var buttons = document.querySelectorAll('button');
+        var clicked = false;
+        for (var i = 0; i < buttons.length; i++) {
+            if (buttons[i].textContent.trim() === 'Delete' && buttons[i].className.indexOf('flex-1') >= 0) {
+                buttons[i].click();
+                clicked = true;
+                break;
+            }
+        }
+        clicked ? 'deleted' : 'not_found'
+    """.replace("\n", " "))
+
+    if result == "deleted":
+        print(f"  Model deleted from Tripo3D assets.")
+        time.sleep(2)  # Wait for deletion to process
+        return True
+    else:
+        print(f"  WARNING: Could not confirm model deletion from Tripo3D.")
+        return False
+
+
 def close_chrome_window(window_id):
     """Close the Chrome window"""
     try:
@@ -553,7 +631,7 @@ def main():
     print(f"{'=' * 60}")
 
     # Step 1: Query database for item image
-    print(f"\n[1/9] Looking up item in database...")
+    print(f"\n[1/10] Looking up item in database...")
     item = get_item_image(item_name)
     if not item:
         print(f"  ERROR: Item '{item_name}' not found in database.")
@@ -571,7 +649,7 @@ def main():
     print(f"  Image URL: {item['image_url'][:80]}...")
 
     # Step 2: Download image to static/models/ (temporary, cleaned up after conversion)
-    print(f"\n[2/9] Downloading image...")
+    print(f"\n[2/10] Downloading image...")
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     image_path = MODEL_DIR / f"{filename}.jpg"
     download_image(item["image_url"], image_path)
@@ -579,30 +657,30 @@ def main():
     window_id = None
     try:
         # Step 3: Open Chrome window
-        print(f"\n[3/9] Opening Chrome to Tripo3D...")
+        print(f"\n[3/10] Opening Chrome to Tripo3D...")
         window_id = open_chrome_window()
 
         # Step 4: Upload image
-        print(f"\n[4/9] Uploading image...")
+        print(f"\n[4/10] Uploading image...")
         upload_image(window_id, image_path)
 
         # Step 5: Configure settings
-        print(f"\n[5/9] Configuring generation settings...")
+        print(f"\n[5/10] Configuring generation settings...")
         configure_settings(window_id)
 
         # Step 6: Generate model
-        print(f"\n[6/9] Starting model generation...")
+        print(f"\n[6/10] Starting model generation...")
         click_generate(window_id)
 
         # Step 7: Wait for generation
-        print(f"\n[7/9] Waiting for generation to complete...")
+        print(f"\n[7/10] Waiting for generation to complete...")
         success = wait_for_generation(window_id, timeout=600)
         if not success:
             print(f"  FAILED: Model generation did not complete.")
             sys.exit(1)
 
         # Step 8: Export model
-        print(f"\n[8/9] Exporting model...")
+        print(f"\n[8/10] Exporting model...")
         export_model(window_id, filename)
 
         # Wait for download
@@ -619,13 +697,17 @@ def main():
             glb_path.unlink()
             print(f"  Cleaned up: {glb_path}")
 
-        # Step 9: Update database
+        # Step 9: Delete model from Tripo3D to free storage
+        print(f"\n[9/10] Deleting model from Tripo3D storage...")
+        delete_model_from_tripo(window_id)
+
+        # Step 10: Update database
         if not args.skip_db_update:
-            print(f"\n[9/9] Updating database...")
+            print(f"\n[10/10] Updating database...")
             model_filename = f"{filename}.glb"
             update_database(item_name, model_filename)
         else:
-            print(f"\n[9/9] Skipping database update (--skip-db-update)")
+            print(f"\n[10/10] Skipping database update (--skip-db-update)")
 
     finally:
         # Clean up image
