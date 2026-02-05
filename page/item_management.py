@@ -749,22 +749,51 @@ async def get(request):
     # Get all grouped items
     grouped_items = get_items_grouped()
 
-    # Get unique item types and locations for filters
-    item_types = []
-    locations = []
+    # Get unique item types and locations for filters with counts
+    item_types_with_counts = []
+    locations_with_counts = []
+    total_count = 0
+    has_3d_count = 0
+    no_3d_count = 0
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT DISTINCT Item_Type FROM Item_Report WHERE Item_Type IS NOT NULL ORDER BY Item_Type")
-        item_types = [row[0] for row in cursor.fetchall()]
+        # Total count
+        cursor.execute("SELECT COUNT(*) FROM Item_Report WHERE Item_Name IS NOT NULL AND Item_Name != ''")
+        total_count = cursor.fetchone()[0]
 
-        cursor.execute("SELECT DISTINCT Current_Location FROM Item_Report WHERE Current_Location IS NOT NULL ORDER BY Current_Location")
+        # Item types with counts
+        cursor.execute("""
+            SELECT Item_Type, COUNT(*) as cnt
+            FROM Item_Report
+            WHERE Item_Type IS NOT NULL AND Item_Name IS NOT NULL AND Item_Name != ''
+            GROUP BY Item_Type
+            ORDER BY Item_Type
+        """)
+        item_types_with_counts = [(row[0], row[1]) for row in cursor.fetchall()]
+
+        # Locations with counts
+        cursor.execute("""
+            SELECT Current_Location, COUNT(*) as cnt
+            FROM Item_Report
+            WHERE Current_Location IS NOT NULL AND Item_Name IS NOT NULL AND Item_Name != ''
+            GROUP BY Current_Location
+            ORDER BY Current_Location
+        """)
+        location_counts = {}
         for row in cursor.fetchall():
             parsed_location = parse_location(row[0])
-            if parsed_location not in locations:
-                locations.append(parsed_location)
-        locations.sort()
+            if parsed_location in location_counts:
+                location_counts[parsed_location] += row[1]
+            else:
+                location_counts[parsed_location] = row[1]
+        locations_with_counts = sorted(location_counts.items(), key=lambda x: x[0])
+
+        # 3D model counts
+        cursor.execute("SELECT COUNT(*) FROM Item_Report WHERE Model_3D IS NOT NULL AND Model_3D != '' AND Item_Name IS NOT NULL AND Item_Name != ''")
+        has_3d_count = cursor.fetchone()[0]
+        no_3d_count = total_count - has_3d_count
 
         conn.close()
     except sqlite3.OperationalError:
@@ -843,8 +872,8 @@ async def get(request):
                             hx-target="#items-container"
                             hx-include="#filter_name, #filter_location, #filter_3d"
                             style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary); color: var(--color-primary);">
-                            <option value="All" selected>All</option>
-                            {"".join([f'<option value="{t}">{t}</option>' for t in item_types])}
+                            <option value="All" selected>All ({total_count})</option>
+                            {"".join([f'<option value="{t}">{t} ({c})</option>' for t, c in item_types_with_counts])}
                         </select>''')
                     ),
                     Div(
@@ -855,21 +884,21 @@ async def get(request):
                             hx-target="#items-container"
                             hx-include="#filter_name, #filter_type, #filter_3d"
                             style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary); color: var(--color-primary);">
-                            <option value="All" selected>All</option>
-                            {"".join([f'<option value="{l}">{l}</option>' for l in locations])}
+                            <option value="All" selected>All ({total_count})</option>
+                            {"".join([f'<option value="{l}">{l} ({c})</option>' for l, c in locations_with_counts])}
                         </select>''')
                     ),
                     Div(
                         Label("3D Model", **{"for": "filter_3d"}, style="display: block; margin-bottom: 4px;"),
-                        NotStr('''<select id="filter_3d" name="filter_3d"
+                        NotStr(f'''<select id="filter_3d" name="filter_3d"
                             hx-get="/item_management/filter_items"
                             hx-trigger="change"
                             hx-target="#items-container"
                             hx-include="#filter_name, #filter_type, #filter_location"
                             style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary); color: var(--color-primary);">
-                            <option value="All" selected>All</option>
-                            <option value="Yes">Has 3D Model</option>
-                            <option value="No">No 3D Model</option>
+                            <option value="All" selected>All ({total_count})</option>
+                            <option value="Yes">Has 3D Model ({has_3d_count})</option>
+                            <option value="No">No 3D Model ({no_3d_count})</option>
                         </select>''')
                     ),
                     cols_lg=4
@@ -2461,46 +2490,127 @@ async def get(request):
     ]
 
 
+def build_filter_conditions(filter_name: str, filter_type: str, filter_location: str, filter_3d: str):
+    """Build SQL WHERE conditions based on filters"""
+    conditions = ["Item_Name IS NOT NULL AND Item_Name != ''"]
+    params = []
+
+    if filter_name:
+        conditions.append("(Item_Name LIKE ? OR Barcode LIKE ?)")
+        params.extend([f"%{filter_name}%", f"%{filter_name}%"])
+
+    if filter_type != "All":
+        conditions.append("Item_Type = ?")
+        params.append(filter_type)
+
+    if filter_location != "All":
+        conditions.append("Current_Location LIKE ?")
+        params.append(f"%{filter_location}%")
+
+    if filter_3d == "Yes":
+        conditions.append("Model_3D IS NOT NULL AND Model_3D != ''")
+    elif filter_3d == "No":
+        conditions.append("(Model_3D IS NULL OR Model_3D = '')")
+
+    return " AND ".join(conditions), params
+
+
+def get_dynamic_filter_counts(cursor, filter_name: str, filter_type: str, filter_location: str, filter_3d: str):
+    """Get counts for each filter option based on current selections (excluding that filter)"""
+
+    # Base condition (always applied)
+    base_cond = "Item_Name IS NOT NULL AND Item_Name != ''"
+
+    # Build conditions for each filter combination
+    def build_cond(exclude_filter):
+        conds = [base_cond]
+        params = []
+        if filter_name:
+            conds.append("(Item_Name LIKE ? OR Barcode LIKE ?)")
+            params.extend([f"%{filter_name}%", f"%{filter_name}%"])
+        if exclude_filter != "type" and filter_type != "All":
+            conds.append("Item_Type = ?")
+            params.append(filter_type)
+        if exclude_filter != "location" and filter_location != "All":
+            conds.append("Current_Location LIKE ?")
+            params.append(f"%{filter_location}%")
+        if exclude_filter != "3d":
+            if filter_3d == "Yes":
+                conds.append("Model_3D IS NOT NULL AND Model_3D != ''")
+            elif filter_3d == "No":
+                conds.append("(Model_3D IS NULL OR Model_3D = '')")
+        return " AND ".join(conds), params
+
+    # Get item type counts (excluding type filter)
+    type_cond, type_params = build_cond("type")
+    cursor.execute(f"""
+        SELECT Item_Type, COUNT(*) as cnt
+        FROM Item_Report
+        WHERE {type_cond} AND Item_Type IS NOT NULL
+        GROUP BY Item_Type
+        ORDER BY Item_Type
+    """, type_params)
+    item_types_with_counts = [(row[0], row[1]) for row in cursor.fetchall()]
+    type_total = sum(c for _, c in item_types_with_counts)
+
+    # Get location counts (excluding location filter)
+    loc_cond, loc_params = build_cond("location")
+    cursor.execute(f"""
+        SELECT Current_Location, COUNT(*) as cnt
+        FROM Item_Report
+        WHERE {loc_cond} AND Current_Location IS NOT NULL
+        GROUP BY Current_Location
+    """, loc_params)
+    location_counts = {}
+    for row in cursor.fetchall():
+        parsed_location = parse_location(row[0])
+        location_counts[parsed_location] = location_counts.get(parsed_location, 0) + row[1]
+    locations_with_counts = sorted(location_counts.items(), key=lambda x: x[0])
+    loc_total = sum(c for _, c in locations_with_counts)
+
+    # Get 3D model counts (excluding 3d filter)
+    d3_cond, d3_params = build_cond("3d")
+    cursor.execute(f"SELECT COUNT(*) FROM Item_Report WHERE {d3_cond}", d3_params)
+    d3_total = cursor.fetchone()[0]
+    cursor.execute(f"SELECT COUNT(*) FROM Item_Report WHERE {d3_cond} AND Model_3D IS NOT NULL AND Model_3D != ''", d3_params)
+    has_3d_count = cursor.fetchone()[0]
+    no_3d_count = d3_total - has_3d_count
+
+    return {
+        "item_types": item_types_with_counts,
+        "type_total": type_total,
+        "locations": locations_with_counts,
+        "loc_total": loc_total,
+        "has_3d": has_3d_count,
+        "no_3d": no_3d_count,
+        "d3_total": d3_total,
+    }
+
+
 @rt("/filter_items")
 def filter_items(filter_name: str = "", filter_type: str = "All", filter_location: str = "All", filter_3d: str = "All"):
-    """Filter items based on criteria"""
+    """Filter items based on criteria and return updated filter counts"""
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Build query with filters
-    query = """
+    # Build query with all filters
+    conditions, params = build_filter_conditions(filter_name, filter_type, filter_location, filter_3d)
+    query = f"""
         SELECT * FROM Item_Report
-        WHERE Item_Name IS NOT NULL AND Item_Name != ''
-    """
-    params = []
-
-    if filter_name:
-        query += " AND (Item_Name LIKE ? OR Barcode LIKE ?)"
-        params.append(f"%{filter_name}%")
-        params.append(f"%{filter_name}%")
-
-    if filter_type != "All":
-        query += " AND Item_Type = ?"
-        params.append(filter_type)
-
-    if filter_location != "All":
-        # Need to handle JSON location values
-        query += " AND Current_Location LIKE ?"
-        params.append(f"%{filter_location}%")
-
-    if filter_3d == "Yes":
-        query += " AND Model_3D IS NOT NULL AND Model_3D != ''"
-    elif filter_3d == "No":
-        query += " AND (Model_3D IS NULL OR Model_3D = '')"
-
-    query += """ ORDER BY Item_Name,
+        WHERE {conditions}
+        ORDER BY Item_Name,
                  CASE WHEN Current_Location LIKE '%3600 Warehouse%' THEN 0 ELSE 1 END,
                  Current_Location,
-                 Barcode"""
+                 Barcode
+    """
 
     cursor.execute(query, params)
     items = cursor.fetchall()
+
+    # Get dynamic filter counts
+    counts = get_dynamic_filter_counts(cursor, filter_name, filter_type, filter_location, filter_3d)
+
     conn.close()
 
     # Group filtered items
@@ -2511,11 +2621,50 @@ def filter_items(filter_name: str = "", filter_type: str = "All", filter_locatio
             grouped_items[item_name] = []
         grouped_items[item_name].append(item)
 
-    # Return filtered grid
-    return Grid(
-        *[create_item_card(name, items) for name, items in grouped_items.items()],
-        cols_xl=3, cols_lg=3, cols_md=2, cols_sm=1,  # Responsive columns
-        cls="gap-4"
+    # Build updated filter dropdowns with hx-swap-oob
+    type_options = f'<option value="All" {"selected" if filter_type == "All" else ""}>All ({counts["type_total"]})</option>'
+    type_options += "".join([f'<option value="{t}" {"selected" if filter_type == t else ""}>{t} ({c})</option>' for t, c in counts["item_types"]])
+
+    loc_options = f'<option value="All" {"selected" if filter_location == "All" else ""}>All ({counts["loc_total"]})</option>'
+    loc_options += "".join([f'<option value="{l}" {"selected" if filter_location == l else ""}>{l} ({c})</option>' for l, c in counts["locations"]])
+
+    d3_options = f'''<option value="All" {"selected" if filter_3d == "All" else ""}>All ({counts["d3_total"]})</option>
+        <option value="Yes" {"selected" if filter_3d == "Yes" else ""}>Has 3D Model ({counts["has_3d"]})</option>
+        <option value="No" {"selected" if filter_3d == "No" else ""}>No 3D Model ({counts["no_3d"]})</option>'''
+
+    # Return items grid plus OOB-swapped filter dropdowns
+    return Div(
+        # Main content
+        Grid(
+            *[create_item_card(name, items) for name, items in grouped_items.items()],
+            cols_xl=3, cols_lg=3, cols_md=2, cols_sm=1,
+            cls="gap-4"
+        ),
+        # OOB swap for filter dropdowns
+        NotStr(f'''<select id="filter_type" name="filter_type" hx-swap-oob="true"
+            hx-get="/item_management/filter_items"
+            hx-trigger="change"
+            hx-target="#items-container"
+            hx-include="#filter_name, #filter_location, #filter_3d"
+            style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary); color: var(--color-primary);">
+            {type_options}
+        </select>'''),
+        NotStr(f'''<select id="filter_location" name="filter_location" hx-swap-oob="true"
+            hx-get="/item_management/filter_items"
+            hx-trigger="change"
+            hx-target="#items-container"
+            hx-include="#filter_name, #filter_type, #filter_3d"
+            style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary); color: var(--color-primary);">
+            {loc_options}
+        </select>'''),
+        NotStr(f'''<select id="filter_3d" name="filter_3d" hx-swap-oob="true"
+            hx-get="/item_management/filter_items"
+            hx-trigger="change"
+            hx-target="#items-container"
+            hx-include="#filter_name, #filter_type, #filter_location"
+            style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary); color: var(--color-primary);">
+            {d3_options}
+        </select>'''),
     )
 
 
