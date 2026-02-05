@@ -830,7 +830,7 @@ async def get(request):
                             hx_get="/item_management/filter_items",
                             hx_trigger="keyup changed delay:500ms",
                             hx_target="#items-container",
-                            hx_include="#filter_type, #filter_location",
+                            hx_include="#filter_type, #filter_location, #filter_3d",
                             cls="uk-input",
                             style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary); color: var(--color-primary);"
                         ),
@@ -841,7 +841,7 @@ async def get(request):
                             hx-get="/item_management/filter_items"
                             hx-trigger="change"
                             hx-target="#items-container"
-                            hx-include="#filter_name, #filter_location"
+                            hx-include="#filter_name, #filter_location, #filter_3d"
                             style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary); color: var(--color-primary);">
                             <option value="All" selected>All</option>
                             {"".join([f'<option value="{t}">{t}</option>' for t in item_types])}
@@ -853,13 +853,26 @@ async def get(request):
                             hx-get="/item_management/filter_items"
                             hx-trigger="change"
                             hx-target="#items-container"
-                            hx-include="#filter_name, #filter_type"
+                            hx-include="#filter_name, #filter_type, #filter_3d"
                             style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary); color: var(--color-primary);">
                             <option value="All" selected>All</option>
                             {"".join([f'<option value="{l}">{l}</option>' for l in locations])}
                         </select>''')
                     ),
-                    cols_lg=3
+                    Div(
+                        Label("3D Model", **{"for": "filter_3d"}, style="display: block; margin-bottom: 4px;"),
+                        NotStr('''<select id="filter_3d" name="filter_3d"
+                            hx-get="/item_management/filter_items"
+                            hx-trigger="change"
+                            hx-target="#items-container"
+                            hx-include="#filter_name, #filter_type, #filter_location"
+                            style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary); color: var(--color-primary);">
+                            <option value="All" selected>All</option>
+                            <option value="Yes">Has 3D Model</option>
+                            <option value="No">No 3D Model</option>
+                        </select>''')
+                    ),
+                    cols_lg=4
                 ),
                 cls="filter-section"
             ),
@@ -2449,7 +2462,7 @@ async def get(request):
 
 
 @rt("/filter_items")
-def filter_items(filter_name: str = "", filter_type: str = "All", filter_location: str = "All"):
+def filter_items(filter_name: str = "", filter_type: str = "All", filter_location: str = "All", filter_3d: str = "All"):
     """Filter items based on criteria"""
 
     conn = get_db_connection()
@@ -2475,6 +2488,11 @@ def filter_items(filter_name: str = "", filter_type: str = "All", filter_locatio
         # Need to handle JSON location values
         query += " AND Current_Location LIKE ?"
         params.append(f"%{filter_location}%")
+
+    if filter_3d == "Yes":
+        query += " AND Model_3D IS NOT NULL AND Model_3D != ''"
+    elif filter_3d == "No":
+        query += " AND (Model_3D IS NULL OR Model_3D = '')"
 
     query += """ ORDER BY Item_Name,
                  CASE WHEN Current_Location LIKE '%3600 Warehouse%' THEN 0 ELSE 1 END,
