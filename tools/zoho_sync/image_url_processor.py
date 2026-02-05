@@ -154,8 +154,9 @@ class ImageURLProcessor:
                                 logger.debug(f"Preserved existing creatorexport URL for {field_name} in record {record_id}, skipping files.zohopublic.com")
                                 continue
 
-                        # Otherwise, keep the files.zohopublic.com URL as-is (will show placeholder in UI)
-                        logger.debug(f"Skipping files.zohopublic.com URL for {field_name} in record {record_id} (not accessible)")
+                        # No existing good URL - remove the field so DB value is preserved on upsert
+                        del updated_record[field_name]
+                        logger.debug(f"Excluded files.zohopublic.com URL for {field_name} in record {record_id} (not accessible)")
                         continue
 
                     # Handle API URLs

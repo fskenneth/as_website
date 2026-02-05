@@ -237,32 +237,19 @@ class ZohoPageScraper:
         if not normalized.get('ID'):
             return None
 
-        # Transform files.zohopublic.com URLs to creatorexport URLs using the
-        # default private key. The x-cli-msg privatekey is the report permalink
-        # key (not the image download key), so we use the known working key instead.
-        from .image_url_processor import ImageURLProcessor
-        processor = ImageURLProcessor()
+        # Handle files.zohopublic.com URLs in image fields.
+        # These URLs don't contain the actual filename needed for creatorexport URLs,
+        # so we exclude them from the record (preserving existing DB value on upsert)
+        # and flag them for API resolution by the sync service.
+        image_fields_need_api = []
         for img_field in ('Item_Image', 'Resized_Image'):
             if normalized.get(img_field) and 'files.zohopublic.com' in str(normalized[img_field]):
-                # Try to extract record_id and timestamp from x-cli-msg, then
-                # build a creatorexport URL with the default private key
-                transform = processor.transform_files_zohopublic_url(
-                    normalized[img_field], img_field, 'Item_Report'
-                )
-                if transform['success']:
-                    # Replace the private key with the default one
-                    url = processor.generate_creator_url(
-                        report_name='Item_Report',
-                        record_id=normalized['ID'],
-                        field_name=img_field,
-                        filename=transform['url'].split('filepath=/')[1] if 'filepath=/' in transform['url'] else f"{img_field}.jpg"
-                    )
-                    normalized[img_field] = url
-                    logger.debug(f"Transformed {img_field} files.zohopublic.com URL to creatorexport for record {normalized['ID']}")
-                else:
-                    # Transformation failed — remove field to preserve existing DB value
-                    del normalized[img_field]
-                    logger.debug(f"Excluded {img_field} files.zohopublic.com URL for record {normalized['ID']} to preserve existing DB URL")
+                image_fields_need_api.append(img_field)
+                del normalized[img_field]
+                logger.debug(f"Excluded {img_field} files.zohopublic.com URL for record {normalized['ID']}, flagged for API resolution")
+
+        if image_fields_need_api:
+            normalized['_image_fields_need_api'] = image_fields_need_api
 
         return normalized
 

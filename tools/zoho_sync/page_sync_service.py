@@ -1,6 +1,7 @@
 """
-Page Sync Service - Polls Zoho report and syncs to local database
-Uses 0 API calls - pure web scraping with Playwright.
+Page Sync Service - Polls Zoho report and syncs to local database.
+Uses web scraping with Playwright for change detection, with targeted
+API calls only when image URLs need resolution (files.zohopublic.com URLs).
 """
 
 import asyncio
@@ -9,6 +10,8 @@ from datetime import datetime
 from typing import Dict, List
 from .page_scraper import ZohoPageScraper, REPORT_URL
 from .database import db
+from .zoho_api import zoho_api
+from .image_url_processor import image_url_processor
 from .utils import get_toronto_now
 
 logger = logging.getLogger(__name__)
@@ -79,9 +82,12 @@ class PageSyncService:
                     item_id = item.get('ID')
                     new_modified_time = item.get('Modified_Time')
 
+                    # Extract API resolution metadata before upserting
+                    image_fields_need_api = item.pop('_image_fields_need_api', [])
+
                     # Check if record exists and compare Modified_Time
                     existing = await db.fetchone(
-                        f"SELECT Modified_Time FROM Item_Report WHERE ID = ?",
+                        f"SELECT Modified_Time, Item_Image, Resized_Image FROM Item_Report WHERE ID = ?",
                         (item_id,)
                     )
 
@@ -96,6 +102,13 @@ class PageSyncService:
                     if upsert_result["successful"] > 0:
                         synced += 1
                         logger.info(f"Synced item {item_id}: {item.get('Item_Name')}")
+
+                        # Resolve image URLs via API if needed.
+                        # Always resolve when record was modified and had files.zohopublic.com URLs,
+                        # since the image itself may have been updated.
+                        if image_fields_need_api:
+                            await self._resolve_image_urls(item_id, image_fields_need_api)
+
                 except Exception as e:
                     error_msg = f"Error syncing item {item.get('ID')}: {e}"
                     logger.error(error_msg)
@@ -121,6 +134,34 @@ class PageSyncService:
             logger.error(f"Sync error: {e}")
 
         return result
+
+    async def _resolve_image_urls(self, record_id: str, fields: List[str]):
+        """Fetch correct image URLs from Zoho API for fields that had files.zohopublic.com URLs"""
+        try:
+            api_record = await zoho_api.get_record_by_id('Item_Report', record_id)
+            if not api_record:
+                logger.warning(f"Could not fetch record {record_id} from API for image URL resolution")
+                return
+
+            for field in fields:
+                api_url = api_record.get(field)
+                if not api_url or not isinstance(api_url, str):
+                    continue
+
+                # API returns URLs like /api/v2/.../download?filepath=ACTUAL_FILENAME
+                if '/api/v2/' in api_url:
+                    info = image_url_processor.extract_image_info(api_url)
+                    if info and info.get('filename'):
+                        creator_url = image_url_processor.generate_creator_url(
+                            'Item_Report', record_id, field, info['filename']
+                        )
+                        await db.execute(
+                            f"UPDATE Item_Report SET {field} = ? WHERE ID = ?",
+                            (creator_url, record_id)
+                        )
+                        logger.info(f"Resolved {field} URL for record {record_id} via API: {info['filename']}")
+        except Exception as e:
+            logger.error(f"Failed to resolve image URLs for record {record_id}: {e}")
 
     async def start_polling(self):
         """
