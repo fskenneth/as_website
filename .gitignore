@@ -68,3 +68,5 @@ zoho_data.db
 
 # Temporary images
 static/temp_images/
+nul
+.claude/settings.local.json
