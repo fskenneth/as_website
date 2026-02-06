@@ -11,6 +11,37 @@ import logging
 logger = logging.getLogger(__name__)
 
 class SyncService:
+    def _preserve_model_3d(self, records: List[Dict], existing_records: Dict[str, Dict]) -> List[Dict]:
+        """Preserve locally-set Model_3D values when Zoho sends empty values.
+        Also maps Zoho field name '3D_Model' to local column 'Model_3D'."""
+        preserved = []
+        preserved_count = 0
+        for record in records:
+            updated = record.copy()
+            record_id = str(record.get('ID', ''))
+            existing = existing_records.get(record_id) if existing_records else None
+
+            # Map Zoho API field name to local DB column name
+            for key in ('3D_Model', '3D Model'):
+                if key in updated:
+                    val = updated.pop(key)
+                    if val and 'Model_3D' not in updated:
+                        updated['Model_3D'] = val
+
+            # Preserve local Model_3D if incoming is empty but local has value
+            if existing:
+                existing_model = existing.get('Model_3D')
+                incoming_model = updated.get('Model_3D')
+                if existing_model and not incoming_model:
+                    updated['Model_3D'] = existing_model
+                    preserved_count += 1
+
+            preserved.append(updated)
+
+        if preserved_count > 0:
+            logger.info(f"Preserved {preserved_count} local Model_3D values during sync")
+        return preserved
+
     async def sync_report(self, report_name: str, sync_type: str = "daily") -> Dict:
         """Sync a single report from Zoho Creator"""
         start_time = get_toronto_now()
@@ -82,6 +113,9 @@ class SyncService:
                 existing_records  # Pass existing records to preserve good URLs
             )
 
+            # Preserve local Model_3D values
+            records_with_urls = self._preserve_model_3d(records_with_urls, existing_records)
+
             # Verify record count for full sync
             if sync_type == "full" and expected_total_count:
                 if len(records) != expected_total_count:
@@ -89,12 +123,30 @@ class SyncService:
                 else:
                     logger.info(f"✓ Pre-sync verification passed: {len(records)} records match expected count")
 
-            # Clear table for full sync
+            # Save local Model_3D values before clearing for full sync
+            saved_model_3d = {}
             if sync_type == "full":
+                for rid, rec in existing_records.items():
+                    model_val = rec.get('Model_3D')
+                    if model_val:
+                        saved_model_3d[rid] = model_val
+                if saved_model_3d:
+                    logger.info(f"Saved {len(saved_model_3d)} Model_3D values before full sync clear")
                 await db.clear_table(table_name)
 
             # Upsert records with Zoho Creator URLs
             upsert_result = await db.upsert_records(table_name, records_with_urls)
+
+            # Restore Model_3D values after full sync
+            if saved_model_3d:
+                restored = 0
+                for rid, model_val in saved_model_3d.items():
+                    await db.execute(
+                        f"UPDATE {table_name} SET Model_3D = ? WHERE ID = ? AND (Model_3D IS NULL OR Model_3D = '')",
+                        (model_val, rid)
+                    )
+                    restored += 1
+                logger.info(f"Restored {restored} Model_3D values after full sync")
             synced_count = upsert_result["successful"]
             skipped_count = upsert_result["skipped"]
 
@@ -319,6 +371,9 @@ class SyncService:
                 records, report_name, existing_records
             )
 
+            # Preserve local Model_3D values
+            records_with_urls = self._preserve_model_3d(records_with_urls, existing_records)
+
             # Upsert records (not clearing table - incremental update)
             upsert_result = await db.upsert_records(table_name, records_with_urls)
             synced_count = upsert_result["successful"]
@@ -461,6 +516,9 @@ class SyncService:
             records_with_urls, urls_processed = image_url_processor.process_records_for_urls(
                 records_to_sync, "Item_Report", existing_records
             )
+
+            # Preserve local Model_3D values
+            records_with_urls = self._preserve_model_3d(records_with_urls, existing_records)
 
             # Upsert only the changed records
             upsert_result = await db.upsert_records(table_name, records_with_urls)

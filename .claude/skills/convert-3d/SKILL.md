@@ -1,3 +1,10 @@
+---
+name: convert-3d
+description: This skill should be used when the user asks to "convert items to 3D", "generate 3D models", "convert to 3D", "make 3D models", or mentions converting inventory items to 3D GLB files using Tripo3D.
+version: 1.0.0
+user-invocable: true
+---
+
 # Skill: Convert Items to 3D Models
 
 ## When to Use

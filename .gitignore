@@ -68,3 +68,6 @@ zoho_data.db
 
 # Temporary images
 static/temp_images/
+tools/model_3d/batch_log.txt
+tools/model_3d/convert_batch.txt
+tools/model_3d/run_batch.sh
