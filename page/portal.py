@@ -945,15 +945,26 @@ def get_portal_scripts():
         if (hasPropertyType || hasPropertySize || hasSelectedAreas) {
             const localData = { ...stagingInfo, ...reserveInfo, status: 'quote' };
 
-            // Check if this local data already exists on server (by property address or similar data)
-            const existsOnServer = stagingItems.some(item =>
-                item.propertyAddress && localData.propertyAddress &&
-                item.propertyAddress === localData.propertyAddress
-            );
+            // Check if this local data already exists on server
+            // Match by property address if available, otherwise by property type + size
+            const existsOnServer = stagingItems.some(item => {
+                if (item.propertyAddress && localData.propertyAddress) {
+                    return item.propertyAddress === localData.propertyAddress;
+                }
+                // If no address on either side, match by type + size
+                return item.propertyType === localData.propertyType &&
+                       item.propertySize === localData.propertySize;
+            });
 
-            if (!existsOnServer) {
-                // Sync local data to server
+            if (existsOnServer) {
+                // Data already on server, clear local storage
+                sessionStorage.removeItem(STAGING_SESSION_KEY);
+                sessionStorage.removeItem(RESERVE_SESSION_KEY);
+            } else if (!loadStagingData._syncing) {
+                // Sync local data to server (with guard against infinite recursion)
+                loadStagingData._syncing = true;
                 await syncLocalToServer(localData);
+                loadStagingData._syncing = false;
                 // Reload to get the synced data
                 return loadStagingData();
             }

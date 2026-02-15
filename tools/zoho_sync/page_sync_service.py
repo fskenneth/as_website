@@ -97,6 +97,10 @@ class PageSyncService:
                         logger.debug(f"Skipped unchanged item {item_id}")
                         continue
 
+                    # Preserve local Model_3D - don't overwrite with empty value from scraper
+                    if not item.get('Model_3D'):
+                        item.pop('Model_3D', None)
+
                     # Upsert the record (new or modified)
                     upsert_result = await db.upsert_records(table_name, [item])
                     if upsert_result["successful"] > 0:
