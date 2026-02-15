@@ -121,6 +121,27 @@ def get_portal_styles():
         display: block;
     }
 
+    /* Users Actions */
+    .users-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 16px;
+    }
+    .create-user-btn {
+        background: #222;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .create-user-btn:hover {
+        background: #444;
+    }
+
     /* Users Table */
     .users-table-container {
         background: var(--bg-secondary);
@@ -746,12 +767,37 @@ def get_portal_scripts():
         const user = window.usersData.find(u => u.id === userId);
         if (!user) return;
 
+        document.getElementById('edit-mode').value = 'edit';
+        document.getElementById('modal-title').textContent = 'Edit User';
+        document.getElementById('modal-submit-btn').textContent = 'Save Changes';
+        document.getElementById('password-label').textContent = 'New Password (leave blank to keep current)';
+        document.getElementById('edit-password').required = false;
+
         document.getElementById('edit-user-id').value = user.id;
         document.getElementById('edit-first-name').value = user.first_name;
         document.getElementById('edit-last-name').value = user.last_name;
         document.getElementById('edit-email').value = user.email;
         document.getElementById('edit-phone').value = user.phone || '';
         document.getElementById('edit-role').value = user.user_role;
+        document.getElementById('edit-password').value = '';
+
+        hideModalMessage();
+        document.getElementById('edit-modal').classList.add('active');
+    }
+
+    function openCreateModal() {
+        document.getElementById('edit-mode').value = 'create';
+        document.getElementById('modal-title').textContent = 'Create User';
+        document.getElementById('modal-submit-btn').textContent = 'Create User';
+        document.getElementById('password-label').textContent = 'Password';
+        document.getElementById('edit-password').required = true;
+
+        document.getElementById('edit-user-id').value = '';
+        document.getElementById('edit-first-name').value = '';
+        document.getElementById('edit-last-name').value = '';
+        document.getElementById('edit-email').value = '';
+        document.getElementById('edit-phone').value = '';
+        document.getElementById('edit-role').value = 'customer';
         document.getElementById('edit-password').value = '';
 
         hideModalMessage();
@@ -778,6 +824,7 @@ def get_portal_scripts():
         const form = event.target;
         const saveBtn = form.querySelector('.modal-btn.save');
         const originalText = saveBtn.textContent;
+        const isCreate = document.getElementById('edit-mode').value === 'create';
 
         // Validate email
         const emailField = document.getElementById('edit-email');
@@ -791,10 +838,10 @@ def get_portal_scripts():
         }
         emailField.classList.remove('input-error');
 
-        // Validate phone (must have 10 digits)
+        // Validate phone (must have 10 digits) - optional for create
         const phoneField = document.getElementById('edit-phone');
         const phoneDigits = phoneField.value.replace(/\D/g, '');
-        if (!phoneDigits || phoneDigits.length < 10) {
+        if (phoneField.value && phoneDigits.length < 10) {
             showModalMessage('Please enter a valid 10-digit phone number', 'error');
             phoneField.classList.add('input-error');
             phoneField.focus();
@@ -802,22 +849,36 @@ def get_portal_scripts():
         }
         phoneField.classList.remove('input-error');
 
+        // Validate password required for create
+        const passwordField = document.getElementById('edit-password');
+        if (isCreate && !passwordField.value) {
+            showModalMessage('Password is required for new users', 'error');
+            passwordField.classList.add('input-error');
+            passwordField.focus();
+            return;
+        }
+        passwordField.classList.remove('input-error');
+
         saveBtn.disabled = true;
-        saveBtn.textContent = 'Saving...';
+        saveBtn.textContent = isCreate ? 'Creating...' : 'Saving...';
         hideModalMessage();
 
         const data = {
-            id: parseInt(document.getElementById('edit-user-id').value),
             first_name: document.getElementById('edit-first-name').value,
             last_name: document.getElementById('edit-last-name').value,
             email: email,
             phone: phoneField.value || null,
             user_role: document.getElementById('edit-role').value,
-            password: document.getElementById('edit-password').value || null
+            password: passwordField.value || null
         };
 
+        const url = isCreate ? '/api/admin/users/create' : '/api/admin/users/update';
+        if (!isCreate) {
+            data.id = parseInt(document.getElementById('edit-user-id').value);
+        }
+
         try {
-            const response = await fetch('/api/admin/users/update', {
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
@@ -826,13 +887,13 @@ def get_portal_scripts():
             const result = await response.json();
 
             if (result.success) {
-                showModalMessage('User updated successfully', 'success');
+                showModalMessage(isCreate ? 'User created successfully' : 'User updated successfully', 'success');
                 setTimeout(() => {
                     closeEditModal();
                     loadUsers();
                 }, 1000);
             } else {
-                showModalMessage(result.error || 'Failed to update user', 'error');
+                showModalMessage(result.error || (isCreate ? 'Failed to create user' : 'Failed to update user'), 'error');
             }
         } catch (error) {
             showModalMessage('An error occurred', 'error');
@@ -1422,6 +1483,10 @@ def portal_page(user: dict = None):
     # Users tab content (admin only)
     users_content = Div(
         Div(
+            Button("+ Create User", cls="create-user-btn", onclick="openCreateModal()"),
+            cls="users-actions"
+        ),
+        Div(
             Table(
                 Thead(
                     Tr(
@@ -1441,17 +1506,18 @@ def portal_page(user: dict = None):
         cls="portal-tab-content"
     ) if is_admin else ""
 
-    # Edit user modal
+    # Edit/Create user modal
     edit_modal = Div(
         Div(
             Div(
-                H3("Edit User", cls="modal-title"),
+                H3("Edit User", id="modal-title", cls="modal-title"),
                 Button("×", cls="modal-close", onclick="closeEditModal()"),
                 cls="modal-header"
             ),
             Div(id="modal-message", cls="modal-message"),
             Form(
                 Input(type="hidden", id="edit-user-id"),
+                Input(type="hidden", id="edit-mode", value="edit"),
                 Div(
                     Div(
                         Label("First Name", **{"for": "edit-first-name"}),
@@ -1488,13 +1554,13 @@ def portal_page(user: dict = None):
                     cls="form-group"
                 ),
                 Div(
-                    Label("New Password (leave blank to keep current)", **{"for": "edit-password"}),
-                    Input(type="password", id="edit-password", placeholder="Enter new password"),
+                    Label("Password", id="password-label", **{"for": "edit-password"}),
+                    Input(type="password", id="edit-password", placeholder="Enter password"),
                     cls="form-group"
                 ),
                 Div(
                     Button("Cancel", type="button", cls="modal-btn cancel", onclick="closeEditModal()"),
-                    Button("Save Changes", type="submit", cls="modal-btn save"),
+                    Button("Save Changes", id="modal-submit-btn", type="submit", cls="modal-btn save"),
                     cls="modal-actions"
                 ),
                 cls="modal-form",

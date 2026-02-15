@@ -1066,6 +1066,49 @@ async def admin_update_user(request: Request):
         return JSONResponse({'success': False, 'error': 'Update failed'}, status_code=500)
 
 
+@rt('/api/admin/users/create', methods=['POST'])
+async def admin_create_user(request: Request):
+    """Create a new user (admin only)"""
+    user = get_current_user(request)
+    if not user or user.get('user_role') != 'admin':
+        return JSONResponse({'error': 'Unauthorized'}, status_code=403)
+
+    try:
+        data = await request.json()
+
+        first_name = data.get('first_name', '').strip()
+        last_name = data.get('last_name', '').strip()
+        email = data.get('email', '').strip()
+        password = data.get('password', '')
+        phone = data.get('phone')
+        user_role = data.get('user_role', 'customer')
+
+        if not first_name or not last_name:
+            return JSONResponse({'success': False, 'error': 'First and last name are required'}, status_code=400)
+        if not email:
+            return JSONResponse({'success': False, 'error': 'Email is required'}, status_code=400)
+        if not password:
+            return JSONResponse({'success': False, 'error': 'Password is required'}, status_code=400)
+
+        result = create_user(
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            password=password,
+            phone=phone,
+            user_role=user_role
+        )
+
+        if result['success']:
+            return JSONResponse({'success': True, 'user': result['user']})
+        else:
+            return JSONResponse({'success': False, 'error': result.get('error', 'Create failed')}, status_code=400)
+
+    except Exception as e:
+        print(f"Admin create user error: {e}")
+        return JSONResponse({'success': False, 'error': 'Create failed'}, status_code=500)
+
+
 # =============================================================================
 # STRIPE PAYMENT ENDPOINTS
 # =============================================================================

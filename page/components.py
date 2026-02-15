@@ -31,7 +31,7 @@ def get_shared_styles():
         --color-secondary: #ccc;
         --color-accent: #666;
         --border-color: #333;
-        --border-hover: #fff;
+        --border-hover: #666;
     }
 
     [data-theme="light"] {
@@ -42,7 +42,7 @@ def get_shared_styles():
         --color-secondary: #333;
         --color-accent: #999;
         --border-color: #ddd;
-        --border-hover: #000;
+        --border-hover: #999;
     }
 
     /* Base Styles */
