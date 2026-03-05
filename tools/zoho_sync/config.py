@@ -3,7 +3,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 
-load_dotenv()
+_env_file = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(dotenv_path=_env_file)
 
 class Settings(BaseSettings):
     # Base directory - points to as_website root (now 2 levels up from tools/zoho_sync)
@@ -34,7 +35,7 @@ class Settings(BaseSettings):
     log_file_path: Path = Path(os.getenv("LOG_FILE_PATH", "./tools/zoho_sync/logs/sync.log"))
 
     class Config:
-        env_file = ".env"
+        env_file = str(_env_file)
         extra = "ignore"  # Ignore extra fields from .env
 
 settings = Settings()
