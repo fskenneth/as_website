@@ -183,6 +183,139 @@ async def shutdown():
     await image_downloader.close()
 
 
+@rt('/api/v1/hello')
+def hello_v1():
+    from datetime import datetime
+    return JSONResponse({
+        'message': 'Hello from as_website',
+        'server_time': datetime.utcnow().isoformat() + 'Z',
+    })
+
+
+def _bearer_token(request: Request):
+    """Extract Bearer token from Authorization header. Returns None if missing/malformed."""
+    auth = request.headers.get('authorization', '') or request.headers.get('Authorization', '')
+    if not auth.lower().startswith('bearer '):
+        return None
+    return auth[7:].strip() or None
+
+
+def _api_user(request: Request):
+    """Validate Bearer token and return the user dict, or None."""
+    token = _bearer_token(request)
+    if not token:
+        return None
+    return get_user_by_session(token)
+
+
+@rt('/api/v1/auth/login', methods=['POST'])
+async def v1_login(request: Request):
+    """Token-based login for mobile clients. Returns {token, user}."""
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({'error': 'Invalid JSON'}, status_code=400)
+
+    email = (data.get('email') or '').strip()
+    password = data.get('password') or ''
+    if not email or not password:
+        return JSONResponse({'error': 'Email and password required'}, status_code=400)
+
+    result = authenticate_user(email, password)
+    if not result.get('success'):
+        return JSONResponse({'error': result.get('error', 'Authentication failed')}, status_code=401)
+
+    user = result['user']
+    token = create_session(user['id'])
+    return JSONResponse({'token': token, 'user': user})
+
+
+def _public_user(user: dict) -> dict:
+    """Strip sensitive fields before returning a user over the API."""
+    return {
+        'id': user.get('id'),
+        'first_name': user.get('first_name'),
+        'last_name': user.get('last_name'),
+        'email': user.get('email'),
+        'phone': user.get('phone'),
+        'user_role': user.get('user_role'),
+    }
+
+
+@rt('/api/v1/auth/me')
+def v1_me(request: Request):
+    """Return the authenticated user, or 401."""
+    user = _api_user(request)
+    if not user:
+        return JSONResponse({'error': 'Not authenticated'}, status_code=401)
+    return JSONResponse({'user': _public_user(user)})
+
+
+@rt('/api/v1/auth/logout', methods=['POST'])
+def v1_logout(request: Request):
+    """Invalidate the current token."""
+    token = _bearer_token(request)
+    if token:
+        delete_session(token)
+    return JSONResponse({'success': True})
+
+
+@rt('/api/v1/items')
+def v1_items(request: Request, search: str = "", limit: int = 100):
+    """List inventory items from synced Zoho data. Auth required."""
+    user = _api_user(request)
+    if not user:
+        return JSONResponse({'error': 'Not authenticated'}, status_code=401)
+
+    import os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "zoho_sync.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        cursor = conn.cursor()
+        query = """
+            SELECT Item_Name, Item_Type, Item_Image, Resized_Image, Item_Color, Item_Style,
+                   Model_3D, Item_Width, Item_Depth, Item_Height, COUNT(*) as item_count
+            FROM Item_Report
+            WHERE Item_Name IS NOT NULL AND Item_Name != ''
+        """
+        params = []
+        if search:
+            query += " AND (Item_Name LIKE ? OR Item_Type LIKE ?)"
+            needle = f"%{search}%"
+            params.extend([needle, needle])
+        query += " GROUP BY Item_Name ORDER BY Item_Name LIMIT ?"
+        params.append(max(1, min(limit, 500)))
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+    finally:
+        conn.close()
+
+    def pick_image(row):
+        for key in ('Resized_Image', 'Item_Image'):
+            val = (row[key] or '').strip()
+            if val and val != 'blank.png' and (val.startswith('http://') or val.startswith('https://')):
+                return val
+        return None
+
+    items = []
+    for r in rows:
+        items.append({
+            'name': r['Item_Name'],
+            'type': r['Item_Type'],
+            'color': r['Item_Color'],
+            'style': r['Item_Style'],
+            'image_url': pick_image(r),
+            'model_3d': r['Model_3D'] or None,
+            'width': r['Item_Width'],
+            'depth': r['Item_Depth'],
+            'height': r['Item_Height'],
+            'count': r['item_count'],
+        })
+    return JSONResponse({'items': items, 'total': len(items)})
+
+
 @rt('/api/instagram-image/{image_id}')
 async def instagram_image_proxy(image_id: str):
     """Proxy Instagram images to avoid CORS issues"""

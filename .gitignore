@@ -33,6 +33,12 @@ ENV/
 *.swp
 *.swo
 
+# Xcode
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad/
+DerivedData/
+
 # OS
 .DS_Store
 Thumbs.db
