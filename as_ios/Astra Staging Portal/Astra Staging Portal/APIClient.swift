@@ -54,6 +54,98 @@ struct ItemsResponse: Codable {
     let total: Int
 }
 
+// MARK: - Task Board models
+
+struct Person: Codable, Hashable, Identifiable {
+    let name: String?
+    let id: String?
+}
+
+struct Customer: Codable {
+    let first_name: String
+    let last_name: String
+    let phone: String?
+    let email: String?
+    var fullName: String {
+        let n = "\(first_name) \(last_name)".trimmingCharacters(in: .whitespaces)
+        return n.isEmpty ? "—" : n
+    }
+}
+
+struct Fees: Codable {
+    let total: Double
+    let owing: Double
+    let paid: Double
+}
+
+struct Milestone: Codable {
+    let done: Bool
+    let date: String?
+}
+
+struct StagingMilestones: Codable {
+    let design: Milestone
+    let before_pictures: Milestone
+    let after_pictures: Milestone
+    let packing: Milestone
+    let setup: Milestone
+    let whatsapp: Milestone
+}
+
+struct Staging: Codable, Identifiable {
+    let id: String
+    let name: String?
+    let staging_date: String?
+    let destaging_date: String?
+    let address: String?
+    let occupancy: String?
+    let property_type: String?
+    let staging_type: String?
+    let status: String?
+    let customer: Customer
+    let stagers: [Person]
+    let staging_movers: [Person]
+    let destaging_movers: [Person]
+    let staging_eta: String?
+    let destaging_eta: String?
+    let driving_time: String?
+    let fees: Fees
+    let milestones: StagingMilestones
+    let moving_instructions: String?
+    let destaging_instructions: String?
+    let general_notes: String?
+    let mls: String?
+    let pictures_folder: String?
+    let housesigma_url: String?
+    let item_count: JSONStringOrInt?
+}
+
+/// Handles fields that Zoho returns as either string or int (e.g. item_count).
+struct JSONStringOrInt: Codable {
+    let stringValue: String
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if let s = try? c.decode(String.self) { stringValue = s }
+        else if let i = try? c.decode(Int.self) { stringValue = String(i) }
+        else { stringValue = "" }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(stringValue)
+    }
+
+    var intValue: Int { Int(stringValue) ?? 0 }
+}
+
+struct TaskBoardResponse: Codable {
+    let stagings: [Staging]
+    let total: Int
+    let period: String
+    let today: String
+}
+
 struct APIErrorBody: Codable {
     let error: String?
 }
@@ -140,5 +232,16 @@ final class APIClient {
         var req = URLRequest(url: comps.url!)
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         return try await send(req, as: ItemsResponse.self)
+    }
+
+    func taskBoard(period: String, mine: Bool, token: String) async throws -> TaskBoardResponse {
+        var comps = URLComponents(url: baseURL.appendingPathComponent("/api/v1/tasks/board"), resolvingAgainstBaseURL: false)!
+        comps.queryItems = [
+            URLQueryItem(name: "period", value: period),
+            URLQueryItem(name: "mine", value: mine ? "true" : "false"),
+        ]
+        var req = URLRequest(url: comps.url!)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        return try await send(req, as: TaskBoardResponse.self)
     }
 }

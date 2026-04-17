@@ -63,16 +63,6 @@ private struct PlaceholderView: View {
     }
 }
 
-struct TaskBoardView: View {
-    var body: some View {
-        PlaceholderView(
-            title: "Task Board",
-            subtitle: "Today's tasks grouped by staging.\nComing soon — pending Zoho Task sync.",
-            systemImage: "checklist"
-        )
-    }
-}
-
 struct MeView: View {
     @Environment(AuthStore.self) private var auth
 

@@ -260,6 +260,217 @@ def v1_logout(request: Request):
     return JSONResponse({'success': True})
 
 
+def _parse_zoho_date(s: str):
+    """Parse Zoho's MM/dd/yyyy date string to ISO yyyy-mm-dd. Returns None if empty/invalid."""
+    if not s or not s.strip():
+        return None
+    try:
+        from datetime import datetime
+        return datetime.strptime(s.strip(), '%m/%d/%Y').date().isoformat()
+    except Exception:
+        return None
+
+
+def _parse_zoho_people(s: str):
+    """Parse Zoho's JSON array of {display_value, ID} → list of {name, id}. Handles empty string."""
+    if not s or not s.strip():
+        return []
+    try:
+        arr = json.loads(s)
+        if isinstance(arr, list):
+            return [{'name': p.get('display_value'), 'id': p.get('ID')} for p in arr if isinstance(p, dict)]
+    except Exception:
+        pass
+    return []
+
+
+def _parse_zoho_link(s: str):
+    """Parse Zoho's JSON object {display_value, ID} → {name, id}. For single-value lookups."""
+    if not s or not s.strip():
+        return None
+    try:
+        obj = json.loads(s)
+        if isinstance(obj, dict):
+            return {'name': obj.get('display_value'), 'id': obj.get('ID')}
+    except Exception:
+        pass
+    return None
+
+
+def _parse_money(s):
+    """Parse Zoho's money string ('0.00', '15750.00') to float. Returns 0.0 if empty/invalid."""
+    if s is None or s == '':
+        return 0.0
+    try:
+        return float(s)
+    except Exception:
+        return 0.0
+
+
+@rt('/api/v1/tasks/board')
+def v1_tasks_board(request: Request, period: str = "upcoming", mine: str = "false"):
+    """
+    Staging Task Board. Returns stagings filtered by period, with milestone dates.
+    period: today | week | upcoming | past | all
+      today    = Staging_Date == today (or Destaging_Date == today)
+      week     = Staging_Date in [today, today+6]
+      upcoming = Staging_Date >= today (next 30 days default)
+      past     = Staging_Date < today (last 30 days)
+      all      = no date filter
+    mine=true: filter to stagings where user's first_name matches a stager/mover display_value.
+    """
+    user = _api_user(request)
+    if not user:
+        return JSONResponse({'error': 'Not authenticated'}, status_code=401)
+
+    import os
+    from datetime import date, timedelta
+    today = date.today()
+
+    # Determine date filter window based on period
+    date_filter_sql = ""
+    date_params = []
+
+    def fmt(d):  # MM/dd/yyyy to match DB format
+        return d.strftime('%m/%d/%Y')
+
+    if period == "today":
+        date_filter_sql = " AND (Staging_Date = ? OR Destaging_Date = ?)"
+        date_params = [fmt(today), fmt(today)]
+    elif period == "week":
+        end = today + timedelta(days=6)
+        # Compare as date via substr rewrites — simpler to pull all upcoming and filter in Python
+        date_filter_sql = " AND Staging_Date != ''"
+    elif period == "upcoming":
+        date_filter_sql = " AND Staging_Date != ''"
+    elif period == "past":
+        date_filter_sql = " AND Staging_Date != ''"
+    elif period == "all":
+        date_filter_sql = ""
+    else:
+        return JSONResponse({'error': f'Invalid period: {period}'}, status_code=400)
+
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "zoho_sync.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        query = f"""
+            SELECT ID, Staging_Display_Name, Staging_Date, Destaging_Date,
+                   Staging_Address, Occupancy_Type, Property_Type, Staging_Type, Staging_Status,
+                   Customer_First_Name, Customer_Last_Name, Customer_Phone, Customer_Email,
+                   Stager, Staging_Movers, Destaging_Movers,
+                   Total_Staging_Fee, Owing_Amount, Paid_Amount,
+                   Staging_ETA, Destaging_ETA, Driving_Time,
+                   Before_Picture_Upload_Date, After_Picture_Upload_Date,
+                   Design_Items_Matched_Date, Staging_Furniture_Design_Finish_Date,
+                   Staging_Accessories_Packing_Finish_Date, WhatsApp_Group_Created_Date,
+                   Staging_Moving_Instructions, Destaging_Moving_Instructions, General_Notes,
+                   MLS, Pictures_Folder, HouseSigma_URL, Total_Item_Number
+            FROM Staging_Report
+            WHERE _sync_status != 'deleted'
+            {date_filter_sql}
+            ORDER BY Staging_Date DESC, CAST(ID AS INTEGER) DESC
+            LIMIT 500
+        """
+        rows = conn.execute(query, date_params).fetchall()
+    finally:
+        conn.close()
+
+    mine_flag = mine.lower() in ('true', '1', 'yes')
+    first_name_lower = (user.get('first_name') or '').lower()
+
+    out = []
+    for r in rows:
+        staging_date = _parse_zoho_date(r['Staging_Date'])
+        destaging_date = _parse_zoho_date(r['Destaging_Date'])
+
+        # Apply Python-side period filter for week/upcoming/past (SQL date math on MM/dd/yyyy strings is awkward)
+        if period == 'week':
+            if not staging_date:
+                continue
+            sd = date.fromisoformat(staging_date)
+            if not (today <= sd <= today + timedelta(days=6)):
+                continue
+        elif period == 'upcoming':
+            if not staging_date:
+                continue
+            sd = date.fromisoformat(staging_date)
+            if sd < today or sd > today + timedelta(days=60):
+                continue
+        elif period == 'past':
+            if not staging_date:
+                continue
+            sd = date.fromisoformat(staging_date)
+            if sd >= today:
+                continue
+
+        stagers = _parse_zoho_people(r['Stager'])
+        staging_movers = _parse_zoho_people(r['Staging_Movers'])
+        destaging_movers = _parse_zoho_people(r['Destaging_Movers'])
+
+        if mine_flag and first_name_lower:
+            assigned_names = {p['name'].lower() for p in stagers + staging_movers + destaging_movers if p.get('name')}
+            if first_name_lower not in assigned_names:
+                continue
+
+        address = _parse_zoho_link(r['Staging_Address']) or {}
+        addr_text = address.get('name') or r['Staging_Display_Name']
+
+        def milestone(done_date_str):
+            d = _parse_zoho_date(done_date_str)
+            return {'done': d is not None, 'date': d}
+
+        out.append({
+            'id': r['ID'],
+            'name': r['Staging_Display_Name'],
+            'staging_date': staging_date,
+            'destaging_date': destaging_date,
+            'address': addr_text,
+            'occupancy': r['Occupancy_Type'] or None,
+            'property_type': r['Property_Type'] or None,
+            'staging_type': r['Staging_Type'] or None,
+            'status': r['Staging_Status'] or None,
+            'customer': {
+                'first_name': r['Customer_First_Name'] or '',
+                'last_name': r['Customer_Last_Name'] or '',
+                'phone': r['Customer_Phone'] or None,
+                'email': r['Customer_Email'] or None,
+            },
+            'stagers': stagers,
+            'staging_movers': staging_movers,
+            'destaging_movers': destaging_movers,
+            'staging_eta': r['Staging_ETA'] or None,
+            'destaging_eta': r['Destaging_ETA'] or None,
+            'driving_time': r['Driving_Time'] or None,
+            'fees': {
+                'total': _parse_money(r['Total_Staging_Fee']),
+                'owing': _parse_money(r['Owing_Amount']),
+                'paid': _parse_money(r['Paid_Amount']),
+            },
+            'milestones': {
+                'design': milestone(r['Design_Items_Matched_Date']),
+                'before_pictures': milestone(r['Before_Picture_Upload_Date']),
+                'after_pictures': milestone(r['After_Picture_Upload_Date']),
+                'packing': milestone(r['Staging_Accessories_Packing_Finish_Date']),
+                'setup': milestone(r['Staging_Furniture_Design_Finish_Date']),
+                'whatsapp': milestone(r['WhatsApp_Group_Created_Date']),
+            },
+            'moving_instructions': r['Staging_Moving_Instructions'] or None,
+            'destaging_instructions': r['Destaging_Moving_Instructions'] or None,
+            'general_notes': r['General_Notes'] or None,
+            'mls': r['MLS'] or None,
+            'pictures_folder': r['Pictures_Folder'] or None,
+            'housesigma_url': r['HouseSigma_URL'] or None,
+            'item_count': r['Total_Item_Number'] or 0,
+        })
+
+    # Sort upcoming by date ascending (nearest first)
+    if period in ('upcoming', 'today', 'week'):
+        out.sort(key=lambda s: s['staging_date'] or '9999-12-31')
+
+    return JSONResponse({'stagings': out, 'total': len(out), 'period': period, 'today': today.isoformat()})
+
+
 @rt('/api/v1/items')
 def v1_items(request: Request, search: str = "", limit: int = 100):
     """List inventory items from synced Zoho data. Auth required."""
