@@ -244,4 +244,18 @@ final class APIClient {
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         return try await send(req, as: TaskBoardResponse.self)
     }
+
+    struct MilestoneResponse: Codable {
+        let ok: Bool
+        let staging_id: String
+        let field: String
+        let value: String
+        let queued: Bool?
+    }
+
+    func setMilestone(stagingId: String, field: String, done: Bool, token: String) async throws -> MilestoneResponse {
+        let path = "/api/v1/stagings/\(stagingId)/milestone"
+        let req = request(path, method: "POST", body: ["field": field, "done": done], token: token)
+        return try await send(req, as: MilestoneResponse.self)
+    }
 }

@@ -528,6 +528,86 @@ def v1_tasks_board(request: Request, period: str = "upcoming", mine: str = "fals
     return JSONResponse({'stagings': out, 'total': len(out), 'period': period, 'today': today.isoformat()})
 
 
+# Whitelist of Staging date-fields that the milestone toggle endpoint is allowed to touch.
+# Matches the milestone chips rendered in iOS + Zoho's Staging_Task_Board convention.
+_ALLOWED_MILESTONE_FIELDS = {
+    'Design_Items_Matched_Date',
+    'Before_Picture_Upload_Date',
+    'After_Picture_Upload_Date',
+    'Staging_Accessories_Packing_Finish_Date',
+    'Staging_Furniture_Design_Finish_Date',
+    'WhatsApp_Group_Created_Date',
+    'Check_Basement_Furniture_Size_Date',
+}
+
+
+@rt('/api/v1/stagings/{staging_id}/milestone', methods=['POST'])
+async def v1_set_milestone(request: Request, staging_id: str):
+    """
+    Toggle a staging milestone date field. Body: {"field": "...", "done": true}.
+    done=true  → sets the field to today (MM/dd/yyyy).
+    done=false → clears the field.
+    Writes to local SQLite immediately and queues the change for Zoho.
+    """
+    user = _api_user(request)
+    if not user:
+        return JSONResponse({'error': 'Not authenticated'}, status_code=401)
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({'error': 'Invalid JSON'}, status_code=400)
+
+    field = body.get('field')
+    done = bool(body.get('done'))
+
+    if field not in _ALLOWED_MILESTONE_FIELDS:
+        return JSONResponse({'error': f'Field not allowed: {field}'}, status_code=400)
+
+    import os
+    from datetime import date as _date
+    new_value = _date.today().strftime('%m/%d/%Y') if done else ''
+
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "zoho_sync.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            f"SELECT ID, {field} AS current FROM Staging_Report WHERE ID = ?",
+            (staging_id,),
+        ).fetchone()
+        if not row:
+            return JSONResponse({'error': 'Staging not found'}, status_code=404)
+
+        old_value = row['current'] or ''
+        if old_value == new_value:
+            # Idempotent — nothing to do
+            return JSONResponse({'ok': True, 'staging_id': staging_id, 'field': field, 'value': new_value, 'queued': False})
+
+        conn.execute(
+            f"UPDATE Staging_Report SET {field} = ? WHERE ID = ?",
+            (new_value, staging_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    # Queue the write for Zoho (write_service reads from the same DB via the db connection pool)
+    try:
+        await write_service.queue_update(
+            record_id=staging_id,
+            report_name='Staging_Report',
+            changes={field: new_value},
+            old_values={field: old_value},
+        )
+    except Exception as e:
+        # Local edit already applied; log the queue failure so it surfaces in server.log.
+        print(f"[Milestone] queue_update failed for {staging_id}.{field}: {e}")
+        return JSONResponse({'ok': True, 'staging_id': staging_id, 'field': field, 'value': new_value, 'queued': False, 'queue_error': str(e)})
+
+    return JSONResponse({'ok': True, 'staging_id': staging_id, 'field': field, 'value': new_value, 'queued': True})
+
+
 @rt('/api/v1/items')
 def v1_items(request: Request, search: str = "", limit: int = 100):
     """List inventory items from synced Zoho data. Auth required."""

@@ -79,9 +79,15 @@ struct TaskBoardView: View {
             ForEach(groupedByDate(), id: \.0) { (dateKey, group) in
                 Section {
                     ForEach(group) { staging in
-                        StagingCard(staging: staging, serverToday: serverToday)
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+                        StagingCard(
+                            staging: staging,
+                            serverToday: serverToday,
+                            onMilestoneToggle: { field, currentlyDone in
+                                await toggleMilestone(stagingId: staging.id, field: field, currentlyDone: currentlyDone)
+                            }
+                        )
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
                     }
                 } header: {
                     Text(dateKey).font(.caption).foregroundStyle(.secondary)
@@ -153,6 +159,49 @@ struct TaskBoardView: View {
             self.error = error.localizedDescription
         }
     }
+
+    fileprivate func toggleMilestone(stagingId: String, field: String, currentlyDone: Bool) async {
+        guard let token = auth.token else { return }
+        do {
+            _ = try await APIClient.shared.setMilestone(
+                stagingId: stagingId, field: field, done: !currentlyDone, token: token
+            )
+            await load()
+        } catch let APIError.badStatus(code, _) where code == 401 {
+            await auth.logout()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+}
+
+/// Milestone definitions kept alongside the view so the field→label mapping lives in one place.
+struct MilestoneDef {
+    let label: String
+    let field: String   // Zoho column name (must match server-side allowlist)
+}
+
+let MILESTONE_DEFS: [MilestoneDef] = [
+    MilestoneDef(label: "Design",  field: "Design_Items_Matched_Date"),
+    MilestoneDef(label: "Before",  field: "Before_Picture_Upload_Date"),
+    MilestoneDef(label: "After",   field: "After_Picture_Upload_Date"),
+    MilestoneDef(label: "Packing", field: "Staging_Accessories_Packing_Finish_Date"),
+    MilestoneDef(label: "Setup",   field: "Staging_Furniture_Design_Finish_Date"),
+    MilestoneDef(label: "WA",      field: "WhatsApp_Group_Created_Date"),
+]
+
+extension StagingMilestones {
+    func milestone(for field: String) -> Milestone {
+        switch field {
+        case "Design_Items_Matched_Date": return design
+        case "Before_Picture_Upload_Date": return before_pictures
+        case "After_Picture_Upload_Date": return after_pictures
+        case "Staging_Accessories_Packing_Finish_Date": return packing
+        case "Staging_Furniture_Design_Finish_Date": return setup
+        case "WhatsApp_Group_Created_Date": return whatsapp
+        default: return Milestone(done: false, date: nil)
+        }
+    }
 }
 
 // MARK: - Staging Card
@@ -160,7 +209,9 @@ struct TaskBoardView: View {
 private struct StagingCard: View {
     let staging: Staging
     let serverToday: String
+    let onMilestoneToggle: (String, Bool) async -> Void  // (field, currentlyDone)
     @State private var expanded = false
+    @State private var togglingField: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -256,12 +307,21 @@ private struct StagingCard: View {
     private var milestonesRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                MilestoneChip(label: "Design", m: staging.milestones.design)
-                MilestoneChip(label: "Before", m: staging.milestones.before_pictures)
-                MilestoneChip(label: "After", m: staging.milestones.after_pictures)
-                MilestoneChip(label: "Packing", m: staging.milestones.packing)
-                MilestoneChip(label: "Setup", m: staging.milestones.setup)
-                MilestoneChip(label: "WA", m: staging.milestones.whatsapp)
+                ForEach(MILESTONE_DEFS, id: \.field) { def in
+                    let m = staging.milestones.milestone(for: def.field)
+                    MilestoneChip(
+                        label: def.label,
+                        m: m,
+                        busy: togglingField == def.field,
+                        onTap: {
+                            Task {
+                                togglingField = def.field
+                                await onMilestoneToggle(def.field, m.done)
+                                togglingField = nil
+                            }
+                        }
+                    )
+                }
             }
         }
     }
@@ -340,17 +400,27 @@ private struct PeopleRow: View {
 private struct MilestoneChip: View {
     let label: String
     let m: Milestone
+    var busy: Bool = false
+    var onTap: (() -> Void)? = nil
     var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: m.done ? "checkmark.circle.fill" : "circle")
-                .font(.caption)
-            Text(label).font(.caption2)
-            if let d = m.date { Text(shortDate(d)).font(.caption2).foregroundStyle(.secondary) }
+        Button(action: { onTap?() }) {
+            HStack(spacing: 4) {
+                if busy {
+                    ProgressView().scaleEffect(0.6).frame(width: 12, height: 12)
+                } else {
+                    Image(systemName: m.done ? "checkmark.circle.fill" : "circle")
+                        .font(.caption)
+                }
+                Text(label).font(.caption2)
+                if let d = m.date { Text(shortDate(d)).font(.caption2).opacity(0.8) }
+            }
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(m.done ? Color.green.opacity(0.18) : Color(.tertiarySystemGroupedBackground))
+            .foregroundStyle(m.done ? Color.green : Color.secondary)
+            .clipShape(Capsule())
         }
-        .padding(.horizontal, 8).padding(.vertical, 4)
-        .background(m.done ? Color.green.opacity(0.18) : Color(.tertiarySystemGroupedBackground))
-        .foregroundStyle(m.done ? Color.green : Color.secondary)
-        .clipShape(Capsule())
+        .buttonStyle(.plain)
+        .disabled(busy || onTap == nil)
     }
 
     private func shortDate(_ iso: String) -> String {
