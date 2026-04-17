@@ -39,18 +39,6 @@ struct ItemsView: View {
             .onChange(of: search) { _, newValue in
                 if newValue.isEmpty { Task { await load() } }
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    if let u = auth.user {
-                        Text("\(u.first_name) · \(u.user_role)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Logout") { Task { await auth.logout() } }
-                }
-            }
             .task { await load() }
         }
     }

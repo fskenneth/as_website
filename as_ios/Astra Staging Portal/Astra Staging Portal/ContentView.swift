@@ -19,7 +19,7 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if auth.isSignedIn {
-                ItemsView()
+                MainTabView()
             } else {
                 LoginView()
             }

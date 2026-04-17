@@ -12,6 +12,17 @@ struct APIUser: Codable, Identifiable {
     let email: String
     let user_role: String
     let phone: String?
+
+    /// Tier for nav gating: execution (1) ⊂ manager (2) ⊂ owner (3).
+    var roleLevel: Int {
+        switch user_role.lowercased() {
+        case "owner", "admin": return 3
+        case "manager": return 2
+        default: return 1  // mover, stager, customer
+        }
+    }
+    var isManagerPlus: Bool { roleLevel >= 2 }
+    var isOwner: Bool { roleLevel >= 3 }
 }
 
 struct Item: Codable, Identifiable {
