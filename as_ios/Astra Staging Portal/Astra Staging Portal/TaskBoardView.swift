@@ -26,8 +26,7 @@ enum TaskPeriod: String, CaseIterable, Identifiable {
 
 struct TaskBoardView: View {
     @Environment(AuthStore.self) private var auth
-    // TODO: flip back to .upcoming once Staging_Report sync is refreshed (currently max 2025-07-15).
-    @State private var period: TaskPeriod = .past
+    @State private var period: TaskPeriod = .upcoming
     @State private var mine: Bool = false
     @State private var stagings: [Staging] = []
     @State private var isLoading = false

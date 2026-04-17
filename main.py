@@ -145,6 +145,45 @@ async def background_zoho_write_sync():
         except Exception as e:
             print(f"[Background Sync] Write error: {e}")
 
+
+async def background_multi_report_sync():
+    """
+    Scheduled sync for reports declared in config.SYNC_SCHEDULE.
+    Each report syncs on its own interval via incremental modified-since fetch.
+    Runs the check loop every 60 seconds; only the reports whose interval has
+    elapsed are actually synced.
+    """
+    from tools.zoho_sync.config import SYNC_SCHEDULE
+    # Track last sync time in memory (also persisted in sync_metadata per-report)
+    last_run: dict = {}
+    while True:
+        try:
+            await asyncio.sleep(60)
+            now = asyncio.get_event_loop().time()
+            due = []
+            for report_name, cfg in SYNC_SCHEDULE.items():
+                interval_min = cfg.get('interval_minutes', 0)
+                if interval_min <= 0:
+                    continue
+                prev = last_run.get(report_name, 0)
+                if (now - prev) >= interval_min * 60:
+                    due.append(report_name)
+
+            for report_name in due:
+                try:
+                    # sync_type='incremental' uses get_modified_records_since under the hood
+                    result = await sync_service.sync_report(report_name, sync_type='incremental')
+                    last_run[report_name] = asyncio.get_event_loop().time()
+                    n = result.get('records_synced', 0)
+                    if n > 0:
+                        print(f"[Multi Sync] {report_name}: {n} records")
+                except Exception as e:
+                    print(f"[Multi Sync] {report_name} error: {e}")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"[Multi Sync] Loop error: {e}")
+
 # Startup/shutdown events for Zoho Sync database
 @app.on_event("startup")
 async def startup():
@@ -155,11 +194,14 @@ async def startup():
     await write_service.init_tables()
 
     # Start background sync tasks
-    # Use page sync (0 API calls) instead of API-based read sync
+    # Page sync (0 API calls) for Item_Report via Playwright
     page_sync_task = asyncio.create_task(background_page_sync())
+    # Writes to Zoho via API (process pending edits)
     write_task = asyncio.create_task(background_zoho_write_sync())
-    _background_tasks.extend([page_sync_task, write_task])
-    print("[Background Sync] Started page sync (30s, 0 API calls) and write (30s) sync tasks")
+    # Multi-report incremental sync (Staging, Module, Area, Employee, Task, Quote)
+    multi_sync_task = asyncio.create_task(background_multi_report_sync())
+    _background_tasks.extend([page_sync_task, write_task, multi_sync_task])
+    print("[Background Sync] Started page sync (30s), write sync (30s), and multi-report sync (60s check) tasks")
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -334,17 +376,24 @@ def v1_tasks_board(request: Request, period: str = "upcoming", mine: str = "fals
     def fmt(d):  # MM/dd/yyyy to match DB format
         return d.strftime('%m/%d/%Y')
 
+    # ISO-shape expression so MM/dd/yyyy strings compare chronologically in SQL.
+    sql_iso = ("substr(Staging_Date, 7, 4) || '-' || "
+               "substr(Staging_Date, 1, 2) || '-' || substr(Staging_Date, 4, 2)")
+
     if period == "today":
         date_filter_sql = " AND (Staging_Date = ? OR Destaging_Date = ?)"
         date_params = [fmt(today), fmt(today)]
     elif period == "week":
         end = today + timedelta(days=6)
-        # Compare as date via substr rewrites — simpler to pull all upcoming and filter in Python
-        date_filter_sql = " AND Staging_Date != ''"
+        date_filter_sql = f" AND Staging_Date != '' AND {sql_iso} BETWEEN ? AND ?"
+        date_params = [today.isoformat(), end.isoformat()]
     elif period == "upcoming":
-        date_filter_sql = " AND Staging_Date != ''"
+        end = today + timedelta(days=60)
+        date_filter_sql = f" AND Staging_Date != '' AND {sql_iso} BETWEEN ? AND ?"
+        date_params = [today.isoformat(), end.isoformat()]
     elif period == "past":
-        date_filter_sql = " AND Staging_Date != ''"
+        date_filter_sql = f" AND Staging_Date != '' AND {sql_iso} < ?"
+        date_params = [today.isoformat()]
     elif period == "all":
         date_filter_sql = ""
     else:
@@ -354,6 +403,11 @@ def v1_tasks_board(request: Request, period: str = "upcoming", mine: str = "fals
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
+        # Staging_Date is stored as MM/dd/yyyy strings — build an ISO-shaped
+        # expression for correct chronological ordering.
+        iso_expr = ("substr(Staging_Date, 7, 4) || '-' || "
+                    "substr(Staging_Date, 1, 2) || '-' || substr(Staging_Date, 4, 2)")
+        order_dir = "ASC" if period in ("today", "week", "upcoming") else "DESC"
         query = f"""
             SELECT ID, Staging_Display_Name, Staging_Date, Destaging_Date,
                    Staging_Address, Occupancy_Type, Property_Type, Staging_Type, Staging_Status,
@@ -369,7 +423,10 @@ def v1_tasks_board(request: Request, period: str = "upcoming", mine: str = "fals
             FROM Staging_Report
             WHERE _sync_status != 'deleted'
             {date_filter_sql}
-            ORDER BY Staging_Date DESC, CAST(ID AS INTEGER) DESC
+            ORDER BY
+              CASE WHEN Staging_Date IS NULL OR Staging_Date = '' THEN 1 ELSE 0 END,
+              {iso_expr} {order_dir},
+              CAST(ID AS INTEGER) DESC
             LIMIT 500
         """
         rows = conn.execute(query, date_params).fetchall()

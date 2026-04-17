@@ -5,6 +5,7 @@ from .database import db
 from .zoho_api import zoho_api
 from .image_downloader import image_downloader
 from .image_url_processor import image_url_processor
+from .config import strip_excluded_columns
 from .utils import get_toronto_now, get_toronto_now_iso
 import logging
 
@@ -94,6 +95,9 @@ class SyncService:
                     "records_synced": 0,
                     "message": "No records to sync"
                 }
+
+            # Strip excluded columns (Table_Row_HTML cache, Employee PII, etc.)
+            records = strip_excluded_columns(records, report_name)
 
             # Get existing records for image comparison
             existing_records = {}
