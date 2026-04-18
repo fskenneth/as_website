@@ -39,12 +39,19 @@ def init_db():
             password_hash TEXT,
             user_role TEXT NOT NULL DEFAULT 'customer',
             google_id TEXT UNIQUE,
+            zoho_employee_id TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_login TIMESTAMP,
             is_active BOOLEAN DEFAULT 1
         )
     ''')
+
+    # Migration: add zoho_employee_id column for existing databases
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN zoho_employee_id TEXT')
+    except Exception:
+        pass  # Column already exists
 
     # Sessions table for managing login sessions
     cursor.execute('''

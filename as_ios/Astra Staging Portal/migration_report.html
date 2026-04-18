@@ -1,0 +1,2022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Astra Staging - Hybrid-First Strategy: Zoho Creator + New Website</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface-2: #1c2333;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-2: #bc8cff;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --orange: #db6d28;
+    --cyan: #39d2c0;
+    --pink: #f778ba;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 0;
+  }
+  .header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    padding: 60px 40px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at 30% 50%, rgba(88,166,255,0.08) 0%, transparent 50%),
+                radial-gradient(circle at 70% 50%, rgba(188,140,255,0.06) 0%, transparent 50%);
+  }
+  .header h1 { font-size: 2.4em; margin-bottom: 10px; position: relative; }
+  .header .subtitle { color: var(--text-muted); font-size: 1.1em; position: relative; }
+  .header .date { color: var(--accent); font-size: 0.9em; margin-top: 15px; position: relative; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 40px 24px; }
+
+  /* Navigation */
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 40px;
+  }
+  .toc h2 { color: var(--accent); margin-bottom: 20px; font-size: 1.3em; }
+  .toc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 8px;
+  }
+  .toc a {
+    color: var(--text);
+    text-decoration: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    display: block;
+    transition: all 0.15s;
+    font-size: 0.92em;
+  }
+  .toc a:hover { background: var(--surface-2); color: var(--accent); }
+  .toc .section-num { color: var(--accent-2); font-weight: 600; margin-right: 8px; }
+
+  /* Sections */
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 36px;
+    margin-bottom: 28px;
+  }
+  .section h2 {
+    color: var(--accent);
+    font-size: 1.5em;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section h3 {
+    color: var(--accent-2);
+    font-size: 1.15em;
+    margin: 24px 0 12px 0;
+  }
+  .section h4 {
+    color: var(--cyan);
+    font-size: 1em;
+    margin: 18px 0 8px 0;
+  }
+  p { margin-bottom: 12px; color: var(--text); }
+  .muted { color: var(--text-muted); }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 0.9em;
+  }
+  th {
+    background: var(--surface-2);
+    color: var(--accent);
+    padding: 12px 14px;
+    text-align: left;
+    border: 1px solid var(--border);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  td {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:hover td { background: rgba(88,166,255,0.04); }
+
+  /* Status badges */
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge-done { background: rgba(63,185,80,0.15); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+  .badge-partial { background: rgba(210,153,34,0.15); color: var(--yellow); border: 1px solid rgba(210,153,34,0.3); }
+  .badge-todo { background: rgba(248,81,73,0.15); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
+  .badge-info { background: rgba(88,166,255,0.15); color: var(--accent); border: 1px solid rgba(88,166,255,0.3); }
+  .badge-phase { background: rgba(188,140,255,0.15); color: var(--accent-2); border: 1px solid rgba(188,140,255,0.3); }
+  .badge-mobile { background: rgba(247,120,186,0.15); color: var(--pink); border: 1px solid rgba(247,120,186,0.3); }
+
+  /* Cards grid */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .card {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+  .card-title { color: var(--accent); font-weight: 600; margin-bottom: 8px; }
+  .card-num { font-size: 2em; font-weight: 700; color: var(--green); }
+  .card-label { color: var(--text-muted); font-size: 0.85em; }
+
+  /* Stats */
+  .stat-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+  }
+  .stat {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 24px;
+    text-align: center;
+    flex: 1;
+    min-width: 140px;
+  }
+  .stat-value { font-size: 2em; font-weight: 700; }
+  .stat-label { color: var(--text-muted); font-size: 0.82em; margin-top: 4px; }
+
+  /* Lists */
+  ul, ol { margin: 8px 0 12px 24px; }
+  li { margin-bottom: 6px; }
+  li strong { color: var(--cyan); }
+
+  /* Alert boxes */
+  .alert {
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin: 16px 0;
+    border-left: 4px solid;
+  }
+  .alert-info { background: rgba(88,166,255,0.08); border-color: var(--accent); }
+  .alert-warn { background: rgba(210,153,34,0.08); border-color: var(--yellow); }
+  .alert-success { background: rgba(63,185,80,0.08); border-color: var(--green); }
+  .alert-danger { background: rgba(248,81,73,0.08); border-color: var(--red); }
+  .alert-title { font-weight: 700; margin-bottom: 6px; }
+
+  /* Phase timeline */
+  .timeline { position: relative; padding-left: 32px; margin: 20px 0; }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 12px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+  .timeline-item {
+    position: relative;
+    margin-bottom: 28px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -26px;
+    top: 24px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: var(--bg);
+  }
+  .timeline-title { color: var(--accent); font-size: 1.15em; font-weight: 700; margin-bottom: 8px; }
+  .timeline-meta { color: var(--text-muted); font-size: 0.85em; margin-bottom: 12px; }
+
+  /* ER Diagram */
+  .er-box {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 8px 0;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.85em;
+    overflow-x: auto;
+  }
+  .er-title { color: var(--accent); font-weight: 700; font-size: 1em; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  .er-field { color: var(--text); padding: 2px 0; }
+  .er-pk { color: var(--yellow); }
+  .er-fk { color: var(--cyan); }
+  .er-type { color: var(--text-muted); }
+
+  /* Code */
+  code {
+    background: var(--surface-2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.88em;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    color: var(--cyan);
+  }
+
+  /* Collapsible */
+  details {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 12px 0;
+  }
+  summary {
+    padding: 14px 18px;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  summary:hover { color: var(--cyan); }
+  details > div { padding: 0 18px 18px; }
+  details[open] summary { border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .header { padding: 40px 20px; }
+    .header h1 { font-size: 1.6em; }
+    .section { padding: 20px; }
+    .toc-grid { grid-template-columns: 1fr; }
+    .card-grid { grid-template-columns: 1fr; }
+    .stat-row { flex-direction: column; }
+  }
+
+  /* Print */
+  @media print {
+    body { background: white; color: black; }
+    .section { border: 1px solid #ddd; break-inside: avoid; }
+    .header { background: #f5f5f5; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Hybrid-First Strategy</h1>
+  <div class="subtitle">Zoho Creator (Operations) + New Website (Customer &amp; Growth) &mdash; Selective Migration Over Time</div>
+  <div class="date">Generated: April 4, 2026 &nbsp;|&nbsp; Source: Staging_Manager.ds (35,522 lines)</div>
+</div>
+
+<div class="container">
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <div class="toc-grid">
+    <a href="#exec"><span class="section-num">1</span> Executive Summary &mdash; Hybrid-First Strategy</a>
+    <a href="#zoho-overview"><span class="section-num">2</span> Zoho Creator System Overview</a>
+    <a href="#zoho-forms"><span class="section-num">3</span> All Forms (Database Tables)</a>
+    <a href="#zoho-reports"><span class="section-num">4</span> All Reports &amp; Views</a>
+    <a href="#zoho-pages"><span class="section-num">5</span> All Pages &amp; UI</a>
+    <a href="#zoho-workflows"><span class="section-num">6</span> Workflows &amp; Automations</a>
+    <a href="#zoho-functions"><span class="section-num">7</span> Custom Functions (106)</a>
+    <a href="#zoho-scheduled"><span class="section-num">8</span> Scheduled Tasks</a>
+    <a href="#zoho-integrations"><span class="section-num">9</span> External Integrations</a>
+    <a href="#website-state"><span class="section-num">10</span> Current Website State</a>
+    <a href="#split"><span class="section-num">11</span> System Split: What Stays vs. What Moves</a>
+    <a href="#website-build"><span class="section-num">12</span> Website Build Plan (New Features)</a>
+    <a href="#phases"><span class="section-num">13</span> Hybrid Phases &amp; Selective Migration</a>
+    <a href="#mobile"><span class="section-num">14</span> Mobile App Strategy</a>
+    <a href="#architecture"><span class="section-num">15</span> Target Architecture (Hybrid)</a>
+    <a href="#risks"><span class="section-num">16</span> Risks, Triggers &amp; Recommendations</a>
+    <a href="#phase3-kickoff"><span class="section-num">17</span> Phase 3 Kickoff: iOS Hello World</a>
+  </div>
+</div>
+
+<!-- 1. EXECUTIVE SUMMARY -->
+<div class="section" id="exec">
+  <h2>1. Executive Summary &mdash; Hybrid-First Strategy</h2>
+
+  <div class="alert alert-success">
+    <div class="alert-title">Core Principle: Don't rebuild what works. Build what Zoho can't do.</div>
+    Keep Zoho Creator for battle-tested internal operations (time tracking, scanning, expenses, packing). Build the website for what it does better (customer experience, 3D design, instant quote, Stripe payments, SEO). Selectively migrate features from Zoho to the website only when there is a clear reason to &mdash; not on a predetermined schedule.
+  </div>
+
+  <p>The <strong>Staging Manager</strong> Zoho Creator application is a comprehensive operations platform with <strong>50+ forms</strong>, <strong>47 reports</strong>, <strong>32+ pages</strong>, <strong>106 custom functions</strong>, and <strong>6 scheduled tasks</strong>. Rebuilding all of this from scratch while running a business is high-risk and unnecessary. Instead, the hybrid-first approach splits ownership between the two systems based on what each does best.</p>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="stat-value" style="color:var(--accent)">50+</div>
+      <div class="stat-label">Zoho Forms (Tables)</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" style="color:var(--accent-2)">47</div>
+      <div class="stat-label">Reports / Views</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" style="color:var(--cyan)">106</div>
+      <div class="stat-label">Custom Functions</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" style="color:var(--green)">32+</div>
+      <div class="stat-label">Pages / Interfaces</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" style="color:var(--yellow)">6</div>
+      <div class="stat-label">Scheduled Tasks</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" style="color:var(--pink)">35,522</div>
+      <div class="stat-label">Lines of Deluge Code</div>
+    </div>
+  </div>
+
+  <h3>The Split at a Glance</h3>
+  <table>
+    <tr><th>Category</th><th style="min-width:160px">Owner</th><th>Rationale</th></tr>
+    <tr><td>Customer Quote &amp; Instant Pricing</td><td><span class="badge badge-done">Website</span></td><td>Already built and better than Zoho. 3D design + Stripe payments.</td></tr>
+    <tr><td>Customer Portal (Public)</td><td><span class="badge badge-done">Website</span></td><td>Better UX, SEO, mobile-responsive. Extend current portal.</td></tr>
+    <tr><td>3D Staging Design Studio</td><td><span class="badge badge-done">Website</span></td><td>900+ GLB models, Three.js rendering. Zoho can't do this.</td></tr>
+    <tr><td>User Auth &amp; Roles</td><td><span class="badge badge-done">Website</span></td><td>Google OAuth, Stripe, session auth already done.</td></tr>
+    <tr><td>Marketing (Blog, SEO, Gallery)</td><td><span class="badge badge-done">Website</span></td><td>25 city landing pages, 14 blog articles, Instagram feed.</td></tr>
+    <tr><td>Inventory Browsing &amp; 3D Models</td><td><span class="badge badge-done">Website</span> <span class="muted">synced from Zoho</span></td><td>Read-only sync works. Zoho remains source of truth for items.</td></tr>
+    <tr><td style="border-top: 2px solid var(--border)">Staging Operations (Full lifecycle)</td><td style="border-top: 2px solid var(--border)"><span class="badge badge-info">Zoho Creator</span></td><td style="border-top: 2px solid var(--border)">200+ fields, 11 sections, tested workflows. Too complex to rebuild now.</td></tr>
+    <tr><td>Employee Time Tracking</td><td><span class="badge badge-info">Zoho Creator</span></td><td>QR check-in/out, overtime calc, MPI &mdash; works today.</td></tr>
+    <tr><td>Expense Reporting</td><td><span class="badge badge-info">Zoho Creator</span></td><td>Receipt photo + camera capture works on Zoho mobile.</td></tr>
+    <tr><td>QR/Barcode Scanning</td><td><span class="badge badge-info">Zoho Creator</span></td><td>7 scan forms with native camera. Reliable, fast, offline-capable.</td></tr>
+    <tr><td>RFID Inventory</td><td><span class="badge badge-info">Zoho Creator</span></td><td>Dock management, bulk location update &mdash; specialized hardware workflow.</td></tr>
+    <tr><td>Packing Guide</td><td><span class="badge badge-info">Zoho Creator</span></td><td>Area-by-area lists, container assignment, dock selection &mdash; works.</td></tr>
+    <tr><td>Task Board</td><td><span class="badge badge-info">Zoho Creator</span></td><td>Daily task management with employee filters &mdash; works.</td></tr>
+    <tr><td>Staging Scheduling (30+ fields)</td><td><span class="badge badge-info">Zoho Creator</span></td><td>Complex module time calculations, mover/stager scheduling &mdash; works.</td></tr>
+    <tr><td>Invoice &amp; Payment (Internal)</td><td><span class="badge badge-info">Zoho Creator</span></td><td>HST calc, multi-method payment tracking, owing amounts &mdash; works.</td></tr>
+    <tr><td>Email Generator (Operational)</td><td><span class="badge badge-info">Zoho Creator</span></td><td>7 email types, CRM lookup, attachment support &mdash; works.</td></tr>
+    <tr><td>Staging Feedback</td><td><span class="badge badge-info">Zoho Creator</span></td><td>12-item checklist used on-site &mdash; works.</td></tr>
+    <tr><td>Zoho CRM Integration</td><td><span class="badge badge-info">Zoho Creator</span></td><td>Native Zoho-to-Zoho integration. No API limits internally.</td></tr>
+    <tr><td style="border-top: 2px solid var(--border)">Customer Email Automation</td><td style="border-top: 2px solid var(--border)"><span class="badge badge-partial">Build on Website</span></td><td style="border-top: 2px solid var(--border)">Confirmation, ETA, extension offers &mdash; better from branded domain.</td></tr>
+    <tr><td>Customer Portal (Extension/Destaging)</td><td><span class="badge badge-partial">Build on Website</span></td><td>Replace Zoho public portal links with website-native customer actions.</td></tr>
+    <tr><td>Invoice &amp; Deposit (Customer-Facing)</td><td><span class="badge badge-partial">Build on Website</span></td><td>Stripe already handles deposits. Add invoice viewing &amp; online payment.</td></tr>
+    <tr><td>Analytics Dashboard</td><td><span class="badge badge-partial">Build on Website</span></td><td>Cross-system data makes analytics better on the website.</td></tr>
+    <tr><td>Native Mobile App</td><td><span class="badge badge-partial">Build on Website</span></td><td>When ready, mobile app consumes website API. Can start before full migration.</td></tr>
+  </table>
+
+  <div class="alert alert-warn">
+    <div class="alert-title">The Sync Layer Is the Bridge</div>
+    The existing Playwright-based Zoho sync (30-second interval, 0 API calls) + write-back queue is the critical bridge between systems. Keep it running and robust. It lets the website read inventory data and push confirmed stagings back to Zoho. This bridge enables the hybrid approach and can be removed only when a feature is fully migrated.
+  </div>
+</div>
+
+<!-- 2. ZOHO CREATOR SYSTEM OVERVIEW -->
+<div class="section" id="zoho-overview">
+  <h2>2. Zoho Creator System Overview</h2>
+  <p>The Staging Manager application (zoho.com/astrastaging/staging-manager) is a complete business operations platform built on Zoho Creator. It manages the entire staging lifecycle from initial customer inquiry through staging execution, payment, and destaging.</p>
+
+  <h3>Application Configuration</h3>
+  <table>
+    <tr><th>Setting</th><th>Value</th></tr>
+    <tr><td>Application Name</td><td>Staging Manager</td></tr>
+    <tr><td>Date Format</td><td>MM/dd/yyyy</td></tr>
+    <tr><td>Time Zone</td><td>America/Toronto</td></tr>
+    <tr><td>Time Format</td><td>24-hour</td></tr>
+    <tr><td>Primary Language</td><td>Zoho Deluge Script</td></tr>
+  </table>
+
+  <h3>Core Business Entities &amp; Relationships</h3>
+  <div class="alert alert-info">
+    <div class="alert-title">Data Flow</div>
+    <code>Quote/Inquiry</code> &rarr; <code>Staging</code> &rarr; [<code>Area</code>, <code>Property_Image</code>, <code>Item_Position</code>, <code>Task</code>, <code>Module</code>] &rarr; [<code>Item</code>, <code>Location</code>, <code>Employee</code>]
+    <br><br>
+    <code>Employee</code> &rarr; [<code>Time_Tracker</code>, <code>Expense</code>, <code>Working_Time_Tracker</code>]
+    <br>
+    <code>Staging</code> &rarr; [<code>Payment</code>, <code>Staging_Invoice</code>, <code>Staging_Feedback</code>, <code>Email_Generator</code>]
+  </div>
+
+  <h3>Functional Areas</h3>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-title">Staging Lifecycle</div>
+      <p class="muted">Quote &rarr; Consultation &rarr; Design &rarr; Staging &rarr; Extension &rarr; Destaging. 200+ fields on the Staging form with 11 sections covering scheduling, payment, customer communication, and logistics.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Inventory Management</div>
+      <p class="muted">900+ furniture items with QR codes, barcodes, RFID tags. Real-time location tracking across warehouse &amp; properties. Rack assignment, dock management, and move history.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Employee Operations</div>
+      <p class="muted">Time tracking (check-in/out via QR), expense reporting with receipt photos, working hours calculation, payroll vs cash payment, duty-based assignment (stager/mover/manager).</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Customer Communication</div>
+      <p class="muted">7 email types (staging notification, payment, consultation, extension, destaging, ETA updates). Public customer portal for self-service actions. Zoho CRM lead integration.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Design &amp; Packing</div>
+      <p class="muted">Area-based design with item positions. Packing guide with container management (bags/bins). Before/after photo documentation. Design notes and seller to-do lists.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Financial Tracking</div>
+      <p class="muted">Invoice generation, HST calculation (13%), extension fees (50% discount), payment tracking (e-transfer, cheque, credit card, cash), deposit management, owing amounts.</p>
+    </div>
+  </div>
+</div>
+
+<!-- 3. ALL FORMS -->
+<div class="section" id="zoho-forms">
+  <h2>3. All Zoho Creator Forms (Database Tables)</h2>
+  <p>The application contains 50+ forms which serve as both the data schema and the user interface for CRUD operations. Each form maps to a database table in Zoho Creator.</p>
+
+  <h3>Core Business Forms</h3>
+  <table>
+    <tr><th>Form</th><th>Purpose</th><th>Key Fields</th><th>Relationships</th></tr>
+    <tr>
+      <td><strong>Staging</strong></td>
+      <td>Core staging project record. 200+ fields across 11 sections covering the complete lifecycle.</td>
+      <td>Staging_Status (Active/Inactive/Inquired), Staging_Type, Staging_Date, Destaging_Date, Staging_Term (30-360 days), all scheduling datetime fields, payment fields, customer info, design notes</td>
+      <td>Quote (bidirectional), Employee (stager, movers, consultation), Location (address), Area, Task, Module, Payment, Invoice, Feedback</td>
+    </tr>
+    <tr>
+      <td><strong>Quote</strong> <span class="muted">(display: "Inquiry")</span></td>
+      <td>Customer inquiry / quote. Captures initial staging request.</td>
+      <td>Customer_First/Last_Name, Email, Phone, Customer_Attributes, Staging_Address, Property_Type/Size, Occupied_or_Vacant, Owner_Type, When_to_Stage, Pets, Decor_Only, Staging_Areas (20 checkboxes), How_Did_You_Hear, Staging_Item_List, Seller_To_Do_List</td>
+      <td>Staging (bidirectional), Employee (assignee, consultation stager), Zoho CRM (leads)</td>
+    </tr>
+    <tr>
+      <td><strong>Item</strong></td>
+      <td>Core inventory item. Every piece of furniture/decor tracked individually.</td>
+      <td>Item_Index (auto from 1001), Item_Type (33 types), dimensions (W/H/D inches), Item_Size/Style/Color/Tone/Material, Model_3D, Barcode (unique QR), Rack, Current_Location, Move_Count, Select_Count, Last_Update_Date, Rentable, Product info</td>
+      <td>Location (current), Item (same_as), Item_Position, Barcode_Scan</td>
+    </tr>
+    <tr>
+      <td><strong>Area</strong></td>
+      <td>Room/area within a staging project. Groups item positions.</td>
+      <td>Area_Name (21 predefined areas), Area_Display_Name, Item_Features (size/style/color/tone/material), Floor (1st-3rd/Basement), Area_Images (1-4), Notes</td>
+      <td>Staging, Property_Image (4 images), Item_Position, Videos_and_Pictures</td>
+    </tr>
+    <tr>
+      <td><strong>Employee</strong></td>
+      <td>Staff records with roles, rates, and assignments.</td>
+      <td>First/Last_Name, User_Name, User_ID, Phone, Email, Hourly_Rate (CAD), Payment_Method (Payroll/Cash), Employee_Status (Active/Inactive), Duty (Staging/Moving/Manager), Uniform_Size, Wrike IDs, IP_Addresses</td>
+      <td>Staging (stager, movers), Quote (assignee), Task, Time_Tracker, Expense</td>
+    </tr>
+    <tr>
+      <td><strong>Location</strong></td>
+      <td>Warehouses, storage facilities, and staging properties.</td>
+      <td>Location_Type (Property/Storage/Scan), Location_Address</td>
+      <td>Staging (address), Item (current location), Inventory_Check, Scan forms</td>
+    </tr>
+  </table>
+
+  <h3>Operations &amp; Scheduling Forms</h3>
+  <table>
+    <tr><th>Form</th><th>Purpose</th><th>Key Fields</th></tr>
+    <tr>
+      <td><strong>Task</strong></td>
+      <td>Work tasks assigned to employees</td>
+      <td>Task_Type (Item Mgmt, Warehouse Mgmt, Furniture Design, Accessories Packing, Design &amp; Packing, Touchup), Staging ref, Start/Finish_Time, Assign_To (multi-employee), Task_Description</td>
+    </tr>
+    <tr>
+      <td><strong>Module</strong></td>
+      <td>Scheduled time blocks within a staging</td>
+      <td>Module_Type (Driving, Loading, Unloading, Furniture Design, Styling, etc.), Scheduled_Start/Finish_Time, Assign_To, Status tracking</td>
+    </tr>
+    <tr>
+      <td><strong>Item_Position</strong></td>
+      <td>Maps items to specific positions in staging areas</td>
+      <td>Area ref, Item_ID ref, Item_Name_and_Index, position within area</td>
+    </tr>
+  </table>
+
+  <h3>Employee &amp; Finance Forms</h3>
+  <table>
+    <tr><th>Form</th><th>Purpose</th><th>Key Fields</th></tr>
+    <tr>
+      <td><strong>Time_Tracker</strong></td>
+      <td>Employee shift tracking</td>
+      <td>Employee, Start/End_Time, Total_Seconds, Duration, Job_Type (AS/Offsite/CGS), Over_Time, Total_Item_Number, Deduct_Mins, Working_Mins, Mins_Per_Item</td>
+    </tr>
+    <tr>
+      <td><strong>Working_Time_Tracker</strong></td>
+      <td>Daily working hours</td>
+      <td>Employee work sessions with start/end, work type tracking</td>
+    </tr>
+    <tr>
+      <td><strong>Working_Time_Adjuster</strong></td>
+      <td>Manual time corrections</td>
+      <td>Employee, old/new times, adjustment reason</td>
+    </tr>
+    <tr>
+      <td><strong>Expense</strong></td>
+      <td>Employee expense claims</td>
+      <td>Employee, Expense_Date, Expense_Amount (CAD), Description, Receipt_Picture (camera)</td>
+    </tr>
+    <tr>
+      <td><strong>Payment</strong></td>
+      <td>Customer payments received</td>
+      <td>Staging ref, Customer_CRM, Paid_Date, Payment_Amount, Payment_Method (E-Transfer/Cheque/CC/Cash), Transaction_Number</td>
+    </tr>
+    <tr>
+      <td><strong>Staging_Invoice</strong></td>
+      <td>Invoice generation &amp; tracking</td>
+      <td>Staging ref, Bill_To, Invoice/Due_Date, Staging_Fee, 3 additional charge lines, Paid_Amount, Owing_Amount, Pay_by_Cash, Online_Payment_URL</td>
+    </tr>
+  </table>
+
+  <h3>Scanning &amp; Inventory Forms</h3>
+  <table>
+    <tr><th>Form</th><th>Purpose</th><th>Camera/Scanner Features</th></tr>
+    <tr><td><strong>Barcode_Scan</strong></td><td>Main QR/barcode scanner for item location updates</td><td>QR + barcode, auto-submit on scan, primary camera</td></tr>
+    <tr><td><strong>Check_Item</strong></td><td>Verify item details via QR scan</td><td>QR + barcode, camera primary</td></tr>
+    <tr><td><strong>Check_Item_by_QR_Code</strong></td><td>Full item check with photo, measurement, condition</td><td>Manual QR input + camera photo (mandatory)</td></tr>
+    <tr><td><strong>Check_Item_Scan</strong></td><td>Quick item scan with position assignment</td><td>QR + barcode, auto-submit</td></tr>
+    <tr><td><strong>Scan</strong></td><td>Generic scan form for warehouse operations</td><td>Camera-based scanning</td></tr>
+    <tr><td><strong>Update_Location</strong></td><td>Update item location via QR</td><td>QR + barcode, show on load, camera</td></tr>
+    <tr><td><strong>Inventory_Check</strong></td><td>RFID-based inventory audit</td><td>RFID file upload, scanned ID lists</td></tr>
+    <tr><td><strong>Manually_Update_Item_Location</strong></td><td>Manual location override</td><td>QR + camera required</td></tr>
+  </table>
+
+  <h3>Communication &amp; Customer Forms</h3>
+  <table>
+    <tr><th>Form</th><th>Purpose</th><th>Key Fields</th></tr>
+    <tr><td><strong>Email_Generator</strong></td><td>Central email hub for all customer communications</td><td>Email_Type (Staging/Payment Notification), To/CC/BCC, Subject, Body (richtext), Attachment</td></tr>
+    <tr><td><strong>Astra_Staging_Customer_Portal</strong></td><td>Public customer portal for staging/extension/destaging</td><td>Portal_Type, Staging ref, lockbox/access info, terms acknowledgment. <em>Does NOT store data</em></td></tr>
+    <tr><td><strong>Notify_Customer</strong></td><td>Customer notification management</td><td>Notification templates and tracking</td></tr>
+    <tr><td><strong>Staging_Feedback</strong></td><td>Post-staging satisfaction survey (12 items)</td><td>Photo, Furniture, Item_Accurate, Supplementary_Items, Furniture_Wrapped, Cleaning_Supplies, Moving_Difficulties, Property_Damage, Client_Happy (each Yes/No with notes)</td></tr>
+    <tr><td><strong>Astra_Staging_Survey</strong></td><td>Market research survey (1 per IP)</td><td>Name, Email, Phone, Actively_Using_Staging (Physical/Virtual/None)</td></tr>
+  </table>
+
+  <h3>Other Forms</h3>
+  <table>
+    <tr><th>Form</th><th>Purpose</th></tr>
+    <tr><td>Property_Image</td><td>Property photos (camera capture, 4:3 aspect, linked to Staging + Area)</td></tr>
+    <tr><td>Videos_and_Pictures</td><td>Media library for staging projects</td></tr>
+    <tr><td>Damaged_Item</td><td>Damaged item documentation (photo + cause/suggestion)</td></tr>
+    <tr><td>Packing_Guide_Selector</td><td>Packing guide configuration and selection</td></tr>
+    <tr><td>Staging_Settings</td><td>Application settings (image files, display options, email preferences)</td></tr>
+    <tr><td>Scan_Settings</td><td>Scanner configuration (location, mode, rack)</td></tr>
+    <tr><td>RFID_Settings</td><td>RFID dock configuration (Dock 1/2 status, last scan time)</td></tr>
+    <tr><td>Logging</td><td>System audit logging</td></tr>
+    <tr><td>Rentable_Item</td><td>Items available for rental (product info for WooCommerce)</td></tr>
+    <tr><td>Rental_Order_Handler</td><td>Rental order processing and shipping</td></tr>
+    <tr><td>Interview_Questionnaire</td><td>Employee interview forms (ID photo, resume, questions)</td></tr>
+    <tr><td>Staging_Property_Image_Taking</td><td>Guided property photo workflow (select area, take 4 photos)</td></tr>
+    <tr><td>Item_HTML_Update</td><td>Batch HTML refresh trigger (staging boards + item images)</td></tr>
+    <tr><td>Item_List_Filter</td><td>Dynamic inventory filtering interface</td></tr>
+    <tr><td>Item_Picture_and_Size</td><td>Item photo and dimension management</td></tr>
+    <tr><td>Service_Payment_Selector</td><td>Service payment type selection</td></tr>
+    <tr><td>Zapier_Item_Updater / ZapierRfidUpdateHandler</td><td>External integration handlers (Zapier webhooks)</td></tr>
+  </table>
+</div>
+
+<!-- 4. REPORTS -->
+<div class="section" id="zoho-reports">
+  <h2>4. All Reports &amp; Views (47)</h2>
+  <p>Reports in Zoho Creator serve as database views / query interfaces. Each report has configurable columns, sorting, filtering, aggregations, and context menus (edit, duplicate, delete).</p>
+
+  <h3>Core Reports</h3>
+  <table>
+    <tr><th>Report</th><th>Table</th><th>Key Columns</th><th>Aggregations</th></tr>
+    <tr><td>Staging_Report</td><td>Staging</td><td>80+ columns: dates, costs, employees, customer info, scheduling</td><td>Total &amp; Average on Total_Amount, Paid_Amount</td></tr>
+    <tr><td>Item_Report</td><td>Item</td><td>40+ columns: images, type, barcode, location, dimensions, rental info</td><td>&mdash;</td></tr>
+    <tr><td>Employee_Report</td><td>Employee</td><td>18 columns: name, contact, rate, status, duty, Wrike IDs</td><td>&mdash;</td></tr>
+    <tr><td>All_Quotes / Inquiry_Report</td><td>Quote</td><td>Customer info, property, staging areas, consultation status</td><td>&mdash;</td></tr>
+    <tr><td>Payment_Report</td><td>Payment</td><td>Staging, CRM, amount, method, transaction, date</td><td>&mdash;</td></tr>
+    <tr><td>Time_Tracker_Report</td><td>Time_Tracker</td><td>Employee, times, duration, job type, items, MPI, overtime</td><td>&mdash;</td></tr>
+    <tr><td>All_Expenses</td><td>Expense</td><td>Employee, receipt, amount, description, date</td><td>&mdash;</td></tr>
+    <tr><td>Area_Report</td><td>Area</td><td>Names, display names, staging, images, notes</td><td>&mdash;</td></tr>
+    <tr><td>Location_Report</td><td>Location</td><td>Address, type, user tracking</td><td>&mdash;</td></tr>
+  </table>
+
+  <h3>Operational Reports</h3>
+  <table>
+    <tr><th>Report</th><th>Purpose</th></tr>
+    <tr><td>Staging_Invoice_Report</td><td>Invoice history with dates, fees, paid/owing amounts, online payment URLs</td></tr>
+    <tr><td>Email_Generator_Report</td><td>Email send log (type, recipients, subject, body, attachments)</td></tr>
+    <tr><td>Barcode_Scan_Report</td><td>Barcode scan history with item position and location data</td></tr>
+    <tr><td>Check_Item_Scan_Report</td><td>Item verification scan results</td></tr>
+    <tr><td>Update_Location_Scan_Report</td><td>Location update scans with RFID tracking</td></tr>
+    <tr><td>Inventory_Check_Report</td><td>RFID audit results: scanned/existing/missing/added items</td></tr>
+    <tr><td>Damaged_Item_Report</td><td>Damaged item documentation</td></tr>
+    <tr><td>All_Tasks</td><td>Task list with type, staging, assignees, times</td></tr>
+    <tr><td>All_Staging_Feedback</td><td>Post-staging feedback collection</td></tr>
+    <tr><td>All_Working_Time_Adjusters</td><td>Time adjustment records (old/new values)</td></tr>
+    <tr><td>All_Notifications / All_Customer_Notifications</td><td>System and customer notification logs</td></tr>
+    <tr><td>All_Rentable_Items</td><td>Rental inventory with product/pricing info</td></tr>
+    <tr><td>All_Rental_Order_Handlers</td><td>Rental order processing</td></tr>
+    <tr><td>Item_Picture_and_Size_Report</td><td>Item photos and dimensions</td></tr>
+    <tr><td>Property_Image_Report</td><td>Property photos and metadata</td></tr>
+    <tr><td>Item_Report_Export / Item_Report_Sync</td><td>Export and sync tracking for items</td></tr>
+    <tr><td>Logging_Report</td><td>System activity logs</td></tr>
+    <tr><td>Inquiry_Cards</td><td>Card view of inquiries</td></tr>
+  </table>
+</div>
+
+<!-- 5. PAGES -->
+<div class="section" id="zoho-pages">
+  <h2>5. All Pages &amp; UI Interfaces (32+)</h2>
+  <p>Pages in Zoho Creator are custom HTML/ZML interfaces that combine multiple forms, reports, and custom logic into unified views. These are the primary interfaces employees interact with daily.</p>
+
+  <h3>Dashboard &amp; Task Pages</h3>
+  <table>
+    <tr><th>Page</th><th>Purpose</th><th>Key Parameters/Features</th></tr>
+    <tr><td><strong>Staging_Task_Board</strong></td><td>Primary daily task management. Shows staging/consultation/non-staging tasks for selected employee and date.</td><td>Employee filter, date filter, display mode (mobile/desktop), task type filter</td></tr>
+    <tr><td><strong>Daily_Task_Board</strong></td><td>Simplified daily view of all tasks</td><td>Date-filtered task cards</td></tr>
+    <tr><td><strong>Staging_Management</strong></td><td>Main staging management dashboard. Lists all active stagings with status, dates, and actions.</td><td>Status filtering, quick edit links, payment status indicators</td></tr>
+    <tr><td><strong>Staging_Analytics_Page</strong></td><td>Business analytics and metrics</td><td>Staging metrics, financial summaries</td></tr>
+  </table>
+
+  <h3>Staging Operations Pages</h3>
+  <table>
+    <tr><th>Page</th><th>Purpose</th><th>Key Parameters/Features</th></tr>
+    <tr><td><strong>Staging_Design</strong></td><td>Interactive staging design interface for stagers. Select items by area, manage item positions.</td><td>area_id, staging_id, item_id, item_position_id, size/style/color/tone/material filters, display mode, delete actions</td></tr>
+    <tr><td><strong>Astra_Staging_Design</strong></td><td>Astra-specific design view</td><td>Similar to Staging_Design with Astra branding</td></tr>
+    <tr><td><strong>Packing_Guide_Page</strong></td><td>Packing instructions for movers. Shows what items to pack per area, with loading order and dock assignment.</td><td>Staging selection, loading times, dock (1/2), area-by-area packing lists</td></tr>
+    <tr><td><strong>Staging_Setup_Guide</strong></td><td>Step-by-step setup instructions for stagers at the property</td><td>Area layouts, item placement instructions</td></tr>
+    <tr><td><strong>Staging_Videos_and_Pictures</strong></td><td>Media gallery for staging documentation</td><td>Photo/video display per staging</td></tr>
+    <tr><td><strong>After_Staging_Pictures</strong></td><td>Post-staging photo review</td><td>Before/after comparison</td></tr>
+    <tr><td><strong>Staging_Invoice_Page</strong></td><td>Invoice display and generation</td><td>Invoice rendering with customer/payment details</td></tr>
+    <tr><td><strong>Consultation_Report</strong></td><td>Consultation summary for stagers</td><td>Customer info, property details, notes, follow-ups</td></tr>
+  </table>
+
+  <h3>Inventory &amp; Item Pages</h3>
+  <table>
+    <tr><th>Page</th><th>Purpose</th><th>Key Parameters/Features</th></tr>
+    <tr><td><strong>Inventory_Management</strong></td><td>Warehouse inventory overview dashboard</td><td>Item counts, location summaries</td></tr>
+    <tr><td><strong>Item_Management_Filter_Page</strong></td><td>Advanced item filtering &amp; search</td><td>Multi-filter (type, size, style, color, location, availability)</td></tr>
+    <tr><td><strong>Item_Select_Page</strong></td><td>Item selection for staging area positions</td><td>item_position_id, filtered item grid</td></tr>
+    <tr><td><strong>Item_Flow</strong></td><td>Item movement workflow tracking</td><td>Movement history, current locations</td></tr>
+    <tr><td><strong>Inventory_Update_Page</strong></td><td>Bulk inventory updates</td><td>RFID scan results processing</td></tr>
+    <tr><td><strong>Image_Display_Page</strong></td><td>Item image gallery</td><td>Image zoom, multiple views</td></tr>
+  </table>
+
+  <h3>Payment &amp; Employee Pages</h3>
+  <table>
+    <tr><th>Page</th><th>Purpose</th></tr>
+    <tr><td><strong>Service_Payment_Page</strong></td><td>Individual employee payment history</td></tr>
+    <tr><td><strong>All_Service_Payment_Page</strong></td><td>All employee payment summaries</td></tr>
+    <tr><td><strong>All_Expenses_Payment_Page</strong></td><td>Expense payment tracking and approval</td></tr>
+    <tr><td><strong>Mover_Time_Table</strong></td><td>Mover schedule and working hours table</td></tr>
+    <tr><td><strong>Off_Days_Tracking_Page</strong></td><td>Employee time-off tracking</td></tr>
+  </table>
+
+  <h3>Customer &amp; Public Pages</h3>
+  <table>
+    <tr><th>Page</th><th>Purpose</th></tr>
+    <tr><td><strong>Astra_Staging</strong></td><td>Main customer-facing portal page</td></tr>
+    <tr><td><strong>Astra_Staging_Quote</strong></td><td>Quote presentation for customers</td></tr>
+    <tr><td><strong>Shopping</strong></td><td>Item browsing / catalog interface</td></tr>
+    <tr><td><strong>Unsubscribe_Page</strong></td><td>Email unsubscribe management</td></tr>
+  </table>
+</div>
+
+<!-- 6. WORKFLOWS -->
+<div class="section" id="zoho-workflows">
+  <h2>6. Workflows &amp; Automations</h2>
+  <p>Zoho Creator workflows are event-driven automations that fire on record creation, editing, deletion, or field changes. These contain the core business logic of the application.</p>
+
+  <h3>Staging Lifecycle Workflows</h3>
+
+  <details>
+    <summary>Quote &rarr; Staging Conversion (On Add Load)</summary>
+    <div>
+      <p>When a new Staging record is created with a Quote reference:</p>
+      <ul>
+        <li>Sets Staging_Status = "Inquired"</li>
+        <li>Copies from Quote: Customer_CRM, customer details, Staging_Term, Initial_Staging_Fee, Photography_Fee, Property_Type, Occupancy_Type, Staging_Item_List, Seller_To_Do_List</li>
+        <li>Links bidirectionally: Quote.Staging = new Staging ID</li>
+      </ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>Staging Status Change &rarr; Item Movement (On User Input)</summary>
+    <div>
+      <p>When Staging_Status changes to "Inactive":</p>
+      <ul>
+        <li>Finds ALL items at the staging address</li>
+        <li>Moves each item back to storage via <code>updateItemCurrentLocationByDirection(item.ID, "in", "Staging Inactive")</code></li>
+        <li>Updates item move counts and location history</li>
+      </ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>Staging Deletion &rarr; Cascade Delete</summary>
+    <div>
+      <p>When Delete_Staging is checked or staging record deleted:</p>
+      <ul>
+        <li>Deletes all Property_Image records for this staging</li>
+        <li>Deletes all Item_Position records</li>
+        <li>Deletes all Area records</li>
+        <li>Deletes the Staging record</li>
+      </ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>Finish Destaging &rarr; Return All Items to Storage</summary>
+    <div>
+      <p>When Finish_Destaging is checked:</p>
+      <ul>
+        <li>Finds all items currently at the staging address</li>
+        <li>Moves each back to storage with <code>"Destaging Finish + timestamp"</code></li>
+        <li>Updates item location history</li>
+      </ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>HST &amp; Fee Calculation (On User Input of Pay_by_Cash)</summary>
+    <div>
+      <p>Dynamic fee recalculation:</p>
+      <ul>
+        <li>If Total_Staging_Fee &lt; $3: No HST, Total = Staging Fee</li>
+        <li>If Pay_by_Cash: HST = 0</li>
+        <li>Otherwise: HST = Total_Staging_Fee &times; 0.13 (13%)</li>
+        <li>Total_Amount = Total_Staging_Fee + HST</li>
+        <li>Owing_Amount = Total_Amount - Paid_Amount (summed from all Payment records)</li>
+      </ul>
+    </div>
+  </details>
+
+  <h3>Area &amp; Design Workflows</h3>
+
+  <details>
+    <summary>Area Creation &rarr; Auto-Generate Item Positions</summary>
+    <div>
+      <p>When a new Area is added to a staging:</p>
+      <ul>
+        <li>Calls <code>createItemPositionList(area_id)</code></li>
+        <li>Generates placeholder Item_Position records based on area type (e.g., Living Room gets: Sofa, Coffee Table, 2x Accent Chair, End Table, Floor Lamp, etc.)</li>
+        <li>Each position has: Item name, area reference, staging reference</li>
+      </ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>Area Name Change &rarr; Rebuild Positions</summary>
+    <div>
+      <p>When Area_Name is changed on edit:</p>
+      <ul>
+        <li>Deletes ALL existing Item_Position records for this area</li>
+        <li>Creates new positions based on the new area type</li>
+        <li>Updates all position display names</li>
+      </ul>
+    </div>
+  </details>
+
+  <h3>Barcode Scan Workflows</h3>
+
+  <details>
+    <summary>Barcode Scan &rarr; Item Location Update or Check</summary>
+    <div>
+      <p>When barcode scanned (auto-submits):</p>
+      <ul>
+        <li><strong>2-char barcode (Rack):</strong> Sets scan setting rack number, switches to storage location</li>
+        <li><strong>BAG/BIN prefix:</strong> Displays container info (floor + area)</li>
+        <li><strong>Item barcode:</strong> Based on Scan_Mode:
+          <ul>
+            <li><em>"Update Location"</em>: Updates Item.Current_Location, assigns rack, increments Move_Count, assigns to matching Item_Position if at a staging property</li>
+            <li><em>"Check Item"</em>: Opens item detail page for viewing</li>
+          </ul>
+        </li>
+        <li>Deletes the scan record after processing (transient)</li>
+      </ul>
+    </div>
+  </details>
+
+  <h3>Invoice &amp; Email Workflows</h3>
+
+  <details>
+    <summary>Invoice Auto-Population (On Add Load)</summary>
+    <div>
+      <p>When creating a new Staging_Invoice:</p>
+      <ul>
+        <li>Invoice_Date = today</li>
+        <li>Due_Date = Staging_Date (or today if past)</li>
+        <li>Staging_Fee = Initial_Staging_Fee</li>
+        <li>Charge_1: Extension fees (if &gt; 0)</li>
+        <li>Charge_2: Photography fees (if &gt; 0)</li>
+        <li>Charge_3: Moving fees (if &gt; 0)</li>
+        <li>Paid_Amount, Pay_by_Cash from Staging</li>
+      </ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>Email Generator &rarr; Send &amp; Track (On Success)</summary>
+    <div>
+      <p>When Email_Generator form submitted:</p>
+      <ul>
+        <li>On Load: Fetches customer email from Zoho CRM (500/day limit), populates email template based on type</li>
+        <li>On Success: Sends email via <code>sendmail</code> with To/CC/BCC/attachments</li>
+        <li>If "Payment Notification": Sets Staging.Invoice_Sent_Date = today</li>
+        <li>Always BCCs sales@astrastaging.com</li>
+        <li>Updates staging table HTML for display</li>
+      </ul>
+    </div>
+  </details>
+
+  <h3>Customer Portal Workflows</h3>
+
+  <details>
+    <summary>Customer Portal &rarr; Dynamic Content Generation</summary>
+    <div>
+      <p>The most complex workflow. Based on Portal_Type:</p>
+      <ul>
+        <li><strong>Staging:</strong> Shows terms, staging item list, rental period, extension offers, destaging info. Generates HTML email with portal button link.</li>
+        <li><strong>Extension:</strong> Offers 50% discount on renewal. Portal button for customer to accept/decline.</li>
+        <li><strong>Destaging:</strong> Requests destaging confirmation and access information. Marks as "*Action Required*" in email.</li>
+      </ul>
+      <p>Portal URL format: <code>https://creatorapp.zohopublic.com/astrastaging/staging-manager/form-perma/Astra_Staging_Customer_Portal/[PUBLIC_ID]?Staging=[id]&amp;Portal_Type=[type]</code></p>
+    </div>
+  </details>
+
+  <h3>RFID &amp; Inventory Workflows</h3>
+
+  <details>
+    <summary>RFID Scan &rarr; Bulk Location Update + Email</summary>
+    <div>
+      <p>When Inventory_Check record created:</p>
+      <ul>
+        <li>Calls <code>updateItemCurrentLocationRfidScan()</code> to process all scanned RFID tags</li>
+        <li>Matches tags to items, updates locations</li>
+        <li>Sends email to scan@astrastaging.com with scan summary and link to Inventory_Update_Page</li>
+      </ul>
+    </div>
+  </details>
+</div>
+
+<!-- 7. CUSTOM FUNCTIONS -->
+<div class="section" id="zoho-functions">
+  <h2>7. Custom Functions (106 Total)</h2>
+  <p>These Deluge functions contain the reusable business logic of the application. Each must be reimplemented as Python functions in the new website.</p>
+
+  <h3>Integer Functions (13)</h3>
+  <table>
+    <tr><th>Function</th><th>Purpose</th></tr>
+    <tr><td><code>getFilterID()</code></td><td>Get current item list filter ID</td></tr>
+    <tr><td><code>getMissingLocationID()</code></td><td>Get ID for "Missing" location</td></tr>
+    <tr><td><code>getNotInWarehouseID()</code></td><td>Get ID for items not in warehouse</td></tr>
+    <tr><td><code>getScanSettingsID()</code></td><td>Get current scan settings record ID</td></tr>
+    <tr><td><code>getStagingSettingsID()</code></td><td>Get staging settings record ID</td></tr>
+    <tr><td><code>getStorageID()</code></td><td>Get default storage/warehouse location ID</td></tr>
+    <tr><td><code>getRfidSettingsId()</code></td><td>Get RFID settings record ID</td></tr>
+    <tr><td><code>getNextAvailableItem(staging_id, item_name)</code></td><td>Find next available item of type for staging</td></tr>
+    <tr><td><code>getStagingEstimatedCost(...)</code></td><td>Calculate staging cost based on areas, property type, size, occupancy, decor_only</td></tr>
+    <tr><td><code>getTimeDifferenceInSeconds(start, end)</code></td><td>Calculate seconds between two timestamps</td></tr>
+    <tr><td><code>getTotalWorkingHours(employee_id)</code></td><td>Sum total hours for employee</td></tr>
+    <tr><td><code>timeToSeconds(date)</code></td><td>Convert time to seconds since midnight</td></tr>
+  </table>
+
+  <h3>String Functions (23)</h3>
+  <table>
+    <tr><th>Function</th><th>Purpose</th></tr>
+    <tr><td><code>displayTime(seconds)</code></td><td>Format seconds to human-readable duration</td></tr>
+    <tr><td><code>formatNumber(number)</code></td><td>Format number with commas and 2 decimals</td></tr>
+    <tr><td><code>getItemPositionHtml(id)</code></td><td>Generate HTML for item position display</td></tr>
+    <tr><td><code>getItemScanInfo(item_id)</code></td><td>Get item details for scan display</td></tr>
+    <tr><td><code>getNextAreaDisplayName(staging_id, area_name)</code></td><td>Generate next area display name (auto-increment)</td></tr>
+    <tr><td><code>getPaymentNotificationEmail(staging_id)</code></td><td>Generate payment invoice email HTML</td></tr>
+    <tr><td><code>getPackingGuideMsg(employee_id, staging_type)</code></td><td>Generate packing guide content for employee</td></tr>
+    <tr><td><code>getScheduleHtml(staging_id, type)</code></td><td>Generate schedule HTML for staging/destaging</td></tr>
+    <tr><td><code>getTotalWorkingTime(employee_id, date, offsite)</code></td><td>Calculate daily working time for employee</td></tr>
+    <tr><td><code>getSalesEmailList()</code></td><td>Get comma-separated sales team emails</td></tr>
+    <tr><td><code>getContainerList(staging_id)</code></td><td>Get bag/bin container list for staging</td></tr>
+    <tr><td><code>getContainerType(item_name)</code></td><td>Determine if item goes in bag or bin</td></tr>
+    <tr><td><code>getWooCategoryID(item_name)</code></td><td>Map item type to WooCommerce category</td></tr>
+    <tr><td><code>getTimeMsg(employee_id)</code></td><td>Get time tracking message for employee</td></tr>
+  </table>
+
+  <h3>Void Functions (63) - Key Operations</h3>
+  <table>
+    <tr><th>Category</th><th>Functions</th></tr>
+    <tr>
+      <td><strong>Item Management</strong></td>
+      <td><code>createItemPosition</code>, <code>createItemPositionList</code>, <code>createItemPositions</code>, <code>assignItemToItemPosition</code>, <code>autoSelectItemInItemPosition</code>, <code>autoSelectItemInArea</code>, <code>updateItemInItemPosition</code>, <code>removeUnscannedItemsByName</code>, <code>removeUnscannedItemsFromRack</code>, <code>copyItem</code>, <code>duplicateItem</code>, <code>duplicateItemPosition</code></td>
+    </tr>
+    <tr>
+      <td><strong>Area Management</strong></td>
+      <td><code>createArea</code>, <code>createAreaList</code>, <code>createAreas</code>, <code>updateAreaItemFeatures</code></td>
+    </tr>
+    <tr>
+      <td><strong>Location Tracking</strong></td>
+      <td><code>updateItemCurrentLocation</code>, <code>updateItemCurrentLocationByDirection</code>, <code>updateItemCurrentLocationRfidScan</code>, <code>updateLocationScan</code>, <code>updateItemCountInWarehouse</code></td>
+    </tr>
+    <tr>
+      <td><strong>Image Processing</strong></td>
+      <td><code>bulkResizeItemImage</code>, <code>updateResizedImage</code>, <code>updateResizedPropertyImage</code>, <code>assignImageToStaging</code></td>
+    </tr>
+    <tr>
+      <td><strong>Staging Operations</strong></td>
+      <td><code>nextStepStagingSetup</code>, <code>updateStagingTableRowHtml</code>, <code>updateStagingPaymentAmount</code>, <code>updateStagingFieldtoToday</code>, <code>updateModules</code>, <code>updateModuleTableRowHtml</code>, <code>updateModuleTime</code>, <code>deleteAllItemPositionsFromInactiveStagings</code></td>
+    </tr>
+    <tr>
+      <td><strong>RFID / External</strong></td>
+      <td><code>updateRfidGoogle</code>, <code>updateRfidSqlServer</code>, <code>updateRentableItemOnWebsite</code></td>
+    </tr>
+    <tr>
+      <td><strong>Utilities</strong></td>
+      <td><code>log</code>, <code>notify</code>, <code>clearRecords</code>, <code>formatItemIndexName</code>, <code>checkUnclickedButtons</code>, <code>updateTaskTableRowHtml</code>, <code>addPastWeekHalfDayHours</code></td>
+    </tr>
+  </table>
+
+  <h3>List Functions (6)</h3>
+  <table>
+    <tr><th>Function</th><th>Purpose</th></tr>
+    <tr><td><code>filterItemByFilter()</code></td><td>Apply user-defined filters to item list</td></tr>
+    <tr><td><code>getAreaList()</code></td><td>Retrieve areas for staging</td></tr>
+    <tr><td><code>getItemList(category, area)</code></td><td>Filtered item list by category and area</td></tr>
+    <tr><td><code>getItemNumberList(area_name)</code></td><td>Get item count per area type</td></tr>
+    <tr><td><code>getItemIdListByFeatures(...)</code></td><td>Find items matching location, name, options, features, warehouse status</td></tr>
+    <tr><td><code>listContains(filter, items, relation)</code></td><td>Check list membership with AND/OR logic</td></tr>
+  </table>
+</div>
+
+<!-- 8. SCHEDULED TASKS -->
+<div class="section" id="zoho-scheduled">
+  <h2>8. Scheduled Tasks (6)</h2>
+
+  <table>
+    <tr><th>Task</th><th>Schedule</th><th>Status</th><th>Action</th></tr>
+    <tr>
+      <td><strong>Daily_Update_Task_Board</strong></td>
+      <td>Daily at 00:00</td>
+      <td><span class="badge badge-done">Active</span></td>
+      <td>Regenerates all staging task board HTML displays (<code>bulkUpdateStagingTaskBoardHTML()</code>)</td>
+    </tr>
+    <tr>
+      <td><strong>Daily_Notify_Staging</strong></td>
+      <td>Daily at 08:30</td>
+      <td><span class="badge badge-done">Active</span></td>
+      <td>Emails customers whose staging date is today. "Astra Staging Preparation in Progress [address]". Maps movers/stagers by name.</td>
+    </tr>
+    <tr>
+      <td><strong>Notify_Unclicked_Buttons</strong></td>
+      <td>Daily at 21:00</td>
+      <td><span class="badge badge-done">Active</span></td>
+      <td>Checks for customers who haven't responded to portal action buttons. Sends reminder notifications.</td>
+    </tr>
+    <tr>
+      <td><strong>Weekly_Clear_Records</strong></td>
+      <td>Weekly (Sunday 00:00)</td>
+      <td><span class="badge badge-done">Active</span></td>
+      <td>Cleans up temporary records and logging data (<code>clearRecords()</code>)</td>
+    </tr>
+    <tr>
+      <td><strong>Send_Attachment_When_Add</strong></td>
+      <td>On Email_Generator record add</td>
+      <td><span class="badge badge-partial">Inactive</span></td>
+      <td>Auto-sends email with attachment after Email_Generator record creation</td>
+    </tr>
+    <tr>
+      <td><strong>Weekly_Payment_Email</strong></td>
+      <td>Weekly (Monday 10:00)</td>
+      <td><span class="badge badge-partial">Inactive</span></td>
+      <td>Sends weekly payment summary to contractors</td>
+    </tr>
+  </table>
+
+  <div class="alert alert-info">
+    <div class="alert-title">Migration Approach</div>
+    These scheduled tasks will be implemented as Python background tasks using <code>asyncio</code> or a task scheduler like <code>APScheduler</code>. The daily staging notification and unclicked button checker are customer-facing and should be migrated first.
+  </div>
+</div>
+
+<!-- 9. INTEGRATIONS -->
+<div class="section" id="zoho-integrations">
+  <h2>9. External Integrations</h2>
+
+  <table>
+    <tr><th>Integration</th><th>Current (Zoho)</th><th>New Website Approach</th><th>Priority</th></tr>
+    <tr>
+      <td><strong>Zoho CRM</strong></td>
+      <td>Lead search/create/update via <code>zoho.crm.getRecordById()</code>. 500 API calls/day limit.</td>
+      <td>Continue using Zoho CRM API, or migrate leads to local SQLite/PostgreSQL as CRM replacement</td>
+      <td><span class="badge badge-phase">Phase 3</span></td>
+    </tr>
+    <tr>
+      <td><strong>Email (sendmail)</strong></td>
+      <td>Zoho built-in sendmail with from/to/cc/bcc/attachments</td>
+      <td>Already using Mailgun. Expand to support all 7 email types with HTML templates.</td>
+      <td><span class="badge badge-phase">Phase 2</span></td>
+    </tr>
+    <tr>
+      <td><strong>Stripe</strong></td>
+      <td>Not in Zoho (payments via e-transfer/cheque/credit card/cash)</td>
+      <td>Already integrated. Expand to full payment tracking matching Zoho's Payment form.</td>
+      <td><span class="badge badge-done">Done</span></td>
+    </tr>
+    <tr>
+      <td><strong>Google Drive</strong></td>
+      <td>RFID file sync via Google Drive API (<code>updateRfidGoogle()</code>)</td>
+      <td>Direct RFID file processing in Python, optional Google Drive backup</td>
+      <td><span class="badge badge-phase">Phase 4</span></td>
+    </tr>
+    <tr>
+      <td><strong>Wrike</strong></td>
+      <td>Employee Wrike_Assignee_ID and Wrike_Folder_ID for project management</td>
+      <td>Replace with built-in task management (Task Board)</td>
+      <td><span class="badge badge-phase">Phase 2</span></td>
+    </tr>
+    <tr>
+      <td><strong>WooCommerce</strong></td>
+      <td>Rentable item sync via <code>getWooCategoryID()</code></td>
+      <td>Built-in rental catalog on website, or continue WooCommerce API sync</td>
+      <td><span class="badge badge-phase">Phase 4</span></td>
+    </tr>
+    <tr>
+      <td><strong>Zapier</strong></td>
+      <td>RFID data import via Zapier_Item_Updater and ZapierRfidUpdateHandler</td>
+      <td>Direct API endpoints for external data import</td>
+      <td><span class="badge badge-phase">Phase 4</span></td>
+    </tr>
+    <tr>
+      <td><strong>SQL Server</strong></td>
+      <td>RFID data sync via <code>updateRfidSqlServer()</code></td>
+      <td>Direct database integration or API endpoint</td>
+      <td><span class="badge badge-phase">Phase 4</span></td>
+    </tr>
+  </table>
+</div>
+
+<!-- 10. CURRENT WEBSITE STATE -->
+<div class="section" id="website-state">
+  <h2>10. Current Website State</h2>
+
+  <h3>Tech Stack</h3>
+  <table>
+    <tr><th>Layer</th><th>Technology</th></tr>
+    <tr><td>Backend</td><td>FastHTML (Python), Starlette, AsyncIO</td></tr>
+    <tr><td>Database</td><td>SQLite (users.db, zoho_sync.db, model_3d_defaults.db)</td></tr>
+    <tr><td>Frontend</td><td>HTML5, CSS3, Vanilla JavaScript (no React/Vue)</td></tr>
+    <tr><td>Payments</td><td>Stripe (live keys)</td></tr>
+    <tr><td>Email</td><td>Mailgun API</td></tr>
+    <tr><td>Auth</td><td>Session tokens + Google OAuth</td></tr>
+    <tr><td>3D</td><td>Three.js (GLB models)</td></tr>
+    <tr><td>Image AI</td><td>Decor8.ai (inpainting), Tripo3D (image-to-3D)</td></tr>
+  </table>
+
+  <h3>Existing Features (Complete)</h3>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-title">Customer Website</div>
+      <ul>
+        <li>Homepage, About, Services, Gallery, Pricing</li>
+        <li>25 geo-targeted city landing pages</li>
+        <li>14 blog articles</li>
+        <li>Contact form with Mailgun</li>
+        <li>Dark/light theme</li>
+        <li>Mobile responsive</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Auth &amp; Users</div>
+      <ul>
+        <li>Email/password registration</li>
+        <li>Google OAuth SSO</li>
+        <li>5 roles: customer, admin, manager, stager, mover</li>
+        <li>Session-based auth (7-day)</li>
+        <li>Admin user management (CRUD)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Quote &amp; Payment</div>
+      <ul>
+        <li>Multi-step staging inquiry form</li>
+        <li>Dynamic pricing calculation</li>
+        <li>Stripe deposit ($500 CAD)</li>
+        <li>Quote &rarr; Confirmed workflow</li>
+        <li>Confirmation emails</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">3D Design Studio</div>
+      <ul>
+        <li>900+ GLB furniture models</li>
+        <li>Background image upload</li>
+        <li>Drag-and-drop placement</li>
+        <li>Position/rotation/scale/brightness</li>
+        <li>Multi-instance support</li>
+        <li>Save/load design state</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Inventory Sync</div>
+      <ul>
+        <li>Zoho Creator two-way sync</li>
+        <li>Playwright page scraping (0 API)</li>
+        <li>30-second smart sync interval</li>
+        <li>Write-back queue</li>
+        <li>Item management UI</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Portal (Basic)</div>
+      <ul>
+        <li>View staging history</li>
+        <li>Design studio access</li>
+        <li>Edit profile / password</li>
+        <li>Admin: user management</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Current Database Schema</h3>
+  <div class="er-box">
+    <div class="er-title">users.db</div>
+    <div class="er-field"><span class="er-pk">PK</span> users (id, first_name, last_name, email, phone, password_hash, user_role, google_id, created_at, updated_at, last_login, is_active)</div>
+    <div class="er-field"><span class="er-fk">FK</span> sessions (id, user_id, session_token, created_at, expires_at)</div>
+    <div class="er-field"><span class="er-fk">FK</span> stagings (id, user_id, status, property_address, property_type, property_size, selected_areas, selected_items, total_fee, staging_date, addons, guest info, special_requests, stripe IDs, area_photos JSON, area_selected_items JSON)</div>
+    <div class="er-field"><span class="er-fk">FK</span> design_models (id, staging_id, background_image, model_url, instance_id, position_xyz, scale, rotation_y, tilt, brightness, item_name, image_url)</div>
+  </div>
+  <div class="er-box">
+    <div class="er-title">zoho_sync.db</div>
+    <div class="er-field"><span class="er-pk">PK</span> Item_Report (ID, Item_Name, Item_Type, Item_Image, Resized_Image, Item_Color, Item_Style, Model_3D, dimensions, Front_Rotation, _synced_at, _modified_time)</div>
+    <div class="er-field">sync_metadata (table_name, last_modified_time, record_count)</div>
+    <div class="er-field">sync_log / sync_issues / pending_zoho_updates / sync_conflicts</div>
+    <div class="er-field">model_default_rotations (model3d, rotation, brightness, tilt)</div>
+  </div>
+
+  <h3>API Endpoints (25+)</h3>
+  <table>
+    <tr><th>Category</th><th>Endpoints</th></tr>
+    <tr><td>Auth</td><td>POST /api/auth/signin, /register, /google, /signout | GET /api/auth/check</td></tr>
+    <tr><td>Stagings</td><td>GET/POST /api/stagings | GET/DELETE /api/stagings/{id}</td></tr>
+    <tr><td>3D Models</td><td>POST /api/save-default-rotation, /save-staging-models | GET /api/get-default-rotation/{m}, /get-staging-models</td></tr>
+    <tr><td>Photos</td><td>POST /api/staging-photos, /staging-photos/cleanup</td></tr>
+    <tr><td>Payments</td><td>GET /api/stripe-config | POST /api/create-payment-intent, /confirm-reservation</td></tr>
+    <tr><td>Inventory</td><td>GET /api/inventory-items</td></tr>
+    <tr><td>Admin</td><td>GET /api/admin/users | POST /api/admin/users/create, /update</td></tr>
+    <tr><td>Other</td><td>POST /api/contact, /api/profile/update, /api/client-log</td></tr>
+  </table>
+</div>
+
+<!-- 11. SYSTEM SPLIT -->
+<div class="section" id="split">
+  <h2>11. System Split: What Stays in Zoho vs. What Moves to Website</h2>
+
+  <div class="alert alert-info">
+    <div class="alert-title">Decision Framework</div>
+    A feature moves to the website when: (1) Zoho Creator is the bottleneck for that feature, OR (2) the feature needs to share state with customer-facing data, OR (3) the native mobile app needs it. A feature stays in Zoho when: it works today, employees are trained on it, and there's no customer-facing benefit to moving it.
+  </div>
+
+  <h3>Stays in Zoho Creator (Don't Touch)</h3>
+  <p>These features are battle-tested, used daily by employees, and carry no customer-facing UX debt. Rebuilding them would be months of work with zero revenue impact.</p>
+  <table>
+    <tr><th>Feature</th><th>Zoho Forms/Pages Used</th><th>Why It Stays</th></tr>
+    <tr>
+      <td><strong>Time Tracking</strong></td>
+      <td>Time_Tracker, Working_Time_Tracker, Working_Time_Adjuster + 3 pages</td>
+      <td>QR check-in/out with camera, overtime calc, MPI, deductions &mdash; works reliably. Employees are trained.</td>
+    </tr>
+    <tr>
+      <td><strong>QR/Barcode Scanning</strong></td>
+      <td>Barcode_Scan, Check_Item, Check_Item_Scan, Check_Item_by_QR_Code, Scan, Update_Location, Manually_Update_Item_Location</td>
+      <td>7 specialized scan forms with native camera, auto-submit on scan. Web camera scanning is inferior. Zoho mobile app handles this well.</td>
+    </tr>
+    <tr>
+      <td><strong>Expense Reporting</strong></td>
+      <td>Expense form + All_Expenses report</td>
+      <td>Simple form with receipt camera capture. Works on Zoho mobile.</td>
+    </tr>
+    <tr>
+      <td><strong>Item Location Tracking</strong></td>
+      <td>Item form (Current_Location, Rack, Dock, Move_Count), updateItemCurrentLocation functions</td>
+      <td>Tightly coupled with scanning. 35+ functions for location logic. Zoho remains source of truth for item locations.</td>
+    </tr>
+    <tr>
+      <td><strong>RFID Inventory</strong></td>
+      <td>Inventory_Check, RFID_Settings, Inventory_Update_Page</td>
+      <td>Specialized hardware workflow, Google Drive/SQL Server sync. Niche and stable.</td>
+    </tr>
+    <tr>
+      <td><strong>Packing Guide</strong></td>
+      <td>Packing_Guide_Selector, Packing_Guide_Page</td>
+      <td>Used by movers at warehouse. Area-by-area lists with container/dock assignment. Stable.</td>
+    </tr>
+    <tr>
+      <td><strong>Task Board</strong></td>
+      <td>Task form, Staging_Task_Board, Daily_Task_Board</td>
+      <td>Daily task management used every morning. Employee filters, HTML table generation. Stable.</td>
+    </tr>
+    <tr>
+      <td><strong>Staging Full Lifecycle</strong></td>
+      <td>Staging form (200+ fields, 11 sections), 40+ related workflows</td>
+      <td>The most complex form. Status transitions, scheduling calculations, module time tracking, employee assignment. Too risky to rebuild.</td>
+    </tr>
+    <tr>
+      <td><strong>Staging Scheduling</strong></td>
+      <td>Module form, 30+ datetime fields on Staging, updateModuleTime functions</td>
+      <td>Mover/stager schedule calculation (driving time, loading time, ETA). Deeply integrated with staging lifecycle.</td>
+    </tr>
+    <tr>
+      <td><strong>Internal Email Generator</strong></td>
+      <td>Email_Generator form + CRM integration</td>
+      <td>Operational emails sent by managers. CRM lookup is native Zoho-to-Zoho (no API limits).</td>
+    </tr>
+    <tr>
+      <td><strong>Staging Feedback</strong></td>
+      <td>Staging_Feedback form</td>
+      <td>12-item checklist filled on-site. Simple, stable, used by stagers.</td>
+    </tr>
+    <tr>
+      <td><strong>Zoho CRM</strong></td>
+      <td>Lead search/create/update</td>
+      <td>Native Zoho-to-Zoho integration. No API limits internally. Continues to work.</td>
+    </tr>
+    <tr>
+      <td><strong>Damaged Item Reporting</strong></td>
+      <td>Damaged_Item form</td>
+      <td>Photo + description. Simple, stable.</td>
+    </tr>
+  </table>
+
+  <h3>Build New on Website</h3>
+  <p>These features either don't exist yet in Zoho, or the website can do them significantly better. This is where development effort should go.</p>
+  <table>
+    <tr><th>Feature</th><th>Complexity</th><th>New DB Tables</th><th>New Endpoints</th><th>Why Build on Website</th></tr>
+    <tr>
+      <td><strong>Customer Portal (Extension/Destaging)</strong></td>
+      <td><span class="badge badge-partial">Medium</span></td>
+      <td>portal_actions</td>
+      <td>~4</td>
+      <td>Replace Zoho public portal links with branded website experience. Better UX, mobile responsive, integrated with existing auth.</td>
+    </tr>
+    <tr>
+      <td><strong>Customer Email Automation</strong></td>
+      <td><span class="badge badge-partial">Medium</span></td>
+      <td>email_log</td>
+      <td>~4</td>
+      <td>Staging confirmation, ETA updates, extension offers &mdash; better sent from branded Mailgun domain. HTML templates with website styling.</td>
+    </tr>
+    <tr>
+      <td><strong>Customer-Facing Invoice &amp; Payment</strong></td>
+      <td><span class="badge badge-partial">Medium</span></td>
+      <td>invoices (customer view)</td>
+      <td>~5</td>
+      <td>Customers view invoices &amp; pay online via Stripe. Currently Zoho sends emails with a payment link. Website can do this natively.</td>
+    </tr>
+    <tr>
+      <td><strong>Analytics Dashboard</strong></td>
+      <td><span class="badge badge-partial">Medium</span></td>
+      <td>&mdash; (computed)</td>
+      <td>~3</td>
+      <td>Cross-system metrics (website quotes + Zoho stagings + Stripe revenue). Better built where all data flows meet.</td>
+    </tr>
+    <tr>
+      <td><strong>Staging Design (Enhanced 3D)</strong></td>
+      <td><span class="badge badge-done">Low</span></td>
+      <td>&mdash; (exists)</td>
+      <td>&mdash; (exists)</td>
+      <td>Already superior to Zoho's Item_Position system. Keep enhancing with 3D model placement.</td>
+    </tr>
+  </table>
+
+  <h3>Estimated Website-Only Build Scope (Hybrid)</h3>
+  <div class="stat-row">
+    <div class="stat">
+      <div class="stat-value" style="color:var(--accent)">~3</div>
+      <div class="stat-label">New Database Tables</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" style="color:var(--accent-2)">~16</div>
+      <div class="stat-label">New API Endpoints</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" style="color:var(--cyan)">~6</div>
+      <div class="stat-label">New Pages/Views</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" style="color:var(--green)">~10</div>
+      <div class="stat-label">New Python Functions</div>
+    </div>
+  </div>
+
+  <div class="alert alert-success">
+    <div class="alert-title">Scope Reduction: Hybrid vs Full Migration</div>
+    <p>Full migration would require ~15 new tables, ~80 endpoints, ~20 pages, and ~60 Python functions reimplementing Zoho Deluge logic. The hybrid approach requires <strong>~3 tables, ~16 endpoints, ~6 pages</strong> &mdash; roughly <strong>80% less work</strong> &mdash; while delivering the same customer experience improvements.</p>
+  </div>
+</div>
+
+<!-- 12. WEBSITE BUILD PLAN -->
+<div class="section" id="website-build">
+  <h2>12. Website Build Plan (New Features)</h2>
+
+  <p>These are the only new features that need to be built on the website in the hybrid approach. Everything else stays in Zoho Creator.</p>
+
+  <h3>A. Customer Portal: Extension &amp; Destaging Actions</h3>
+  <div class="card">
+    <p>Replace Zoho's public portal links (<code>creatorapp.zohopublic.com/...</code>) with native website pages. When a staging is confirmed, the customer sees actions in their portal:</p>
+    <ul>
+      <li><strong>Extension:</strong> "Extend 30 days" button &rarr; shows fee (50% of initial), terms, Stripe payment</li>
+      <li><strong>Destaging:</strong> "Request pickup" button &rarr; access info form (lockbox code, contact person), terms acknowledgment</li>
+      <li><strong>View Staging:</strong> Design photos, item list, staging date, current status</li>
+    </ul>
+    <p class="muted">New table: <code>portal_actions</code> (staging_id, action_type, status, access_info JSON, acknowledged_at). Write-back to Zoho via sync queue.</p>
+  </div>
+
+  <h3>B. Customer Email Automation</h3>
+  <div class="card">
+    <p>Send customer-facing emails from the website via Mailgun instead of Zoho. These emails already have equivalents in Zoho's Email_Generator but will be better branded and linked to the website.</p>
+    <ul>
+      <li><strong>Staging Confirmation:</strong> After Stripe payment &rarr; summary, date, access instructions</li>
+      <li><strong>ETA Update:</strong> Morning of staging day &rarr; "Team is on the way" with estimated arrival</li>
+      <li><strong>Extension Offer:</strong> 2 weeks before destaging date &rarr; "Extend at 50% off" with portal link</li>
+      <li><strong>Destaging Confirmation:</strong> After customer requests pickup &rarr; confirmation + access form link</li>
+      <li><strong>Completion:</strong> After staging/destaging &rarr; review request</li>
+    </ul>
+    <p class="muted">New table: <code>email_log</code> (staging_id, email_type, to, subject, sent_at, status). Templates stored as Python functions.</p>
+  </div>
+
+  <h3>C. Customer-Facing Invoice View</h3>
+  <div class="card">
+    <p>Customers view invoices in their portal and pay remaining balance via Stripe. Currently, Zoho sends invoice emails with an external payment link. The website can handle this natively.</p>
+    <ul>
+      <li>View invoice details (staging fee, charges, HST, paid, owing)</li>
+      <li>Pay online via Stripe (for owing amounts beyond initial deposit)</li>
+      <li>Download PDF invoice</li>
+    </ul>
+    <p class="muted">New table: <code>invoices</code> (staging_id, invoice_date, due_date, staging_fee, charge_1-3, paid_amount, owing_amount, stripe_payment_id). Synced from Zoho's Staging_Invoice via read sync.</p>
+  </div>
+
+  <h3>D. Analytics Dashboard</h3>
+  <div class="card">
+    <p>Cross-system analytics pulling from website data (quotes, payments, users) and Zoho sync data (inventory, stagings). Accessible to admin/manager roles.</p>
+    <ul>
+      <li>Quotes per month, conversion rate (quote &rarr; confirmed)</li>
+      <li>Revenue tracking (Stripe deposits + synced Zoho payments)</li>
+      <li>Active stagings count, upcoming dates</li>
+      <li>Inventory utilization (items at properties vs warehouse)</li>
+    </ul>
+    <p class="muted">No new tables &mdash; computed from existing data. ~3 API endpoints, 1 dashboard page.</p>
+  </div>
+</div>
+
+<!-- 13. HYBRID PHASES -->
+<div class="section" id="phases">
+  <h2>13. Hybrid Phases &amp; Selective Migration</h2>
+
+  <div class="alert alert-info">
+    <div class="alert-title">Principle: Build what matters now. Migrate only when triggered.</div>
+    Phases 1-2 build new customer-facing features on the website. Phases 3-4 are <strong>conditional</strong> &mdash; they only happen when a specific trigger is met (see "Migration Trigger" for each). Phase 5+ covers eventual full migration if/when it makes sense.
+  </div>
+
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="timeline-title">Phase 1: Customer Experience Enhancement</div>
+      <div class="timeline-meta">Priority: Now &nbsp;|&nbsp; Dependencies: None &nbsp;|&nbsp; Zoho Impact: None</div>
+      <p>Build features the website does better than Zoho. Zero disruption to employees.</p>
+      <h4>Build</h4>
+      <ul>
+        <li><strong>Customer Portal Extension/Destaging</strong> &mdash; Replace Zoho public portal links with website-native pages. Extension button (50% renewal + Stripe), destaging request (access info form + terms). New table: <code>portal_actions</code>.</li>
+        <li><strong>Customer Email Automation</strong> &mdash; Staging confirmation, ETA update, extension offer, destaging confirmation, completion/review request. Branded HTML templates via Mailgun. New table: <code>email_log</code>.</li>
+        <li><strong>Customer Invoice View &amp; Online Payment</strong> &mdash; Customers see invoices in portal, pay remaining balance via Stripe. Sync invoice data from Zoho read sync. New table: <code>invoices</code>.</li>
+        <li><strong>Strengthen Zoho Sync</strong> &mdash; Harden the Playwright sync layer. Add health monitoring, auto-restart on failure, alerting. This is the critical bridge between systems.</li>
+      </ul>
+      <h4>Result</h4>
+      <p>Customers interact entirely through the website. No more <code>creatorapp.zohopublic.com</code> links in emails. Better branding, better UX, Stripe-native payments.</p>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-title">Phase 2: Analytics &amp; Data Visibility</div>
+      <div class="timeline-meta">Priority: Soon &nbsp;|&nbsp; Dependencies: Phase 1 &nbsp;|&nbsp; Zoho Impact: None</div>
+      <p>Pull insights from both systems into a single dashboard.</p>
+      <h4>Build</h4>
+      <ul>
+        <li><strong>Analytics Dashboard</strong> &mdash; Quotes per month, conversion rate, revenue (Stripe + synced Zoho payments), active stagings, upcoming dates, inventory utilization</li>
+        <li><strong>Synced Staging View</strong> &mdash; Read-only view of Zoho staging data on the website for admin/manager users. Pull key fields (status, dates, assignment, payment) via enhanced sync. No editing &mdash; that stays in Zoho.</li>
+        <li><strong>Scheduled Email Tasks</strong> &mdash; Daily staging-day notification (8:30 AM), extension offer reminders, review requests. Replaces Zoho's Daily_Notify_Staging scheduled task for customer-facing emails only.</li>
+      </ul>
+      <h4>Result</h4>
+      <p>Managers see a unified view of business metrics. Customer emails are automated from the website. Internal operations untouched in Zoho.</p>
+    </div>
+
+    <div class="timeline-item" style="border-left: 3px solid var(--green);">
+      <div class="timeline-title">Phase 3: Mobile App (API-First) &mdash; <span class="badge badge-done">Starting Now (2026-04-16)</span></div>
+      <div class="timeline-meta">Priority: Active &nbsp;|&nbsp; Dependencies: None (Zoho sync bridge already in place) &nbsp;|&nbsp; Zoho Impact: Minimal</div>
+      <p><strong>Starting Phase 3 first, ahead of Phases 1-2.</strong> Rationale: the Playwright-based Zoho sync bridge for items and stagings is already built and stable, so the backend is already an effective API server. The FastHTML app can double as a JSON API for mobile. Phase 1-2 customer-facing web features can be built in parallel as needed.</p>
+      <p><strong>Stack:</strong> iOS native (Swift + SwiftUI) first. Android native (Kotlin + Jetpack Compose) later, only when a team member needs it. See &sect;14 for framework decision rationale and &sect;17 for the hello-world kickoff.</p>
+      <p><strong>Backend prep:</strong> add a versioned <code>/api/v1/*</code> namespace, add token-based auth (JWT or long-lived API tokens) alongside the existing session cookies (mobile apps don't cookie well), and extend the Zoho sync to pull operational staging fields read-only for employee screens.</p>
+      <h4>Build</h4>
+      <ul>
+        <li><strong>Customer-facing screens</strong> &mdash; Quote, design studio, portal, invoice/payment (all already have API endpoints)</li>
+        <li><strong>Employee dashboard</strong> &mdash; Read-only task view (synced from Zoho), staging overview</li>
+        <li><strong>Push notifications</strong> &mdash; Task assignments, staging-day alerts, ETA updates</li>
+        <li><strong>GPS check-in</strong> &mdash; Geofenced time tracking (new feature, not in Zoho)</li>
+      </ul>
+      <p>See Section 14 for detailed mobile strategy.</p>
+      <h4>Result</h4>
+      <p>Native app for customers (quote + design + pay) and basic employee features. Employees still use Zoho Creator for complex operations (scanning, packing, full staging management).</p>
+    </div>
+
+    <div class="timeline-item" style="border-left: 3px solid var(--yellow);">
+      <div class="timeline-title">Phase 4+: Selective Feature Migration (Trigger-Based)</div>
+      <div class="timeline-meta">Priority: Only when triggered &nbsp;|&nbsp; Dependencies: Specific triggers met</div>
+      <p>These features move from Zoho to the website <strong>only when a specific trigger is met</strong>. Do not pre-schedule these. Evaluate quarterly.</p>
+
+      <table>
+        <tr><th>Feature</th><th>Migration Trigger</th><th>Effort</th></tr>
+        <tr>
+          <td><strong>QR/Barcode Scanning</strong></td>
+          <td>When the native mobile app (Phase 3) has proven camera scanning reliability equal to or better than Zoho Creator mobile. OR when Zoho Creator mobile degrades.</td>
+          <td><span class="badge badge-todo">High</span></td>
+        </tr>
+        <tr>
+          <td><strong>Time Tracking</strong></td>
+          <td>When mobile GPS geofencing (Phase 3) makes website time tracking clearly better than Zoho's QR-based system. OR when Zoho pricing increases significantly.</td>
+          <td><span class="badge badge-todo">High</span></td>
+        </tr>
+        <tr>
+          <td><strong>Task Board</strong></td>
+          <td>When employees are already using the mobile app daily for other features and the context switch to Zoho for task board becomes friction.</td>
+          <td><span class="badge badge-partial">Medium</span></td>
+        </tr>
+        <tr>
+          <td><strong>Expense Reporting</strong></td>
+          <td>When mobile app camera for receipt capture is ready and employees prefer the app over Zoho mobile.</td>
+          <td><span class="badge badge-partial">Medium</span></td>
+        </tr>
+        <tr>
+          <td><strong>Staging Full Lifecycle</strong></td>
+          <td>When 80%+ of other operations are on the website and the remaining Zoho usage is just this form. This is the <em>last</em> thing to migrate.</td>
+          <td><span class="badge badge-todo">Very High</span></td>
+        </tr>
+        <tr>
+          <td><strong>Packing Guide</strong></td>
+          <td>When movers are using the mobile app for task board and scanning, and want the packing guide in the same app.</td>
+          <td><span class="badge badge-partial">Medium</span></td>
+        </tr>
+        <tr>
+          <td><strong>RFID Inventory</strong></td>
+          <td>When RFID hardware can connect directly to the mobile app or a web interface. May never need to migrate.</td>
+          <td><span class="badge badge-partial">Medium</span></td>
+        </tr>
+        <tr>
+          <td><strong>Zoho CRM</strong></td>
+          <td>When customer leads are fully managed in the website (all quotes originate there) and the Zoho CRM adds no unique value.</td>
+          <td><span class="badge badge-partial">Medium</span></td>
+        </tr>
+      </table>
+
+      <div class="alert alert-warn">
+        <div class="alert-title">The Zoho Decommission Decision</div>
+        Full Zoho decommission happens only when ALL triggers above have been met and all features are running on the website for 3+ months without issues. This may take 1-2 years. That's fine. There is no deadline &mdash; the hybrid runs indefinitely as long as it works.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 14. MOBILE APP -->
+<div class="section" id="mobile">
+  <h2>14. Mobile App Strategy</h2>
+
+  <h3>Why Native Mobile?</h3>
+  <p>The Zoho Creator mobile app currently provides camera access for QR/barcode scanning, photo capture for receipts and property images, and location tracking. The new mobile app needs these native capabilities plus offline support for warehouse operations.</p>
+
+  <h3>Mobile-Required Features</h3>
+  <table>
+    <tr><th>Feature</th><th>Native Need</th><th>Web Alternative</th><th>Recommendation</th></tr>
+    <tr>
+      <td>QR/Barcode Scanning</td>
+      <td>Camera access, auto-focus, fast decode</td>
+      <td>Web Camera API + barcode.js works but slower</td>
+      <td><span class="badge badge-mobile">Native + Web</span></td>
+    </tr>
+    <tr>
+      <td>Receipt Photo Capture</td>
+      <td>Camera with flash, auto-crop</td>
+      <td>Web Camera API (functional but basic)</td>
+      <td><span class="badge badge-mobile">Native preferred</span></td>
+    </tr>
+    <tr>
+      <td>Property Photo Capture</td>
+      <td>Camera with orientation, EXIF data</td>
+      <td>Web Camera API + image compression</td>
+      <td><span class="badge badge-mobile">Native preferred</span></td>
+    </tr>
+    <tr>
+      <td>GPS Location</td>
+      <td>Background location for driving time tracking</td>
+      <td>Web Geolocation API (foreground only)</td>
+      <td><span class="badge badge-mobile">Native required</span></td>
+    </tr>
+    <tr>
+      <td>Push Notifications</td>
+      <td>Task assignments, ETA updates, schedule changes</td>
+      <td>Web Push (limited on iOS)</td>
+      <td><span class="badge badge-mobile">Native required</span></td>
+    </tr>
+    <tr>
+      <td>Offline Mode</td>
+      <td>Scan items in warehouse (weak connectivity)</td>
+      <td>Service Workers (complex)</td>
+      <td><span class="badge badge-mobile">Native preferred</span></td>
+    </tr>
+    <tr>
+      <td>Time Tracking</td>
+      <td>Check-in/out with geofencing</td>
+      <td>Web (no geofencing)</td>
+      <td><span class="badge badge-mobile">Native for geofencing</span></td>
+    </tr>
+  </table>
+
+  <h3>Recommended Approach: Native (Swift + Kotlin) &mdash; <span class="badge badge-done">Decision 2026-04-16</span></h3>
+  <div class="alert alert-success">
+    <div class="alert-title">Decision: Go native on both platforms.</div>
+    The employee app's mobile-critical features (camera scanning, GPS geofencing, background location, push, offline warehouse mode) are exactly where cross-platform frameworks struggle and need bridging code anyway. Performance, platform APIs, and OS updates all land first on native. <strong>Start iOS first (Swift/SwiftUI). Android (Kotlin/Compose) only when a team member actually needs it.</strong>
+  </div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-title">Option A (chosen): Native Swift + Kotlin</div>
+      <ul>
+        <li>iOS: Swift + SwiftUI in Xcode</li>
+        <li>Android: Kotlin + Jetpack Compose in Android Studio</li>
+        <li>Best camera / barcode / GPS / push / offline integration</li>
+        <li>No framework upgrade churn, no bridge layer</li>
+        <li>Two codebases &mdash; the real cost</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Option B (rejected): React Native / Flutter</div>
+      <ul>
+        <li>One codebase for iOS + Android</li>
+        <li>Still need native drops for camera/scanning edge cases</li>
+        <li>Framework/runtime upgrade churn</li>
+        <li>Good for feature-light apps; this one is hardware-heavy</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Option C (rejected): PWA</div>
+      <ul>
+        <li>No app store, reuses website code</li>
+        <li>Limited camera / scanning on iOS</li>
+        <li>No background location on iOS</li>
+        <li>Fine as a complement, not as the employee ops app</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="alert alert-info">
+    <div class="alert-title">Codebase count clarification</div>
+    Going native means <strong>3 codebases total</strong>, not 4: (1) FastHTML web app &mdash; serves both public marketing and the authenticated webapp from one repo, (2) iOS native (Swift), (3) Android native (Kotlin, later). Public site and webapp share auth/DB/sync and stay in one codebase; isolation is achieved via <em>two deployments of the same app</em> (see &sect;15), not two repos.
+  </div>
+
+  <h3>Mobile App Screens</h3>
+  <table>
+    <tr><th>Screen</th><th>Primary Users</th><th>Features</th></tr>
+    <tr><td>Dashboard</td><td>All employees</td><td>Today's tasks, active staging, quick actions</td></tr>
+    <tr><td>QR Scanner</td><td>Movers, Stagers</td><td>Camera scan, auto-submit, location update, item check</td></tr>
+    <tr><td>Time Tracker</td><td>All employees</td><td>Check-in/out button, GPS verification, daily summary</td></tr>
+    <tr><td>Task Board</td><td>All employees</td><td>Today's assignments, task details, mark complete</td></tr>
+    <tr><td>Expense Report</td><td>All employees</td><td>Receipt photo, amount entry, submission</td></tr>
+    <tr><td>Packing Guide</td><td>Movers</td><td>Area-by-area list, check items, loading order</td></tr>
+    <tr><td>Item Check</td><td>Warehouse staff</td><td>Scan item, view details, update condition/photo</td></tr>
+    <tr><td>Staging Detail</td><td>Stagers, Managers</td><td>Full staging info, schedule, design notes, customer details</td></tr>
+    <tr><td>Staging Feedback</td><td>Stagers</td><td>12-item checklist form, submit on-site</td></tr>
+    <tr><td>Property Photos</td><td>Stagers</td><td>Guided photo capture (4 per area, 4 directions)</td></tr>
+  </table>
+
+  <div class="alert alert-info">
+    <div class="alert-title">API-First Architecture</div>
+    The website's existing API endpoints serve as the foundation for the mobile app. Build the mobile app as a consumer of the same REST API. All new Phase 1-4 endpoints should be designed mobile-friendly from the start (JSON responses, proper auth tokens, file upload support).
+  </div>
+</div>
+
+<!-- 15. TARGET ARCHITECTURE -->
+<div class="section" id="architecture">
+  <h2>15. Target Architecture (Hybrid)</h2>
+
+  <h3>System Architecture</h3>
+  <div class="er-box" style="text-align: center; padding: 24px;">
+<pre style="color: var(--text); line-height: 1.8; font-size: 0.85em; text-align: left; display: inline-block;">
+    <span style="color:var(--cyan)">CUSTOMERS</span>                              <span style="color:var(--pink)">EMPLOYEES</span>
+        │                                       │
+        ▼                                       ▼
+┌──────────────────────┐         ┌──────────────────────────┐
+│  <span style="color:var(--accent)">ASTRA STAGING WEBSITE</span> │         │  <span style="color:var(--yellow)">ZOHO CREATOR</span>              │
+│  (FastHTML + SQLite)  │         │  (Staging Manager)        │
+│                       │         │                           │
+│  ● Quote &amp; Pricing    │         │  ● Staging Lifecycle      │
+│  ● 3D Design Studio   │         │  ● Time Tracking          │
+│  ● Stripe Payments    │         │  ● QR/Barcode Scanning    │
+│  ● Customer Portal    │         │  ● Expense Reporting      │
+│  ● Email Automation   │         │  ● Packing Guide          │
+│  ● Invoice View       │         │  ● Task Board             │
+│  ● Blog &amp; SEO         │         │  ● Scheduling             │
+│  ● Analytics          │         │  ● RFID Inventory         │
+│  ● Admin Portal       │         │  ● CRM Integration        │
+│                       │         │  ● Internal Emails        │
+│  <span style="color:var(--green)">SQLite DBs</span>           │         │  <span style="color:var(--green)">Zoho DB</span>                  │
+│  - users.db           │         │  - 50+ forms              │
+│  - zoho_sync.db       │◄───────►│  - 47 reports             │
+│  - model_3d.db        │  <span style="color:var(--accent)">SYNC</span>   │  - 106 functions          │
+└──────────┬────────────┘         └──────────────────────────┘
+           │
+    ┌──────▼──────┐
+    │ <span style="color:var(--pink)">MOBILE APP</span>   │    (Phase 3)
+    │ iOS/Android  │
+    │              │
+    │ ● Customer   │
+    │   features   │
+    │ ● GPS time   │
+    │   tracking   │
+    │ ● Push notif │
+    └──────────────┘
+
+<span style="color:var(--accent)">SYNC LAYER</span>: Playwright page scraping (30s interval, 0 API calls)
+            + Write-back queue (confirmed stagings → Zoho)
+            + Enhanced: portal_actions, email triggers → Zoho
+
+<span style="color:var(--yellow)">SERVICES</span>:   Stripe, Mailgun, Google OAuth, Google Places, Tripo3D, Decor8.ai
+</pre>
+  </div>
+
+  <h3>The Sync Layer (Critical Infrastructure)</h3>
+  <div class="alert alert-danger">
+    <div class="alert-title">The sync layer is the single most important piece of the hybrid architecture</div>
+    <p>The Playwright-based page sync (30-second interval) + write-back queue is what makes the hybrid possible. If it breaks, both systems are blind to each other's data. Invest in:</p>
+    <ul>
+      <li><strong>Health monitoring:</strong> Alert if sync hasn't run in 5 minutes</li>
+      <li><strong>Auto-restart:</strong> Restart Playwright browser if it crashes</li>
+      <li><strong>Conflict detection:</strong> Flag when both systems modify the same record</li>
+      <li><strong>Audit log:</strong> Track every sync operation for debugging</li>
+    </ul>
+  </div>
+
+  <h3>Database Strategy</h3>
+  <div class="alert alert-warn">
+    <div class="alert-title">SQLite is fine for hybrid</div>
+    <p>With Zoho handling the heavy concurrent writes (employee operations), the website's SQLite only needs to handle customer traffic and read-only sync data. SQLite is more than sufficient. Re-evaluate for PostgreSQL only if Phase 4+ migrates high-write operations to the website.</p>
+  </div>
+
+  <h3>Deployment Strategy: One Codebase, Two Deployments</h3>
+  <div class="alert alert-success">
+    <div class="alert-title">Public site and webapp stay in one codebase &mdash; but run as two processes.</div>
+    <p>The FastHTML app serves both the public marketing site and the authenticated webapp (portal, design studio, admin, quote flow). They share auth, DB, models, and the Zoho sync bridge &mdash; splitting them into two repos would just create a sync-code-between-repos problem.</p>
+    <p>Isolation is achieved at the process layer, not the code layer:</p>
+    <ul>
+      <li><strong><code>astrastaging.com</code></strong> &rarr; uvicorn process A (public-facing, autoscaled for traffic spikes)</li>
+      <li><strong><code>app.astrastaging.com</code></strong> &rarr; uvicorn process B (webapp routes, authenticated users)</li>
+      <li><strong><code>api.astrastaging.com</code></strong> (optional) &rarr; uvicorn process C (mobile API, <code>/api/v1/*</code>)</li>
+    </ul>
+    <p>All three run the same <code>main.py</code>. A webapp crash or memory leak doesn't take the marketing site down. Deployments can be rolled independently. The shared DB is still a shared dependency &mdash; mitigate with query timeouts and, if ever needed, a read replica.</p>
+  </div>
+
+  <h3>Auth &amp; Permissions Architecture</h3>
+  <table>
+    <tr><th>Role</th><th>Portal Access</th><th>Key Permissions</th></tr>
+    <tr><td><span class="badge badge-info">Customer</span></td><td>Customer portal</td><td>View own stagings, design studio, payment history, portal actions</td></tr>
+    <tr><td><span class="badge badge-phase">Mover</span></td><td>Employee portal</td><td>Task board, time tracking, QR scanning, expense reporting, damaged item reporting</td></tr>
+    <tr><td><span class="badge badge-phase">Stager</span></td><td>Employee portal</td><td>All mover permissions + staging design, packing guide, consultation, feedback, property photos</td></tr>
+    <tr><td><span class="badge badge-partial">Manager</span></td><td>Management portal</td><td>All stager permissions + employee management, payment/invoice management, analytics, scheduling</td></tr>
+    <tr><td><span class="badge badge-done">Admin</span></td><td>Full access</td><td>Everything + user management, settings, system configuration</td></tr>
+  </table>
+</div>
+
+<!-- 16. RISKS -->
+<div class="section" id="risks">
+  <h2>16. Risks, Triggers &amp; Recommendations</h2>
+
+  <h3>Hybrid-Specific Risks</h3>
+  <table>
+    <tr><th>Risk</th><th>Impact</th><th>Mitigation</th></tr>
+    <tr>
+      <td><strong>Sync Layer Failure</strong><br>Playwright browser crashes, Zoho changes their UI, or sync gets stuck. Data diverges between systems.</td>
+      <td><span class="badge badge-todo">High</span></td>
+      <td>Health monitoring + auto-restart. Alert within 5 min of failure. Manual fallback: Zoho operates independently. Website shows "sync paused" warning. Weekly sync audit.</td>
+    </tr>
+    <tr>
+      <td><strong>Data Consistency</strong><br>Same staging modified in both Zoho (by employee) and website (by customer) simultaneously.</td>
+      <td><span class="badge badge-partial">Medium</span></td>
+      <td>Clear ownership split: customers only write to website tables (portal_actions, payments). Employees only write in Zoho. The sync is primarily read-only with a narrow write-back queue for confirmed stagings.</td>
+    </tr>
+    <tr>
+      <td><strong>Zoho Creator Pricing Change</strong><br>Zoho raises prices or changes per-user licensing model.</td>
+      <td><span class="badge badge-partial">Medium</span></td>
+      <td>This is a migration trigger, not a crisis. The hybrid approach ensures the website is always ready to absorb more features. Accelerate Phase 4+ if pricing becomes unacceptable.</td>
+    </tr>
+    <tr>
+      <td><strong>Zoho Creator Mobile App Degrades</strong><br>Zoho changes or deprecates their mobile app, breaking scanning/camera workflows.</td>
+      <td><span class="badge badge-partial">Medium</span></td>
+      <td>This triggers migration of scanning features to the native mobile app (Phase 3+). Having the website API layer ready means mobile app can take over quickly.</td>
+    </tr>
+    <tr>
+      <td><strong>Customer Confusion (Two Systems)</strong><br>Customers encounter Zoho public portal links alongside website links.</td>
+      <td><span class="badge badge-done">Low</span></td>
+      <td>Phase 1 specifically replaces all customer-facing Zoho links. After Phase 1, customers interact only with the website. Zero Zoho exposure.</td>
+    </tr>
+    <tr>
+      <td><strong>Email Deliverability (Transition)</strong><br>Moving customer emails from Zoho sendmail to Mailgun.</td>
+      <td><span class="badge badge-done">Low</span></td>
+      <td>Already using Mailgun for confirmations. Ensure SPF/DKIM/DMARC configured for astrastaging.com. Test with small batch before full switch.</td>
+    </tr>
+  </table>
+
+  <h3>Migration Triggers (When to Move Features Off Zoho)</h3>
+  <div class="alert alert-warn">
+    <div class="alert-title">Evaluate Quarterly: Should any feature move?</div>
+    <p>Check each trigger condition every quarter. If a trigger is met, plan the migration for that specific feature. Don't batch features &mdash; move one at a time, verify it works for 1+ month, then evaluate the next.</p>
+  </div>
+  <table>
+    <tr><th>Trigger</th><th>What It Migrates</th><th>Signal to Watch</th></tr>
+    <tr>
+      <td>Zoho monthly cost exceeds $X or pricing model changes</td>
+      <td>Start with cheapest-to-migrate features: expense reporting, task board</td>
+      <td>Zoho renewal notice, pricing page changes</td>
+    </tr>
+    <tr>
+      <td>Native mobile app camera scanning proven reliable (&gt;95% success rate)</td>
+      <td>QR/barcode scanning &rarr; mobile app</td>
+      <td>Mobile app beta test with movers, success rate metrics</td>
+    </tr>
+    <tr>
+      <td>Employees using mobile app daily and complaining about Zoho context-switch</td>
+      <td>Task board, then time tracking</td>
+      <td>Employee feedback, Zoho login frequency declining</td>
+    </tr>
+    <tr>
+      <td>Zoho Creator mobile app breaks or is deprecated</td>
+      <td>All scanning + time tracking &rarr; mobile app (emergency migration)</td>
+      <td>Zoho changelog, app store reviews, employee reports</td>
+    </tr>
+    <tr>
+      <td>Sync layer becomes unreliable despite hardening efforts</td>
+      <td>Make website the source of truth for inventory. One-way sync Zoho &rarr; archive</td>
+      <td>Sync failures &gt; 3x per week, data discrepancies found</td>
+    </tr>
+    <tr>
+      <td>80%+ of daily operations are on the website/mobile app</td>
+      <td>Staging full lifecycle (the last big piece)</td>
+      <td>Usage analytics: Zoho login count per week</td>
+    </tr>
+  </table>
+
+  <h3>Key Recommendations</h3>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-title">1. Harden the Sync Layer First</div>
+      <p class="muted">Before building any new features, add health monitoring, auto-restart, and alerting to the Playwright sync. This is the foundation of the hybrid approach. If sync is fragile, everything else is at risk.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">2. Customer-First, Operations-Later</div>
+      <p class="muted">All Phase 1-2 work is customer-facing. Zero employee disruption. This delivers business value immediately (better UX, more conversions) without touching the operations that already work.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">3. API-First Everything</div>
+      <p class="muted">Every new feature on the website exposes a REST API endpoint. This ensures the mobile app (Phase 3) can immediately consume the same APIs without rebuilding.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">4. No Forced Deadlines for Migration</div>
+      <p class="muted">The hybrid runs indefinitely. Zoho decommission is a natural consequence of all triggers being met, not a calendar date. Don't migrate for migration's sake.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">5. Measure Before Migrating</div>
+      <p class="muted">Before moving any feature off Zoho: measure current usage (how often, by whom, on what device). After moving: compare. If the new version is worse, roll back. Keep Zoho as the safety net.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">6. One Feature at a Time</div>
+      <p class="muted">Never migrate two operations features simultaneously. Move one, let it stabilize for 1+ month, collect feedback, then evaluate the next. This limits blast radius.</p>
+    </div>
+  </div>
+
+  <h3>Cost Comparison: Hybrid vs Full Migration</h3>
+  <div class="alert alert-success">
+    <div class="alert-title">Hybrid Advantage</div>
+    <table>
+      <tr><th></th><th>Full Migration</th><th>Hybrid-First</th></tr>
+      <tr><td>New database tables</td><td>~15</td><td><strong>~3</strong></td></tr>
+      <tr><td>New API endpoints</td><td>~80</td><td><strong>~16</strong></td></tr>
+      <tr><td>New pages/views</td><td>~20</td><td><strong>~6</strong></td></tr>
+      <tr><td>Python functions to write</td><td>~60 (reimplementing Deluge)</td><td><strong>~10</strong></td></tr>
+      <tr><td>Employee training needed</td><td>Full retraining</td><td><strong>None</strong> (Phases 1-2)</td></tr>
+      <tr><td>Employee disruption risk</td><td>High</td><td><strong>Zero</strong> (Phases 1-2)</td></tr>
+      <tr><td>Zoho cost during transition</td><td>Still paying until cutover</td><td><strong>Same</strong>, but no deadline pressure</td></tr>
+      <tr><td>Customer experience improvement</td><td>Eventually (after ops rebuilt)</td><td><strong>Immediately</strong> (Phase 1)</td></tr>
+      <tr><td>Rollback if issues</td><td>Difficult (data migrated)</td><td><strong>Easy</strong> (Zoho still running)</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- 17. PHASE 3 KICKOFF -->
+<div class="section" id="phase3-kickoff">
+  <h2>17. Phase 3 Kickoff: iOS Hello World</h2>
+
+  <div class="alert alert-info">
+    <div class="alert-title">Goal: prove the full round-trip &mdash; iPhone app &rarr; FastHTML backend &rarr; JSON response.</div>
+    Smallest possible test of the "FastHTML backend as mobile API server" architecture. No auth, no data models, no UI polish. Just: tap a button, hit <code>/api/v1/hello</code>, render the response. Added 2026-04-16.
+  </div>
+
+  <h3>Architecture Under Test</h3>
+  <pre style="background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 20px; overflow-x: auto; font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 0.85em; color: var(--text); line-height: 1.5;">
+┌─────────────┐      HTTP GET       ┌──────────────────┐
+│  iPhone App │ ──────────────────&gt; │  FastHTML App    │
+│  (SwiftUI)  │  /api/v1/hello      │  main.py :5001   │
+│             │ &lt;────────────────── │  host=0.0.0.0    │
+└─────────────┘   JSON response     └──────────────────┘
+
+JSON: { "message": "Hello from as_website",
+        "server_time": "2026-04-16T..." }
+</pre>
+
+  <h3>Step 1 &mdash; Backend Endpoint</h3>
+  <p>Added to <code>/Users/kennethjin/Desktop/development/as_website/main.py</code> (right before the <code>/api/instagram-image/{image_id}</code> route):</p>
+  <pre style="background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 20px; overflow-x: auto; font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 0.85em; color: var(--text); line-height: 1.5;">@rt('/api/v1/hello')
+def hello_v1():
+    from datetime import datetime
+    return JSONResponse({
+        'message': 'Hello from as_website',
+        'server_time': datetime.utcnow().isoformat() + 'Z',
+    })</pre>
+
+  <h3>Step 2 &mdash; Start &amp; Test the Backend</h3>
+  <pre style="background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 20px; overflow-x: auto; font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 0.85em; color: var(--text); line-height: 1.5;"># Terminal 1: start the server
+cd /Users/kennethjin/Desktop/development/as_website
+python3 main.py
+
+# Terminal 2: verify the endpoint
+curl http://localhost:5001/api/v1/hello
+# expected: {"message":"Hello from as_website","server_time":"..."}</pre>
+
+  <div class="alert alert-info">
+    <div class="alert-title">Mac LAN IP for physical-device testing</div>
+    <p>The server binds to <code>0.0.0.0:5001</code>, so it's reachable from any device on the same WiFi. As of 2026-04-16, the Mac's LAN IP is <strong><code>192.168.2.236</code></strong>. Verify before each session with <code>ipconfig getifaddr en0</code> (it can change when DHCP leases rotate).</p>
+  </div>
+
+  <h3>Step 3 &mdash; Create the Xcode Project</h3>
+  <ol>
+    <li>Open Xcode &rarr; <strong>File &rarr; New &rarr; Project</strong></li>
+    <li><strong>iOS &rarr; App</strong> &rarr; Next</li>
+    <li>Product Name: <code>AstraHello</code> &nbsp;|&nbsp; Interface: <strong>SwiftUI</strong> &nbsp;|&nbsp; Language: <strong>Swift</strong> &rarr; Next &rarr; save anywhere (e.g. <code>~/Desktop/development/as_ios/</code>)</li>
+    <li>Select the project target &rarr; <strong>Info</strong> tab &rarr; expand <strong>App Transport Security Settings</strong> &rarr; set <strong>Allow Arbitrary Loads = YES</strong>
+      <br><span class="muted">(Dev only &mdash; iOS blocks plain HTTP by default. Production must use HTTPS; revert this flag before shipping.)</span>
+    </li>
+  </ol>
+
+  <h3>Step 4 &mdash; Replace <code>ContentView.swift</code></h3>
+  <pre style="background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 20px; overflow-x: auto; font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 0.85em; color: var(--text); line-height: 1.5;">import SwiftUI
+
+struct ContentView: View {
+    // Simulator: use localhost. Physical iPhone: use "http://192.168.2.236:5001"
+    private let apiBase = "http://localhost:5001"
+
+    @State private var message = "Tap the button to call the server"
+    @State private var serverTime = ""
+    @State private var isLoading = false
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Text("Astra Hello").font(.largeTitle).bold()
+
+            Text(message)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+
+            if !serverTime.isEmpty {
+                Text("Server time: \(serverTime)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button(action: fetchHello) {
+                HStack {
+                    if isLoading { ProgressView() }
+                    Text(isLoading ? "Loading..." : "Ping /api/v1/hello")
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(Color.blue)
+                .foregroundStyle(.white)
+                .clipShape(Capsule())
+            }
+            .disabled(isLoading)
+        }
+        .padding()
+    }
+
+    private func fetchHello() {
+        guard let url = URL(string: "\(apiBase)/api/v1/hello") else { return }
+        isLoading = true
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            DispatchQueue.main.async {
+                isLoading = false
+                if let error = error {
+                    message = "Error: \(error.localizedDescription)"
+                    return
+                }
+                guard let data = data,
+                      let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    message = "Invalid response"
+                    return
+                }
+                message = (obj["message"] as? String) ?? "No message"
+                serverTime = (obj["server_time"] as? String) ?? ""
+            }
+        }.resume()
+    }
+}
+
+#Preview { ContentView() }</pre>
+
+  <h3>Step 5 &mdash; Run</h3>
+  <table>
+    <tr><th>Target</th><th>apiBase value</th><th>Prereqs</th></tr>
+    <tr>
+      <td>iPhone Simulator</td>
+      <td><code>http://localhost:5001</code></td>
+      <td>Cmd+R in Xcode. Simulator shares the Mac's network &mdash; <code>localhost</code> just works.</td>
+    </tr>
+    <tr>
+      <td>Physical iPhone</td>
+      <td><code>http://192.168.2.236:5001</code></td>
+      <td>Plug phone into Mac, select device as run target in Xcode, both on the same WiFi, ATS exception set.</td>
+    </tr>
+  </table>
+
+  <h3>Expected Result</h3>
+  <div class="alert alert-success">
+    <div class="alert-title">Success criteria</div>
+    Tapping the button shows "<em>Hello from as_website</em>" with a UTC timestamp. This proves the FastHTML backend can serve as the iOS app's API server over LAN. All future <code>/api/v1/*</code> endpoints (auth tokens, staging reads, scan submissions, etc.) build on this same pattern.
+  </div>
+
+  <h3>Common Snags</h3>
+  <table>
+    <tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr>
+    <tr>
+      <td><code>App Transport Security has blocked...</code></td>
+      <td>HTTP not whitelisted in Info.plist</td>
+      <td>Set <strong>Allow Arbitrary Loads = YES</strong> (step 3.4) or add an exception domain</td>
+    </tr>
+    <tr>
+      <td><code>Could not connect to the server</code> on physical iPhone</td>
+      <td>Wrong LAN IP, or phone on different WiFi (e.g. cellular)</td>
+      <td>Re-run <code>ipconfig getifaddr en0</code>, confirm phone WiFi matches Mac</td>
+    </tr>
+    <tr>
+      <td><code>Connection refused</code> in simulator</td>
+      <td>Backend not running</td>
+      <td>Start it: <code>cd as_website &amp;&amp; python3 main.py</code></td>
+    </tr>
+    <tr>
+      <td>Mac firewall prompt on first LAN request</td>
+      <td>macOS asks whether to allow incoming connections</td>
+      <td>Click <strong>Allow</strong> in the dialog</td>
+    </tr>
+    <tr>
+      <td>Xcode: "Untrusted Developer" on physical device</td>
+      <td>Free Apple ID profile needs manual trust</td>
+      <td>On iPhone: Settings &rarr; General &rarr; VPN &amp; Device Management &rarr; trust your Apple ID</td>
+    </tr>
+  </table>
+
+  <h3>What's Next (after hello world works)</h3>
+  <ol>
+    <li><strong>Auth tokens:</strong> add <code>/api/v1/auth/login</code> that returns a bearer token. Store in iOS Keychain. Add <code>Authorization: Bearer</code> header to all subsequent calls.</li>
+    <li><strong>First real screen:</strong> employee task list &mdash; <code>GET /api/v1/tasks/today</code> reading from synced Zoho data.</li>
+    <li><strong>Extend Zoho sync:</strong> pull operational staging fields (status, schedule, assigned employees) read-only into SQLite for the employee app to consume.</li>
+    <li><strong>Split deployments:</strong> spin up a second uvicorn process on <code>api.astrastaging.com</code> (see &sect;15) so mobile traffic is isolated from the marketing site.</li>
+  </ol>
+</div>
+
+</div><!-- /container -->
+
+<div style="text-align: center; padding: 40px; color: var(--text-muted); border-top: 1px solid var(--border); font-size: 0.85em;">
+  Astra Staging &mdash; Hybrid-First Strategy Report &mdash; Generated April 4, 2026
+  <br>Source: Staging_Manager.ds (35,522 lines) | Strategy: Zoho Creator (Operations) + Website (Customer &amp; Growth)
+</div>
+
+</body>
+</html>
