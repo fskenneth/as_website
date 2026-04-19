@@ -1,12 +1,53 @@
 import httpx
 import asyncio
+import sqlite3
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
+from pathlib import Path
 import json
 from .config import settings
+from .utils import get_toronto_now
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+# ---- API call counter (m4-local view; does not see other hosts' usage) ----
+_COUNTER_DB = Path(__file__).parent.parent.parent / "data" / "zoho_api_calls.db"
+
+
+def _record_api_call(url: str, status: int | None, duration_ms: int) -> None:
+    """Best-effort local counter for every Zoho API request. Never raises."""
+    try:
+        _COUNTER_DB.parent.mkdir(parents=True, exist_ok=True)
+        con = sqlite3.connect(str(_COUNTER_DB), timeout=2.0)
+        con.execute(
+            "CREATE TABLE IF NOT EXISTS api_calls "
+            "(ts_toronto TEXT, url TEXT, status INTEGER, duration_ms INTEGER)"
+        )
+        con.execute(
+            "INSERT INTO api_calls VALUES (?,?,?,?)",
+            (get_toronto_now().isoformat(), url, status, duration_ms),
+        )
+        con.commit()
+        con.close()
+    except Exception:
+        pass
+
+
+def get_daily_call_count(days_back: int = 0) -> int:
+    """Returns count of API calls made on (today - days_back) in Toronto time."""
+    try:
+        day = (get_toronto_now() - timedelta(days=days_back)).date().isoformat()
+        con = sqlite3.connect(str(_COUNTER_DB), timeout=2.0)
+        row = con.execute(
+            "SELECT COUNT(*) FROM api_calls WHERE substr(ts_toronto,1,10) = ?",
+            (day,),
+        ).fetchone()
+        con.close()
+        return row[0] if row else 0
+    except Exception:
+        return 0
 
 class ZohoCreatorAPI:
     def __init__(self):
@@ -58,16 +99,22 @@ class ZohoCreatorAPI:
             "Authorization": f"Zoho-oauthtoken {access_token}",
         }
 
-        response = await self._client.request(
-            method=method,
-            url=url,
-            headers=headers,
-            params=params,
-            json=data
-        )
-
-        response.raise_for_status()
-        return response.json()
+        start_ns = asyncio.get_event_loop().time()
+        response = None
+        try:
+            response = await self._client.request(
+                method=method,
+                url=url,
+                headers=headers,
+                params=params,
+                json=data
+            )
+            response.raise_for_status()
+            return response.json()
+        finally:
+            duration_ms = int((asyncio.get_event_loop().time() - start_ns) * 1000)
+            status = response.status_code if response is not None else None
+            _record_api_call(url, status, duration_ms)
 
     async def get_report_data(self, report_name: str, criteria: str = None,
                             page: int = 1, page_size: int = 200) -> Dict:

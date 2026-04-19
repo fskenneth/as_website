@@ -73,6 +73,17 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Run as_webapp on port 5002; iOS + Android clients point at it directly.
 
 
+@rt('/api/zoho-usage')
+def zoho_usage():
+    """Local (m4-only) Zoho API call counter. Does NOT include calls from mac-mini-1."""
+    from tools.zoho_sync.zoho_api import get_daily_call_count
+    return JSONResponse({
+        'host': 'm4',
+        'today': get_daily_call_count(0),
+        'yesterday': get_daily_call_count(1),
+        'note': 'm4-local only; mac-mini-1 calls are not counted here',
+    })
+
 
 @rt('/api/instagram-image/{image_id}')
 async def instagram_image_proxy(image_id: str):

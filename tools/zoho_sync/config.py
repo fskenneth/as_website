@@ -59,15 +59,15 @@ GLOBAL_EXCLUDE_COLUMN_PATTERNS = [
 # interval_minutes = 0 → skip auto-sync (still triggerable manually).
 SYNC_SCHEDULE = {
     "Staging_Report": {
-        "interval_minutes": 60,
+        "interval_minutes": 0,  # disabled: mac-mini-1 is authoritative syncer
         "exclude_column_patterns": [],
     },
     "All_Modules": {
-        "interval_minutes": 60,
+        "interval_minutes": 0,  # disabled: mac-mini-1 is authoritative syncer
         "exclude_column_patterns": [],
     },
     "Employee_Report": {
-        "interval_minutes": 1440,  # daily — employee roster changes rarely
+        "interval_minutes": 0,  # disabled: mac-mini-1 is authoritative syncer
         # Report doesn't expose Modified_Time, fall back to Added_Time.
         # Trade-off: catches new employees, misses edits to existing rows.
         "criteria_field": "Added_Time",
@@ -79,24 +79,24 @@ SYNC_SCHEDULE = {
         ],
     },
     "Area_Report": {
-        "interval_minutes": 360,  # 6h
+        "interval_minutes": 0,  # disabled: mac-mini-1 is authoritative syncer
         # Report doesn't expose Modified_Time → criteria 404s.
         "criteria_field": "Added_Time",
         "exclude_column_patterns": [],
     },
     "All_Tasks": {
-        "interval_minutes": 60,
+        "interval_minutes": 0,  # disabled: mac-mini-1 is authoritative syncer
         "exclude_column_patterns": [],
     },
     "Location_Report": {
-        "interval_minutes": 1440,
+        "interval_minutes": 0,  # disabled: mac-mini-1 is authoritative syncer
         # Modified_Time column is present in records but criteria on it 404s
         # (likely a lookup/formula field that isn't indexed for filtering).
         "criteria_field": "Added_Time",
         "exclude_column_patterns": [],
     },
     "All_Quotes": {
-        "interval_minutes": 360,
+        "interval_minutes": 0,  # disabled: mac-mini-1 is authoritative syncer
         "exclude_column_patterns": [],
     },
 }
