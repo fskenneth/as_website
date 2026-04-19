@@ -95,6 +95,15 @@ class ZohoCreatorAPI:
                 "has_more": has_more,
                 "total_records": total_records
             }
+        except httpx.HTTPStatusError as e:
+            # Zoho Creator v2 returns 404 (not 200-with-empty-array) when a criteria
+            # query matches zero records on some reports. Treat that as empty rather
+            # than a hard failure so incremental syncs succeed on quiet days.
+            if e.response.status_code == 404 and criteria:
+                logger.info(f"No records matching criteria on {report_name} (404 from Zoho)")
+                return {"data": [], "has_more": False, "total_records": 0}
+            logger.error(f"Failed to fetch report {report_name}: {str(e)}")
+            raise
         except Exception as e:
             logger.error(f"Failed to fetch report {report_name}: {str(e)}")
             raise
@@ -134,20 +143,31 @@ class ZohoCreatorAPI:
         logger.info(f"Fetching records from {report_name} modified between {today_str} and {tomorrow_str}")
         return await self.get_all_report_data(report_name, criteria)
 
-    async def get_modified_records_since(self, report_name: str, since_date: datetime) -> List[Dict]:
-        """Get records modified since a specific date"""
-        # Convert date to Zoho format
+    async def get_modified_records_since(
+        self,
+        report_name: str,
+        since_date: datetime,
+        field_name: str = "Modified_Time",
+    ) -> List[Dict]:
+        """Get records where `field_name` is on/after `since_date`.
+
+        Note: Zoho Creator v2 criteria only reliably supports date-level resolution
+        (datetime-precision criteria returns 404). So sub-day sync intervals will
+        re-fetch the current day's matching rows each cycle — still vastly cheaper
+        than a full-table fetch.
+
+        Some reports don't expose Modified_Time in their column set (or expose it
+        as a non-queryable lookup/formula field); `field_name` lets the caller
+        fall back to e.g. Added_Time for those.
+        """
         month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
         day = since_date.strftime("%d")
         month = month_names[since_date.month - 1]
-        year = since_date.year
-        date_str = f"{day}-{month}-{year}"
+        date_str = f"{day}-{month}-{since_date.year}"
+        criteria = f'{field_name} >= "{date_str}"'
 
-        # Criteria for records modified since date
-        criteria = f'Modified_Time >= "{date_str}"'
-
-        logger.info(f"Fetching records from {report_name} modified since {date_str}")
+        logger.info(f"Fetching {report_name} where {field_name} >= {date_str}")
         return await self.get_all_report_data(report_name, criteria)
 
     async def get_report_total_count(self, report_name: str) -> int:

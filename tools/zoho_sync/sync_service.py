@@ -5,7 +5,7 @@ from .database import db
 from .zoho_api import zoho_api
 from .image_downloader import image_downloader
 from .image_url_processor import image_url_processor
-from .config import strip_excluded_columns
+from .config import strip_excluded_columns, criteria_field_for
 from .utils import get_toronto_now, get_toronto_now_iso
 import logging
 
@@ -81,7 +81,9 @@ class SyncService:
                 sync_meta = await db.get_sync_metadata(table_name)
                 if sync_meta and sync_meta["last_modified_time"]:
                     last_sync = datetime.fromisoformat(sync_meta["last_modified_time"])
-                    records = await zoho_api.get_modified_records_since(report_name, last_sync)
+                    records = await zoho_api.get_modified_records_since(
+                        report_name, last_sync, field_name=criteria_field_for(report_name)
+                    )
                 else:
                     # First sync, get all records
                     records = await zoho_api.get_all_report_data(report_name)
@@ -158,14 +160,13 @@ class SyncService:
             if skipped_count > 0:
                 logger.warning(f"⚠️  {skipped_count} records were skipped during sync for {report_name} (missing ID field)")
 
-            # Update sync metadata with actual successful count
-            last_modified = max(
-                (r.get("Modified_Time", "") for r in records if r.get("Modified_Time")),
-                default=""
-            )
-
-            if last_modified:
-                await db.update_sync_metadata(table_name, last_modified, synced_count)
+            # Watermark for next incremental sync.
+            # Use start_time (captured before the fetch) so records modified during
+            # the sync are still picked up next cycle. Fall back to start_time when
+            # the report's API response doesn't expose Modified_Time — otherwise
+            # metadata never gets written and every "incremental" run becomes a
+            # full fetch.
+            await db.update_sync_metadata(table_name, start_time.isoformat(), synced_count)
 
             await db.log_sync(sync_type, table_name, "success", synced_count)
 

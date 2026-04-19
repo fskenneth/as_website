@@ -68,6 +68,9 @@ SYNC_SCHEDULE = {
     },
     "Employee_Report": {
         "interval_minutes": 1440,  # daily — employee roster changes rarely
+        # Report doesn't expose Modified_Time, fall back to Added_Time.
+        # Trade-off: catches new employees, misses edits to existing rows.
+        "criteria_field": "Added_Time",
         "exclude_column_patterns": [
             # PII — never sync to local DB
             "SIN", "Bank", "Wage", "Salary", "Hourly",
@@ -77,6 +80,8 @@ SYNC_SCHEDULE = {
     },
     "Area_Report": {
         "interval_minutes": 360,  # 6h
+        # Report doesn't expose Modified_Time → criteria 404s.
+        "criteria_field": "Added_Time",
         "exclude_column_patterns": [],
     },
     "All_Tasks": {
@@ -85,6 +90,9 @@ SYNC_SCHEDULE = {
     },
     "Location_Report": {
         "interval_minutes": 1440,
+        # Modified_Time column is present in records but criteria on it 404s
+        # (likely a lookup/formula field that isn't indexed for filtering).
+        "criteria_field": "Added_Time",
         "exclude_column_patterns": [],
     },
     "All_Quotes": {
@@ -92,6 +100,11 @@ SYNC_SCHEDULE = {
         "exclude_column_patterns": [],
     },
 }
+
+
+def criteria_field_for(report_name: str) -> str:
+    """Return the datetime field used for incremental-sync criteria (default Modified_Time)."""
+    return (SYNC_SCHEDULE.get(report_name) or {}).get("criteria_field", "Modified_Time")
 
 
 def columns_excluded_for(report_name: str) -> list[str]:
