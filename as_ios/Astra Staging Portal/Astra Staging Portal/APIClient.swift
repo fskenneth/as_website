@@ -167,8 +167,9 @@ enum APIError: LocalizedError {
 final class APIClient {
     static let shared = APIClient()
 
-    // Simulator: localhost. Physical iPhone: change to "http://192.168.2.236:5001"
-    let baseURL = URL(string: "http://localhost:5001")!
+    // Portal API lives in as_webapp on :5002. Public marketing site stays on :5001.
+    // Simulator: localhost. Physical iPhone: change to "http://<m4-lan-ip>:5002"
+    let baseURL = URL(string: "http://localhost:5002")!
 
     private let session: URLSession = {
         let cfg = URLSessionConfiguration.default
