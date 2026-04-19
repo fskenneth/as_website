@@ -10,8 +10,10 @@ import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Database path
-DB_PATH = Path(__file__).parent.parent / "data" / "users.db"
+# Database path — customer accounts + their staging records.
+# Renamed from users.db during the as_webapp split: employee auth moved
+# to data/employees.db (see as_webapp/as_portal_api/employees_db.py).
+DB_PATH = Path(__file__).parent.parent / "data" / "customers.db"
 
 
 def get_db_connection():
