@@ -185,9 +185,13 @@ final class APIClient {
     private func request(_ path: String, method: String = "GET", body: [String: Any]? = nil, token: String? = nil) -> URLRequest {
         var req = URLRequest(url: baseURL.appendingPathComponent(path))
         req.httpMethod = method
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Content-Type only when there's actually a JSON body. Setting it on
+        // an empty GET made FastHTML try to parse "" as JSON and return 500.
+        if let body {
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        }
         if let token { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
-        if let body { req.httpBody = try? JSONSerialization.data(withJSONObject: body) }
         return req
     }
 

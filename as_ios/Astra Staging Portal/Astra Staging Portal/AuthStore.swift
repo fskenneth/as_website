@@ -25,6 +25,19 @@ final class AuthStore {
 
     func restoreSession() async {
         defer { isLoading = false }
+
+        // DEV bypass: debug builds with a hardcoded token skip login entirely.
+        if let bypass = DEV_BYPASS_TOKEN, !bypass.isEmpty {
+            do {
+                let me = try await APIClient.shared.me(token: bypass)
+                self.token = bypass
+                self.user = me.user
+                return
+            } catch {
+                // Bypass rejected — fall through to normal flow so login screen shows
+            }
+        }
+
         guard let saved = Keychain.get(tokenKey), !saved.isEmpty else { return }
         do {
             let me = try await APIClient.shared.me(token: saved)
@@ -53,7 +66,11 @@ final class AuthStore {
     }
 
     func logout() async {
-        if let t = token { await APIClient.shared.logout(token: t) }
+        // Don't invalidate the dev bypass token server-side — next cold
+        // start would lose the auto-login.
+        if let t = token, t != DEV_BYPASS_TOKEN {
+            await APIClient.shared.logout(token: t)
+        }
         Keychain.delete(tokenKey)
         token = nil
         user = nil

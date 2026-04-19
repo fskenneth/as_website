@@ -18,9 +18,6 @@ android {
     }
 
     buildTypes {
-        release {
-            isMinifyEnabled = false
-        }
         debug {
             // Tailscale IP for m4 — reachable from any network where the phone
             // has Tailscale active. Alternatives if this ever needs swapping:
@@ -28,8 +25,22 @@ android {
             //   Same Wi-Fi as m4:        "http://192.168.2.<m4 LAN IP>:5002"
             //   MagicDNS (same tailnet): "http://kenneths-mac-mini-m4.taile1438a.ts.net:5002"
             buildConfigField("String", "API_BASE_URL", "\"http://100.114.47.80:5002\"")
+
+            // DEV-ONLY auto-login: if non-empty, debug builds skip the login
+            // screen and sign in with this token. Expires 2027-04-19. Delete
+            // this line (or set to "") before any release / public build.
+            buildConfigField(
+                "String", "DEV_BYPASS_TOKEN",
+                "\"dFF4hOUwq9s6nnOFzYBITC8OZ5_dyOqIBP8qzYHxyzU\""
+            )
+
             // Plaintext HTTP allowed only in debug for local dev — controlled via
             // network_security_config.xml.
+        }
+        release {
+            isMinifyEnabled = false
+            buildConfigField("String", "API_BASE_URL", "\"https://portal.astrastaging.com\"")
+            buildConfigField("String", "DEV_BYPASS_TOKEN", "\"\"")  // must stay empty in release
         }
     }
 

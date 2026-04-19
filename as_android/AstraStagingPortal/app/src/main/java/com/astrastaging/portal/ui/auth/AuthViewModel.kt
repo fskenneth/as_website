@@ -3,6 +3,7 @@ package com.astrastaging.portal.ui.auth
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.astrastaging.portal.BuildConfig
 import com.astrastaging.portal.data.ApiClient
 import com.astrastaging.portal.data.ApiError
 import com.astrastaging.portal.data.ApiUser
@@ -32,6 +33,20 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun restoreSession() {
         viewModelScope.launch {
+            // DEV bypass: debug builds with a hardcoded token skip the login
+            // screen entirely. Release builds have DEV_BYPASS_TOKEN="" so
+            // this branch is dead code.
+            val bypass = BuildConfig.DEV_BYPASS_TOKEN
+            if (bypass.isNotEmpty()) {
+                try {
+                    val me = ApiClient.me(bypass)
+                    _state.value = State(user = me.user, token = bypass, isLoading = false)
+                    return@launch
+                } catch (_: Throwable) {
+                    // Bypass token rejected by server — fall through to normal flow
+                }
+            }
+
             val saved = tokenStore.get()
             if (saved.isNullOrEmpty()) {
                 _state.value = _state.value.copy(isLoading = false)
@@ -67,7 +82,10 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
         val t = _state.value.token
         _state.value = State(isLoading = false)
         tokenStore.clear()
-        if (t != null) {
+        // Don't invalidate the dev bypass token server-side — next cold
+        // start would lose the auto-login.
+        val bypass = BuildConfig.DEV_BYPASS_TOKEN
+        if (t != null && t != bypass) {
             viewModelScope.launch { ApiClient.logout(t) }
         }
     }
