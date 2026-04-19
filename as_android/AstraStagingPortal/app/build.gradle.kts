@@ -22,9 +22,12 @@ android {
             isMinifyEnabled = false
         }
         debug {
-            // The Android emulator maps host's localhost to 10.0.2.2.
-            // Physical device on same Wi-Fi: point at m4's LAN IP.
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:5002\"")
+            // Tailscale IP for m4 — reachable from any network where the phone
+            // has Tailscale active. Alternatives if this ever needs swapping:
+            //   Emulator (no Tailscale): "http://10.0.2.2:5002"
+            //   Same Wi-Fi as m4:        "http://192.168.2.<m4 LAN IP>:5002"
+            //   MagicDNS (same tailnet): "http://kenneths-mac-mini-m4.taile1438a.ts.net:5002"
+            buildConfigField("String", "API_BASE_URL", "\"http://100.114.47.80:5002\"")
             // Plaintext HTTP allowed only in debug for local dev — controlled via
             // network_security_config.xml.
         }

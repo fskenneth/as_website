@@ -1,12 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Allow plaintext HTTP to localhost/LAN hosts for dev. Production
-         (portal.astrastaging.com) is HTTPS-only by default. -->
+    <!-- Allow plaintext HTTP to localhost, LAN, and Tailscale for dev.
+         Production (portal.astrastaging.com) will be HTTPS-only. -->
     <domain-config cleartextTrafficPermitted="true">
+        <!-- Emulator → host -->
         <domain includeSubdomains="false">10.0.2.2</domain>
         <domain includeSubdomains="false">localhost</domain>
+
+        <!-- Common LAN ranges (home Wi-Fi, direct connection) -->
         <domain includeSubdomains="true">192.168.0.0</domain>
         <domain includeSubdomains="true">192.168.1.0</domain>
         <domain includeSubdomains="true">192.168.2.0</domain>
+
+        <!-- Tailscale: m4 IP + MagicDNS name -->
+        <domain includeSubdomains="false">100.114.47.80</domain>
+        <domain includeSubdomains="true">ts.net</domain>
     </domain-config>
 </network-security-config>
