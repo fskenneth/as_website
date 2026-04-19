@@ -6,13 +6,17 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.astrastaging.portal.ui.auth.AuthViewModel
+import com.astrastaging.portal.ui.auth.LoginScreen
+import com.astrastaging.portal.ui.main.MainScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -20,7 +24,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    HelloScreen()
+                    AppRoot()
                 }
             }
         }
@@ -28,19 +32,32 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun HelloScreen() {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(text = "Hello, Astra Staging!", style = MaterialTheme.typography.headlineMedium)
-        Text(text = "Android portal — v0.1", style = MaterialTheme.typography.bodyMedium)
+private fun AppRoot() {
+    val vm: AuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val state by vm.state.collectAsStateWithLifecycle()
+
+    when {
+        state.isLoading && !state.isSignedIn -> SplashLoading()
+        !state.isSignedIn -> LoginScreen(
+            isLoading = state.isLoading,
+            loginError = state.loginError,
+            onLogin = vm::login,
+        )
+        else -> MainScreen(
+            user = state.user!!,
+            token = state.token!!,
+            onLogout = vm::logout,
+        )
     }
 }
 
-@Preview(showBackground = true)
 @Composable
-fun HelloPreview() {
-    MaterialTheme { HelloScreen() }
+private fun SplashLoading() {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        CircularProgressIndicator()
+    }
 }
