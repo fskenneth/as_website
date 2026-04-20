@@ -8,9 +8,17 @@ Field updates write straight to Staging_Report. No Zoho push; changes stay
 local so web/iOS/Android all see each other. When Zoho is deprecated,
 zoho_sync.db becomes the primary DB and these writes become authoritative.
 
-Pattern for row buttons: an HTML form POSTs to a local handler, handler
-writes the field, then 303 redirects back. Sub-pages not yet ported land
-on /stub; see as_webapp/UNPORTED_PAGES.md for the queue.
+Render strategy:
+- Server fetches every Active + Inquired staging (~124 rows) plus the
+  employee list and emits the full table with data-* attributes on each
+  row.
+- Client-side JS handles all filtering (date range, search, my-tasks) by
+  toggling row visibility. Filter state lives in-memory + localStorage,
+  never in the URL.
+- Buttons that write to the DB still POST back to the server, same as
+  before, so the DB stays authoritative.
+
+Sub-pages that aren't ported yet land on /stub; see as_webapp/UNPORTED_PAGES.md.
 """
 from datetime import date, datetime, timedelta
 import json
@@ -21,12 +29,10 @@ from urllib.parse import urlencode
 from fasthtml.common import (
     A, Body, Button, Dialog, Div, Form, H1, H2, H3, Head, Html, Input,
     Label, Li, Link, Main, Meta, Ol, P, Script, Span, Style, Svg, Table,
-    Tbody, Td, Th, Thead, Tr, Titled, Title, Ul, NotStr,
+    Tbody, Td, Th, Thead, Title, Tr, Ul, NotStr, to_xml,
 )
-from starlette.responses import HTMLResponse
-from fasthtml.common import to_xml
 from starlette.requests import Request
-from starlette.responses import RedirectResponse
+from starlette.responses import HTMLResponse, RedirectResponse
 
 
 ZOHO_DB = os.path.join(
@@ -55,12 +61,6 @@ _DATE_FIELDS = {
     "Destaging_Confirmation_Email_Sent_Date",
 }
 
-_PERIOD_RANGES = {
-    "today_only": lambda today: (today, today + timedelta(days=1)),
-    "this_week":  lambda today: (today + timedelta(days=-5), today + timedelta(days=14)),
-    "anytime":    lambda today: (today + timedelta(days=-1000), today + timedelta(days=365)),
-}
-
 
 # -------------------- data helpers --------------------
 
@@ -79,7 +79,8 @@ def _parse_mdy(s):
         return None
 
 
-def _fmt_mdy(d): return d.strftime("%m/%d/%Y")
+def _fmt_mdy(d):
+    return d.strftime("%m/%d/%Y")
 
 
 def _parse_people(s):
@@ -111,10 +112,14 @@ def _money(s):
         return 0.0
 
 
-def _fetch_stagings(period, show_my, show_stars, my_name):
-    today = date.today()
-    from_d, to_d = _PERIOD_RANGES.get(period, _PERIOD_RANGES["this_week"])(today)
+def _iso(d):
+    return d.strftime("%Y-%m-%d")
 
+
+def _fetch_all_stagings():
+    """Every Active + Inquired staging with a scheduled date, sorted
+    chronologically. Filtering happens client-side.
+    """
     iso = ("substr(Coming_Staging_Destaging_Date, 7, 4) || '-' || "
            "substr(Coming_Staging_Destaging_Date, 1, 2) || '-' || "
            "substr(Coming_Staging_Destaging_Date, 4, 2)")
@@ -126,26 +131,33 @@ def _fetch_stagings(period, show_my, show_stars, my_name):
           AND (Staging_Status = 'Active' OR Staging_Status = 'Inquired')
           AND Coming_Staging_Destaging_Date IS NOT NULL
           AND Coming_Staging_Destaging_Date != ''
-          AND {iso} >= ?
-          AND {iso} < ?
         ORDER BY {iso} ASC, CAST(ID AS INTEGER) ASC
-        LIMIT 1000
     """
     with _conn() as c:
-        rows = c.execute(sql, (from_d.isoformat(), to_d.isoformat())).fetchall()
-
-    if show_my and my_name:
-        needle = my_name.lower()
-        rows = [r for r in rows if _is_mine(r, needle)]
-    return rows, from_d, to_d, today
+        return c.execute(sql).fetchall()
 
 
-def _is_mine(row, needle):
-    for field in (row["Stager"], row["Staging_Movers"], row["Destaging_Movers"]):
-        for name in _parse_people(field):
-            if name and needle in name.lower():
-                return True
-    return False
+def _fetch_employees():
+    """First-name roster for the 'I am…' selector. Only active employees."""
+    with _conn() as c:
+        try:
+            rows = c.execute(
+                "SELECT First_Name, Last_Name FROM Employee_Report "
+                "WHERE First_Name IS NOT NULL AND First_Name != '' "
+                "ORDER BY First_Name, Last_Name"
+            ).fetchall()
+            names = []
+            seen = set()
+            for r in rows:
+                fn = (r["First_Name"] or "").strip()
+                ln = (r["Last_Name"] or "").strip()
+                full = f"{fn} {ln}".strip()
+                if full and full not in seen:
+                    seen.add(full)
+                    names.append(full)
+            return names
+        except Exception:
+            return []
 
 
 def _group_by_date(rows):
@@ -163,23 +175,54 @@ def _group_by_date(rows):
     return out
 
 
-# -------------------- theme system --------------------
+def _build_autocomplete_corpus(rows, employees):
+    """Unique tokens for the search dropdown. Month names, status values,
+    addresses, customer names, stager/mover names. All lowercased.
+    """
+    corpus = set()
+    for name in employees:
+        corpus.add(name)
+    months = ["January", "February", "March", "April", "May", "June",
+              "July", "August", "September", "October", "November", "December"]
+    weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    corpus.update(months)
+    corpus.update(weekdays)
+    corpus.update(["Active", "Inquired", "Vacant", "Occupied", "Staging", "Destaging"])
 
-# Six curated themes. Each defines an accent palette; base neutrals come
-# from the root :root selector. Applied via <html data-theme="X">.
+    for r in rows:
+        for key in ("Customer_First_Name", "Customer_Last_Name", "Property_Type",
+                    "Occupancy_Type", "Staging_Type", "Staging_Status", "MLS"):
+            val = (r[key] or "").strip()
+            if val and len(val) >= 2:
+                corpus.add(val)
+        addr = _parse_link(r["Staging_Address"]) or ""
+        if addr:
+            # Split address into tokens (street name, city) to broaden matches
+            for part in addr.replace(",", " ").split():
+                if len(part) > 2 and not part[0].isdigit():
+                    corpus.add(part.strip(" ,."))
+            corpus.add(addr)
+        for field in ("Stager", "Staging_Movers", "Destaging_Movers"):
+            for name in _parse_people(r[field]):
+                if name:
+                    corpus.add(name)
+    return sorted(corpus, key=lambda s: s.lower())
+
+
+# -------------------- theme system (unchanged) --------------------
+
 _THEMES = [
-    ("default", "Slate", "#4f46e5"),   # indigo
-    ("ocean",   "Ocean", "#0891b2"),   # cyan/teal
-    ("forest",  "Forest", "#059669"),  # emerald
-    ("sunset",  "Sunset", "#ea580c"),  # orange
-    ("rose",    "Rose",  "#e11d48"),   # rose/red
-    ("noir",    "Noir",  "#0a0a0a"),   # grayscale / high contrast
+    ("default", "Slate", "#4f46e5"),
+    ("ocean",   "Ocean", "#0891b2"),
+    ("forest",  "Forest", "#059669"),
+    ("sunset",  "Sunset", "#ea580c"),
+    ("rose",    "Rose",  "#e11d48"),
+    ("noir",    "Noir",  "#0a0a0a"),
 ]
 
 
 def _style_block():
     return Style("""
-    /* ---------- reset + base ---------- */
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; height: 100%; }
     body {
@@ -193,96 +236,43 @@ def _style_block():
         transition: background 180ms ease, color 180ms ease;
     }
 
-    /* ---------- theme: light defaults ---------- */
     :root {
-        --bg:            #f6f7fb;
-        --surface:       #ffffff;
-        --surface-2:     #f1f3f9;
-        --surface-3:     #e7eaf3;
-        --border:        #e3e6ef;
-        --border-strong: #c9cfdd;
-        --text:          #181b2b;
-        --text-muted:    #5b6275;
-        --text-faint:    #8b91a5;
-
-        --accent:        #4f46e5;
-        --accent-hover:  #4338ca;
-        --accent-soft:   #eef0ff;
-        --accent-fg:     #ffffff;
-
-        --success:       #059669;
-        --success-soft:  #d1fae5;
-        --warning:       #d97706;
-        --warning-soft:  #fef3c7;
-        --danger:        #dc2626;
-        --danger-soft:   #fee2e2;
-
-        --row-odd:       #ffffff;
-        --row-even:      #fafbfd;
-        --row-hover:     #f4f6fb;
-        --row-today:     #eff6ff;
-        --row-destage:   #fffbeb;
-        --row-inquired:  #f3f4f8;
-        --row-inactive:  #eeeef2;
-
-        --date-bg:       linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
-        --date-text:     #78350f;
-        --date-border:   #fbbf24;
-
+        --bg:#f6f7fb; --surface:#ffffff; --surface-2:#f1f3f9; --surface-3:#e7eaf3;
+        --border:#e3e6ef; --border-strong:#c9cfdd;
+        --text:#181b2b; --text-muted:#5b6275; --text-faint:#8b91a5;
+        --accent:#4f46e5; --accent-hover:#4338ca; --accent-soft:#eef0ff; --accent-fg:#ffffff;
+        --success:#059669; --success-soft:#d1fae5;
+        --warning:#d97706; --warning-soft:#fef3c7;
+        --danger:#dc2626;  --danger-soft:#fee2e2;
+        --row-odd:#ffffff; --row-even:#fafbfd; --row-hover:#f4f6fb;
+        --row-today:#eff6ff; --row-destage:#fffbeb; --row-inquired:#f3f4f8; --row-inactive:#eeeef2;
+        --date-bg: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+        --date-text:#78350f; --date-border:#fbbf24;
         --shadow-sm: 0 1px 2px rgba(15,23,42,.06);
         --shadow-md: 0 4px 12px rgba(15,23,42,.08);
         --shadow-lg: 0 12px 32px rgba(15,23,42,.12);
-
-        --radius-sm: 6px;
-        --radius-md: 10px;
-        --radius-lg: 16px;
-
+        --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px;
         --toolbar-h: 64px;
     }
-
-    /* ---------- theme accents (override accent family) ---------- */
     :root[data-theme="ocean"]  { --accent:#0891b2; --accent-hover:#0e7490; --accent-soft:#ecfeff; }
     :root[data-theme="forest"] { --accent:#059669; --accent-hover:#047857; --accent-soft:#ecfdf5; }
     :root[data-theme="sunset"] { --accent:#ea580c; --accent-hover:#c2410c; --accent-soft:#fff7ed; }
     :root[data-theme="rose"]   { --accent:#e11d48; --accent-hover:#be123c; --accent-soft:#fff1f2; }
     :root[data-theme="noir"]   { --accent:#0a0a0a; --accent-hover:#000000; --accent-soft:#f4f4f5; }
 
-    /* ---------- dark mode (system or forced) ---------- */
     @media (prefers-color-scheme: dark) {
         :root:not([data-mode="light"]) {
-            --bg:            #0b0d14;
-            --surface:       #141726;
-            --surface-2:     #1c2033;
-            --surface-3:     #252a42;
-            --border:        #262a3f;
-            --border-strong: #363b58;
-            --text:          #e6e8ef;
-            --text-muted:    #9ea5bd;
-            --text-faint:    #6b7490;
-
-            --accent:        #818cf8;
-            --accent-hover:  #a5b4fc;
-            --accent-soft:   #1e1f3a;
-
-            --success:       #34d399;
-            --success-soft:  #0f2921;
-            --warning:       #fbbf24;
-            --warning-soft:  #2a2110;
-            --danger:        #f87171;
-            --danger-soft:   #2a1515;
-
-            --row-odd:       #141726;
-            --row-even:      #181c2f;
-            --row-hover:     #1e2337;
-            --row-today:     #1a2344;
-            --row-destage:   #231a0d;
-            --row-inquired:  #171a28;
-            --row-inactive:  #111320;
-
-            --date-bg:       linear-gradient(135deg, #2a1f0a 0%, #3a2a0d 100%);
-            --date-text:     #fbbf24;
-            --date-border:   #d97706;
-
+            --bg:#0b0d14; --surface:#141726; --surface-2:#1c2033; --surface-3:#252a42;
+            --border:#262a3f; --border-strong:#363b58;
+            --text:#e6e8ef; --text-muted:#9ea5bd; --text-faint:#6b7490;
+            --accent:#818cf8; --accent-hover:#a5b4fc; --accent-soft:#1e1f3a;
+            --success:#34d399; --success-soft:#0f2921;
+            --warning:#fbbf24; --warning-soft:#2a2110;
+            --danger:#f87171;  --danger-soft:#2a1515;
+            --row-odd:#141726; --row-even:#181c2f; --row-hover:#1e2337;
+            --row-today:#1a2344; --row-destage:#231a0d; --row-inquired:#171a28; --row-inactive:#111320;
+            --date-bg: linear-gradient(135deg, #2a1f0a 0%, #3a2a0d 100%);
+            --date-text:#fbbf24; --date-border:#d97706;
             --shadow-sm: 0 1px 2px rgba(0,0,0,.3);
             --shadow-md: 0 4px 12px rgba(0,0,0,.35);
             --shadow-lg: 0 16px 40px rgba(0,0,0,.5);
@@ -293,7 +283,6 @@ def _style_block():
         :root:not([data-mode="light"])[data-theme="rose"]   { --accent:#fb7185; --accent-hover:#fda4af; --accent-soft:#2a1015; }
         :root:not([data-mode="light"])[data-theme="noir"]   { --accent:#e5e5e5; --accent-hover:#fafafa; --accent-soft:#18181b; }
     }
-    /* explicit dark mode toggle (overrides system preference) */
     :root[data-mode="dark"] {
         --bg:#0b0d14; --surface:#141726; --surface-2:#1c2033; --surface-3:#252a42;
         --border:#262a3f; --border-strong:#363b58;
@@ -301,7 +290,7 @@ def _style_block():
         --accent:#818cf8; --accent-hover:#a5b4fc; --accent-soft:#1e1f3a;
         --success:#34d399; --success-soft:#0f2921;
         --warning:#fbbf24; --warning-soft:#2a2110;
-        --danger:#f87171; --danger-soft:#2a1515;
+        --danger:#f87171;  --danger-soft:#2a1515;
         --row-odd:#141726; --row-even:#181c2f; --row-hover:#1e2337;
         --row-today:#1a2344; --row-destage:#231a0d; --row-inquired:#171a28; --row-inactive:#111320;
         --date-bg: linear-gradient(135deg, #2a1f0a 0%, #3a2a0d 100%);
@@ -316,90 +305,84 @@ def _style_block():
     :root[data-mode="dark"][data-theme="rose"]   { --accent:#fb7185; --accent-hover:#fda4af; --accent-soft:#2a1015; }
     :root[data-mode="dark"][data-theme="noir"]   { --accent:#e5e5e5; --accent-hover:#fafafa; --accent-soft:#18181b; }
 
-    /* ---------- layout shell ---------- */
-    .app-shell {
-        display: flex; flex-direction: column;
-        height: 100vh; overflow: hidden;
-    }
+    /* ---------- layout ---------- */
+    .app-shell { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
     .toolbar {
         flex: 0 0 var(--toolbar-h);
         display: flex; align-items: center; gap: 12px;
-        padding: 0 20px;
-        background: var(--surface);
-        border-bottom: 1px solid var(--border);
-        box-shadow: var(--shadow-sm);
-        z-index: 10;
+        padding: 0 16px;
+        background: var(--surface); border-bottom: 1px solid var(--border);
+        box-shadow: var(--shadow-sm); z-index: 20;
     }
-    .toolbar-title {
-        font-weight: 700; font-size: 17px; letter-spacing: -0.01em;
-        margin-right: 8px;
-    }
+    .toolbar-title { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; white-space: nowrap; }
     .toolbar-title .accent { color: var(--accent); }
     .toolbar-spacer { flex: 1; }
-    .toolbar-meta {
-        font-size: 12px; color: var(--text-muted);
-        padding: 4px 10px; background: var(--surface-2);
-        border-radius: var(--radius-sm);
-    }
-    .seg {
-        display: inline-flex; background: var(--surface-2);
-        border: 1px solid var(--border); border-radius: var(--radius-md);
-        padding: 3px; gap: 2px;
-    }
-    .seg a, .seg button {
-        padding: 6px 12px; font-size: 13px; font-weight: 500;
-        color: var(--text-muted); border: 0; background: transparent;
-        border-radius: 7px; cursor: pointer; text-decoration: none;
-        transition: background 140ms ease, color 140ms ease;
-    }
-    .seg a:hover, .seg button:hover { color: var(--text); background: var(--surface-3); }
-    .seg a.on, .seg button.on {
-        background: var(--surface); color: var(--accent);
-        box-shadow: var(--shadow-sm);
-    }
-    .toolbar-btn {
-        display: inline-flex; align-items: center; gap: 6px;
+
+    /* unified toolbar button */
+    .tbtn {
+        all: unset; box-sizing: border-box;
+        display: inline-flex; align-items: center; gap: 7px;
         padding: 7px 12px; font-size: 13px; font-weight: 500;
         background: var(--surface); color: var(--text);
         border: 1px solid var(--border); border-radius: var(--radius-md);
-        cursor: pointer; text-decoration: none;
+        cursor: pointer; transition: all 140ms ease;
+        font-family: inherit; white-space: nowrap;
+    }
+    .tbtn:hover { background: var(--surface-2); border-color: var(--border-strong); }
+    .tbtn.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+    .tbtn.needs-setup { border-style: dashed; color: var(--text-faint); }
+    .tbtn.needs-setup:hover { color: var(--text); }
+    .tbtn.accent { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+    .tbtn.accent:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .tbtn svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+    .range-btn { min-width: 200px; justify-content: center; }
+    .range-btn .range-count { font-weight: 600; color: var(--accent); }
+    .range-btn .range-dash { color: var(--text-faint); margin: 0 4px; }
+
+    /* search */
+    .search-wrap { position: relative; flex: 1 1 420px; max-width: 520px; min-width: 200px; }
+    .search-input {
+        width: 100%; padding: 9px 14px 9px 36px;
+        background: var(--surface-2); color: var(--text);
+        border: 1px solid var(--border); border-radius: var(--radius-md);
+        font-family: inherit; font-size: 13px;
         transition: all 140ms ease;
     }
-    .toolbar-btn:hover { background: var(--surface-2); border-color: var(--border-strong); }
-    .toolbar-btn.accent {
-        background: var(--accent); color: var(--accent-fg); border-color: var(--accent);
+    .search-input:focus { outline: none; border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .search-icon {
+        position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+        color: var(--text-faint); pointer-events: none;
     }
-    .toolbar-btn.accent:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
-    .toolbar-btn svg { width: 15px; height: 15px; }
+    .search-suggest {
+        position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius-md); box-shadow: var(--shadow-md);
+        max-height: 280px; overflow-y: auto; z-index: 30;
+        padding: 4px; display: none;
+    }
+    .search-suggest.open { display: block; }
+    .search-suggest .item {
+        padding: 8px 12px; cursor: pointer; border-radius: var(--radius-sm);
+        font-size: 13px; color: var(--text);
+    }
+    .search-suggest .item:hover, .search-suggest .item.hl { background: var(--accent-soft); color: var(--accent); }
+    .search-suggest .hint { padding: 4px 12px; font-size: 11px; color: var(--text-faint); border-top: 1px solid var(--border); margin-top: 4px; }
+    .search-suggest .hint kbd { background: var(--surface-2); border: 1px solid var(--border); border-radius: 3px; padding: 1px 4px; font-size: 10px; font-family: inherit; }
 
-    /* ---------- main scroll area ---------- */
-    .scroll-area {
-        flex: 1; overflow: auto; position: relative;
-        background: var(--bg);
-    }
+    /* scroll area */
+    .scroll-area { flex: 1; overflow: auto; position: relative; background: var(--bg); }
 
-    /* ---------- desktop table ---------- */
-    table.board {
-        width: 100%; border-collapse: separate; border-spacing: 0;
-        background: var(--surface);
-        font-size: 13px;
-    }
-    table.board thead tr {
-        position: sticky; top: 0; z-index: 5;
-        background: var(--surface-2);
-    }
+    /* table */
+    table.board { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--surface); font-size: 13px; }
+    table.board thead tr { position: sticky; top: 0; z-index: 5; background: var(--surface-2); }
     table.board thead th {
         text-align: left; font-weight: 600; font-size: 12px;
         text-transform: uppercase; letter-spacing: 0.04em;
-        color: var(--text-muted);
-        padding: 12px 14px; border-bottom: 1px solid var(--border);
-        white-space: nowrap;
+        color: var(--text-muted); padding: 12px 14px;
+        border-bottom: 1px solid var(--border); white-space: nowrap;
     }
-    table.board tbody td {
-        padding: 14px; vertical-align: top;
-        border-bottom: 1px solid var(--border);
-        min-width: 240px; max-width: 340px;
-    }
+    table.board tbody td { padding: 14px; vertical-align: top; border-bottom: 1px solid var(--border); min-width: 240px; max-width: 340px; }
     table.board tbody td.col-wide { min-width: 280px; max-width: 420px; }
     table.board tbody td.col-narrow { min-width: 180px; max-width: 220px; }
 
@@ -409,12 +392,9 @@ def _style_block():
     tr.data-row.state-today td { background: var(--row-today); }
     tr.data-row.state-destage td { background: var(--row-destage); }
     tr.data-row.state-inquired td { background: var(--row-inquired); }
-    tr.data-row.state-inactive td { background: var(--row-inactive); color: var(--text-muted); }
 
-    /* full-width date banner row */
     tr.date-banner td {
-        background: var(--date-bg);
-        color: var(--date-text);
+        background: var(--date-bg); color: var(--date-text);
         font-weight: 700; font-size: 13px;
         text-transform: uppercase; letter-spacing: 0.08em;
         text-align: center; padding: 10px;
@@ -422,43 +402,22 @@ def _style_block():
         border-bottom: 1px solid var(--date-border);
         position: sticky; top: 41px; z-index: 4;
     }
-    tr.slot-row td {
-        font-size: 12px; color: var(--text-faint);
-        font-style: italic; text-align: center; padding: 8px;
-        background: var(--surface);
-    }
 
-    /* ---------- row cell content ---------- */
+    tr.empty-state td {
+        text-align: center; padding: 40px 20px;
+        color: var(--text-muted); font-size: 14px;
+    }
+    tr.empty-state .emoji { font-size: 32px; display: block; margin-bottom: 8px; opacity: 0.7; }
+
+    /* row cell content */
     .staging-title { font-weight: 700; font-size: 14px; color: var(--text); margin-bottom: 4px; }
     .staging-meta { color: var(--text-muted); font-size: 12px; margin-bottom: 2px; }
     .staging-address { font-weight: 600; color: var(--text); margin-top: 2px; }
-    .staging-address + .staging-meta { margin-top: 2px; }
-    .sublinks {
-        display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
-    }
-    .sublink {
-        font-size: 11px; font-weight: 500;
-        padding: 3px 8px; border-radius: var(--radius-sm);
-        background: var(--accent-soft); color: var(--accent);
-        text-decoration: none; transition: background 140ms ease;
-    }
+    .sublinks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .sublink { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--accent); text-decoration: none; transition: background 140ms ease; }
     .sublink:hover { background: var(--accent); color: var(--accent-fg); }
 
-    /* milestone chips */
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-    .chip {
-        display: inline-flex; align-items: center; gap: 4px;
-        padding: 4px 10px; font-size: 11px; font-weight: 500;
-        background: var(--surface-2); color: var(--text-muted);
-        border: 1px solid var(--border); border-radius: 999px;
-        cursor: pointer; transition: all 140ms ease;
-    }
-    .chip:hover { background: var(--surface-3); color: var(--text); }
-    .chip.done {
-        background: var(--success-soft); color: var(--success);
-        border-color: transparent;
-    }
-    .chip svg { width: 10px; height: 10px; }
     .chip-form { display: inline-block; margin: 0; padding: 0; }
     .chip-btn {
         all: unset; display: inline-flex; align-items: center; gap: 4px;
@@ -470,7 +429,6 @@ def _style_block():
     .chip-btn:hover { background: var(--surface-3); color: var(--text); }
     .chip-btn.done { background: var(--success-soft); color: var(--success); border-color: transparent; }
 
-    /* action buttons (Download Invoice, etc.) */
     .btn {
         display: inline-flex; align-items: center; gap: 6px;
         padding: 6px 10px; font-size: 12px; font-weight: 500;
@@ -484,73 +442,47 @@ def _style_block():
     .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
     .btn-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 
-    /* money display */
     .money-block { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; }
     .money-block .label { color: var(--text-muted); }
     .money-block .val { font-variant-numeric: tabular-nums; font-weight: 500; }
     .money-block .val.owing { color: var(--danger); font-weight: 600; }
 
-    /* notes column */
     .notes { font-size: 12px; color: var(--text-muted); line-height: 1.5; max-height: 260px; overflow-y: auto; }
-
-    /* persons column */
     .persons { font-size: 12px; }
     .persons .row { margin-bottom: 4px; }
     .persons .label { color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin-right: 4px; }
     .persons .val { color: var(--text); font-weight: 500; }
 
-    /* ---------- mobile card layout ---------- */
-    .cards { padding: 16px; display: flex; flex-direction: column; gap: 12px; max-width: 900px; margin: 0 auto; }
-    .card {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-sm);
-        padding: 16px;
-        transition: box-shadow 180ms ease;
-    }
-    .card:hover { box-shadow: var(--shadow-md); }
-    .card.today { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
-    .card-date-banner {
-        font-size: 12px; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.08em; color: var(--date-text);
-        padding: 10px 16px; background: var(--date-bg);
-        border: 1px solid var(--date-border);
-        border-radius: var(--radius-md);
-        text-align: center; margin-top: 8px;
-    }
-    .card .staging-title { font-size: 15px; }
-
-    /* ---------- modal ---------- */
-    dialog.modal {
-        border: 0; padding: 0; background: transparent;
-        max-width: min(520px, 92vw); width: 100%;
-    }
+    /* modals */
+    dialog.modal { border: 0; padding: 0; background: transparent; max-width: min(520px, 94vw); width: 100%; }
     dialog.modal::backdrop { background: rgba(15,23,42,.5); backdrop-filter: blur(4px); }
-    dialog.modal .modal-card {
-        background: var(--surface); color: var(--text);
-        border: 1px solid var(--border); border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-lg); padding: 24px;
-        max-height: 85vh; overflow-y: auto;
-    }
+    dialog.modal .modal-card { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); padding: 24px; max-height: 85vh; overflow-y: auto; }
     .modal-title { font-size: 18px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.01em; }
     .modal-sub { font-size: 13px; color: var(--text-muted); margin: 0 0 20px; }
     .modal-section { margin-top: 20px; }
     .modal-section h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 0 0 10px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
 
-    .theme-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-    .theme-card {
-        position: relative; padding: 12px; cursor: pointer;
-        border: 2px solid var(--border); border-radius: var(--radius-md);
-        background: var(--surface); transition: all 140ms ease;
-        text-align: left;
+    /* date-range modal */
+    .preset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .preset-grid .tbtn { justify-content: center; padding: 10px; font-size: 13px; }
+    .date-inputs { display: flex; gap: 12px; margin-top: 16px; }
+    .date-inputs > div { flex: 1; }
+    .date-inputs label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; margin-bottom: 4px; }
+    .date-inputs input[type="date"] {
+        width: 100%; padding: 8px 10px;
+        background: var(--surface-2); color: var(--text);
+        border: 1px solid var(--border); border-radius: var(--radius-sm);
+        font-family: inherit; font-size: 13px;
     }
+    .date-inputs input[type="date"]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+    /* settings modal — theme grid */
+    .theme-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .theme-card { position: relative; padding: 12px; cursor: pointer; border: 2px solid var(--border); border-radius: var(--radius-md); background: var(--surface); transition: all 140ms ease; text-align: left; font-family: inherit; }
     .theme-card:hover { border-color: var(--border-strong); }
     .theme-card.active { border-color: var(--accent); background: var(--accent-soft); }
-    .theme-swatch {
-        display: block; height: 32px; border-radius: var(--radius-sm);
-        margin-bottom: 8px; background: var(--sw, #4f46e5);
-    }
+    .theme-swatch { display: block; height: 32px; border-radius: var(--radius-sm); margin-bottom: 8px; background: var(--sw, #4f46e5); }
     .theme-name { font-size: 12px; font-weight: 600; color: var(--text); }
     .theme-card .check { display: none; }
     .theme-card.active .check {
@@ -562,102 +494,65 @@ def _style_block():
     }
 
     .mode-seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 3px; gap: 2px; }
-    .mode-seg button {
-        padding: 7px 14px; font-size: 13px; font-weight: 500;
-        background: transparent; color: var(--text-muted);
-        border: 0; border-radius: 7px; cursor: pointer;
-        display: inline-flex; align-items: center; gap: 6px;
-        font-family: inherit;
-    }
+    .mode-seg button { padding: 7px 14px; font-size: 13px; font-weight: 500; background: transparent; color: var(--text-muted); border: 0; border-radius: 7px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-family: inherit; }
     .mode-seg button:hover { color: var(--text); }
     .mode-seg button.on { background: var(--surface); color: var(--accent); box-shadow: var(--shadow-sm); }
-    .mode-seg svg { width: 14px; height: 14px; }
 
-    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+    .me-select {
+        width: 100%; padding: 9px 12px;
+        background: var(--surface-2); color: var(--text);
+        border: 1px solid var(--border); border-radius: var(--radius-md);
+        font-family: inherit; font-size: 13px;
+    }
+    .me-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
-    /* ---------- stub page ---------- */
+    /* stub */
     .stub-wrap { max-width: 560px; margin: 80px auto; padding: 0 20px; }
     .stub-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; box-shadow: var(--shadow-md); }
     .stub-card h1 { margin: 0 0 8px; font-size: 22px; letter-spacing: -0.02em; }
     .stub-card .pill { display: inline-block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--warning); background: var(--warning-soft); padding: 3px 10px; border-radius: 999px; margin-bottom: 14px; }
-    .stub-card .params { list-style: none; padding: 0; margin: 16px 0; background: var(--surface-2); border-radius: var(--radius-md); padding: 12px; font-family: 'SF Mono', Menlo, monospace; font-size: 12px; }
+    .stub-card .params { list-style: none; padding: 12px; margin: 16px 0; background: var(--surface-2); border-radius: var(--radius-md); font-family: 'SF Mono', Menlo, monospace; font-size: 12px; }
     .stub-card .params li { padding: 2px 0; color: var(--text); }
     .stub-card .params li span { color: var(--text-muted); }
 
-    /* scrollbar styling */
-    .scroll-area::-webkit-scrollbar, .modal-card::-webkit-scrollbar, .notes::-webkit-scrollbar { width: 10px; height: 10px; }
-    .scroll-area::-webkit-scrollbar-thumb, .modal-card::-webkit-scrollbar-thumb, .notes::-webkit-scrollbar-thumb {
-        background: var(--border-strong); border-radius: 5px; border: 2px solid var(--bg);
-    }
-    .scroll-area::-webkit-scrollbar-track { background: transparent; }
+    /* scrollbars */
+    .scroll-area::-webkit-scrollbar, .modal-card::-webkit-scrollbar, .notes::-webkit-scrollbar, .search-suggest::-webkit-scrollbar { width: 10px; height: 10px; }
+    .scroll-area::-webkit-scrollbar-thumb, .modal-card::-webkit-scrollbar-thumb, .notes::-webkit-scrollbar-thumb, .search-suggest::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; border: 2px solid var(--bg); }
 
-    /* responsive toolbar collapse */
-    @media (max-width: 780px) {
-        .toolbar { flex-wrap: wrap; height: auto; padding: 12px; gap: 8px; }
-        .app-shell { height: 100vh; }
-        .toolbar-title { flex: 1 0 100%; }
+    /* ---------- responsive: auto collapse at narrow viewports ---------- */
+    @media (max-width: 960px) {
+        /* Hide lower-priority columns in desktop table */
+        table.board th.col-notes, table.board td.col-notes,
+        table.board th.col-moving, table.board td.col-moving,
+        table.board th.col-listing, table.board td.col-listing {
+            display: none;
+        }
+    }
+    @media (max-width: 720px) {
+        .toolbar { flex-wrap: wrap; height: auto; padding: 10px; gap: 8px; }
         :root { --toolbar-h: auto; }
-        table.board thead th, table.board tbody td { padding: 10px; }
+        .toolbar-title { flex: 1 0 100%; }
+        .search-wrap { order: 3; flex: 1 1 100%; min-width: 0; }
+        .range-btn { min-width: 0; flex: 1; }
+
+        /* Collapse table to stacked cards. Each row becomes a block. */
+        table.board, table.board thead, table.board tbody, table.board tr, table.board td { display: block; }
+        table.board thead { display: none; }
+        table.board tbody tr.data-row { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); margin: 10px; overflow: hidden; }
+        table.board tbody tr.data-row td { max-width: none; min-width: 0; border-bottom: 1px solid var(--border); padding: 10px 14px; }
+        table.board tbody tr.data-row td:last-child { border-bottom: 0; }
+        table.board tbody tr.data-row td::before { content: attr(data-label); display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); margin-bottom: 4px; font-weight: 600; }
+        table.board tbody tr.date-banner td { border-radius: var(--radius-md); margin: 10px; position: static; }
+        table.board tbody tr.date-banner td::before { display: none; }
         .theme-grid { grid-template-columns: repeat(2, 1fr); }
+        .preset-grid { grid-template-columns: repeat(2, 1fr); }
     }
     """)
 
 
-def _script_block():
-    # Tiny theme controller: reads localStorage on load, writes on change.
-    return Script(r"""
-    (function() {
-        const doc = document.documentElement;
-        const THEME_KEY = 'tb_theme';
-        const MODE_KEY = 'tb_mode';
-
-        function apply() {
-            const theme = localStorage.getItem(THEME_KEY) || 'default';
-            const mode = localStorage.getItem(MODE_KEY) || 'auto';
-            if (theme === 'default') doc.removeAttribute('data-theme');
-            else doc.setAttribute('data-theme', theme);
-            if (mode === 'auto') doc.removeAttribute('data-mode');
-            else doc.setAttribute('data-mode', mode);
-        }
-        apply();
-
-        window.TB = {
-            setTheme(t) { localStorage.setItem(THEME_KEY, t); apply(); refreshModalState(); },
-            setMode(m) { localStorage.setItem(MODE_KEY, m); apply(); refreshModalState(); },
-            openModal() {
-                const dlg = document.getElementById('theme-modal');
-                if (dlg && dlg.showModal) { refreshModalState(); dlg.showModal(); }
-            },
-            closeModal() {
-                const dlg = document.getElementById('theme-modal');
-                if (dlg && dlg.close) dlg.close();
-            },
-        };
-
-        function refreshModalState() {
-            const theme = localStorage.getItem(THEME_KEY) || 'default';
-            const mode = localStorage.getItem(MODE_KEY) || 'auto';
-            document.querySelectorAll('.theme-card').forEach(el => {
-                el.classList.toggle('active', el.dataset.theme === theme);
-            });
-            document.querySelectorAll('.mode-seg button').forEach(el => {
-                el.classList.toggle('on', el.dataset.mode === mode);
-            });
-        }
-
-        // backdrop-click to close
-        document.addEventListener('click', e => {
-            const dlg = document.getElementById('theme-modal');
-            if (dlg && dlg.open && e.target === dlg) dlg.close();
-        });
-    })();
-    """)
-
-
-# -------------------- SVG icons --------------------
+# -------------------- icons --------------------
 
 def _icon(d, size=15):
-    """Inline SVG from a path `d`. Uses currentColor so it inherits text color."""
     return NotStr(
         f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" '
         f'stroke="currentColor" stroke-width="2" stroke-linecap="round" '
@@ -670,31 +565,94 @@ _ICON_PALETTE = "M12 22a10 10 0 1 1 0-20 10 10 0 0 1 10 10c0 3-2 3-4 3h-2a2 2 0 
 _ICON_SUN = "M12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10z M12 1v2 M12 21v2 M4.22 4.22l1.42 1.42 M18.36 18.36l1.42 1.42 M1 12h2 M21 12h2 M4.22 19.78l1.42-1.42 M18.36 5.64l1.42-1.42"
 _ICON_MOON = "M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
 _ICON_MONITOR = "M3 3h18v12H3z M8 21h8 M12 15v6"
-_ICON_MOBILE = "M5 2h14v20H5z M12 18h.01"
-_ICON_DESKTOP = "M3 4h18v12H3z M8 20h8 M12 16v4"
+_ICON_CAL = "M19 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z M16 2v4 M8 2v4 M3 10h18"
+_ICON_USER = "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"
+_ICON_SEARCH = "M21 21l-6-6 M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14z"
 
 
-# -------------------- UI builders --------------------
+# -------------------- modals --------------------
 
-def _modal():
-    """Theme selector modal (native <dialog>)."""
+def _date_modal():
+    return Dialog(
+        Div(
+            H2("Date Range", cls="modal-title"),
+            P("Filter stagings by date. Quick presets, or pick a custom range.",
+              cls="modal-sub"),
+
+            Div(
+                H3("Quick"),
+                Div(
+                    Button("Today", type="button", cls="tbtn", onclick="TB.setRangePreset('today')"),
+                    Button("Week", type="button", cls="tbtn", onclick="TB.setRangePreset('week')"),
+                    Button("Month", type="button", cls="tbtn", onclick="TB.setRangePreset('month')"),
+                    Button("Past", type="button", cls="tbtn", onclick="TB.setRangePreset('past')"),
+                    Button("Upcoming", type="button", cls="tbtn", onclick="TB.setRangePreset('upcoming')"),
+                    Button("All", type="button", cls="tbtn", onclick="TB.setRangePreset('all')"),
+                    cls="preset-grid",
+                ),
+                cls="modal-section",
+            ),
+
+            Div(
+                H3("Custom"),
+                Div(
+                    Div(
+                        Label("From", **{"for": "range-from"}),
+                        Input(type="date", id="range-from"),
+                    ),
+                    Div(
+                        Label("To", **{"for": "range-to"}),
+                        Input(type="date", id="range-to"),
+                    ),
+                    cls="date-inputs",
+                ),
+                cls="modal-section",
+            ),
+
+            Div(
+                Button("Cancel", type="button", cls="tbtn", onclick="TB.closeModal('date-modal')"),
+                Button("Apply", type="button", cls="tbtn accent", onclick="TB.applyCustomRange()"),
+                cls="modal-actions",
+            ),
+            cls="modal-card",
+        ),
+        id="date-modal", cls="modal",
+    )
+
+
+def _settings_modal(employees):
     theme_cards = []
     for slug, name, swatch in _THEMES:
         theme_cards.append(
             Button(
-                NotStr(f'<span class="check">✓</span>'),
+                NotStr('<span class="check">✓</span>'),
                 NotStr(f'<span class="theme-swatch" style="--sw:{swatch}"></span>'),
                 NotStr(f'<span class="theme-name">{name}</span>'),
-                type="button",
-                cls="theme-card",
+                type="button", cls="theme-card",
                 **{"data-theme": slug, "onclick": f"TB.setTheme('{slug}')"},
             )
         )
 
+    options_html = '<option value="">— pick your name —</option>'
+    for name in employees:
+        safe = name.replace('"', "&quot;")
+        options_html += f'<option value="{safe}">{safe}</option>'
+
     return Dialog(
         Div(
-            H2("Appearance", cls="modal-title"),
-            P("Pick a theme and color mode. Preferences stay on this device.", cls="modal-sub"),
+            H2("Appearance & identity", cls="modal-title"),
+            P("Stored on this device only. 'Who am I' filters the 'My tasks' toggle.", cls="modal-sub"),
+
+            Div(
+                H3("Who am I?"),
+                NotStr(
+                    '<select id="me-select" class="me-select" '
+                    'onchange="TB.setMe(this.value)">'
+                    + options_html
+                    + '</select>'
+                ),
+                cls="modal-section",
+            ),
 
             Div(
                 H3("Theme"),
@@ -717,85 +675,61 @@ def _modal():
             ),
 
             Div(
-                Button("Done", type="button", cls="toolbar-btn accent", onclick="TB.closeModal()"),
+                Button("Done", type="button", cls="tbtn accent", onclick="TB.closeModal('settings-modal')"),
                 cls="modal-actions",
             ),
             cls="modal-card",
         ),
-        id="theme-modal",
-        cls="modal",
+        id="settings-modal", cls="modal",
     )
 
 
-def _toolbar(display_mode, period, show_my, rows_count, from_d, to_d, today):
-    def link(params, label, on=False):
-        qs = {
-            "display": display_mode if display_mode != "desktop" else "",
-            "show_period": period if period != "this_week" else "",
-            "show_only_my_tasks": "yes" if show_my else "",
-        }
-        qs.update(params)
-        qs = {k: v for k, v in qs.items() if v not in (None, "")}
-        href = "/staging_task_board"
-        if qs:
-            href += "?" + urlencode(qs)
-        return A(label, href=href, cls="on" if on else "")
+# -------------------- toolbar --------------------
 
-    period_seg = Div(
-        link({"show_period": "today_only"}, "Today", on=(period == "today_only")),
-        link({"show_period": "this_week"}, "Week", on=(period == "this_week")),
-        link({"show_period": "anytime"}, "All", on=(period == "anytime")),
-        cls="seg",
-    )
-    mine_seg = Div(
-        link({"show_only_my_tasks": ""}, "All tasks", on=(not show_my)),
-        link({"show_only_my_tasks": "yes"}, "My tasks", on=show_my),
-        cls="seg",
-    )
-    display_seg = Div(
-        A(_icon(_ICON_DESKTOP), NotStr(" Desktop"),
-          href="/staging_task_board" + (
-              "?" + urlencode({k: v for k, v in {
-                  "show_period": period if period != "this_week" else "",
-                  "show_only_my_tasks": "yes" if show_my else "",
-              }.items() if v}) if (period != "this_week" or show_my) else ""
-          ),
-          cls="on" if display_mode == "desktop" else ""),
-        A(_icon(_ICON_MOBILE), NotStr(" Mobile"),
-          href="/staging_task_board?" + urlencode({
-              k: v for k, v in {
-                  "display": "mobile",
-                  "show_period": period if period != "this_week" else "",
-                  "show_only_my_tasks": "yes" if show_my else "",
-              }.items() if v
-          }),
-          cls="on" if display_mode == "mobile" else ""),
-        cls="seg",
-    )
-
-    meta = Span(
-        f"{rows_count} stagings · {from_d.strftime('%b %d')} → {(to_d - timedelta(days=1)).strftime('%b %d')}",
-        cls="toolbar-meta",
-    )
-
-    theme_btn = Button(
-        _icon(_ICON_PALETTE), Span(" Theme"),
-        type="button", cls="toolbar-btn", onclick="TB.openModal()",
-    )
-
+def _toolbar():
+    """Toolbar is rendered by the server; live counts + range text are
+    updated by JS from the client state."""
     return Div(
         Div(NotStr("Staging "), Span("Task Board", cls="accent"), cls="toolbar-title"),
-        period_seg,
-        mine_seg,
-        display_seg,
-        Div(cls="toolbar-spacer"),
-        meta,
-        theme_btn,
+
+        Button(
+            _icon(_ICON_CAL),
+            Span(NotStr('<span id="range-count" class="range-count">—</span> stagings '
+                        '<span class="range-dash">·</span> '
+                        '<span id="range-label">this week</span>')),
+            type="button", cls="tbtn range-btn",
+            id="range-btn",
+            onclick="TB.openModal('date-modal')",
+        ),
+
+        Div(
+            Span(_icon(_ICON_SEARCH, 16), cls="search-icon"),
+            Input(
+                type="search", id="tb-search", cls="search-input",
+                placeholder="Search address, person, date, notes…",
+                autocomplete="off", spellcheck="false",
+            ),
+            Div(id="search-suggest", cls="search-suggest"),
+            cls="search-wrap",
+        ),
+
+        Button(
+            _icon(_ICON_USER), Span(id="mytasks-label"), NotStr(" My tasks"),
+            type="button", cls="tbtn", id="mytasks-btn",
+            onclick="TB.toggleMyTasks()",
+        ),
+
+        Button(
+            _icon(_ICON_PALETTE), Span(" Settings"),
+            type="button", cls="tbtn",
+            onclick="TB.openModal('settings-modal')",
+        ),
+
         cls="toolbar",
     )
 
 
-# -------------------- column content --------------------
+# -------------------- row rendering --------------------
 
 def _sub_page_link(label, page, **params):
     q = {"page": page, **{k: v for k, v in params.items() if v}}
@@ -817,8 +751,7 @@ def _chip_button(staging_id, field, label, done):
 
 
 def _col_staging(row, serial):
-    date_s = row["Coming_Staging_Destaging_Date"] or ""
-    d = _parse_mdy(date_s)
+    d = _parse_mdy(row["Coming_Staging_Destaging_Date"])
     occ = row["Occupancy_Type"] or ""
     prop = row["Property_Type"] or ""
     sd = _parse_mdy(row["Staging_Date"])
@@ -840,16 +773,14 @@ def _col_staging(row, serial):
     drive = row["Driving_Time"] or ""
 
     meta_bits = []
-    if occ or prop:
-        meta_bits.append(f"{occ} {prop}".strip())
-    if eta:
-        meta_bits.append(eta)
-    if drive:
-        meta_bits.append(f"{drive} min drive")
+    if occ or prop: meta_bits.append(f"{occ} {prop}".strip())
+    if eta: meta_bits.append(eta)
+    if drive: meta_bits.append(f"{drive} min drive")
 
     return Td(
         Div(f"{kind} {serial}", cls="staging-title"),
-        Div(f"{remaining_days if remaining_days is not None else '—'} days remaining · {item_count} items", cls="staging-meta"),
+        Div(f"{remaining_days if remaining_days is not None else '—'} days remaining · {item_count} items",
+            cls="staging-meta"),
         Div(address, cls="staging-address"),
         *([Div(" · ".join(meta_bits), cls="staging-meta")] if meta_bits else []),
         Div(
@@ -860,27 +791,25 @@ def _col_staging(row, serial):
             _sub_page_link("Setup", "Staging_Setup_Guide", staging_id=row["ID"]),
             cls="sublinks",
         ),
-        cls="col-wide",
+        cls="col-wide", **{"data-label": "Staging"},
     )
 
 
 def _col_persons(row):
-    cust_fn = row["Customer_First_Name"] or ""
-    cust_ln = row["Customer_Last_Name"] or ""
-    customer = f"{cust_fn} {cust_ln}".strip() or "—"
+    cust = f"{row['Customer_First_Name'] or ''} {row['Customer_Last_Name'] or ''}".strip() or "—"
     stagers = ", ".join(_parse_people(row["Stager"])) or "—"
     movers = ", ".join(_parse_people(row["Staging_Movers"])) or "—"
     destage = ", ".join(_parse_people(row["Destaging_Movers"]))
 
     rows = [
-        Div(Span("Customer", cls="label"), Span(customer, cls="val"), cls="row"),
+        Div(Span("Customer", cls="label"), Span(cust, cls="val"), cls="row"),
         Div(Span("Stager", cls="label"), Span(stagers, cls="val"), cls="row"),
         Div(Span("Movers", cls="label"), Span(movers, cls="val"), cls="row"),
     ]
     if destage:
         rows.append(Div(Span("Destage", cls="label"), Span(destage, cls="val"), cls="row"))
 
-    return Td(Div(*rows, cls="persons"))
+    return Td(Div(*rows, cls="persons"), **{"data-label": "Persons"})
 
 
 def _col_actions(row):
@@ -900,17 +829,23 @@ def _col_actions(row):
         val = row[field]
         done = bool(val and val.strip())
         chips.append(_chip_button(sid, field, label, done))
-    return Td(Div(*chips, cls="chips"))
+    return Td(Div(*chips, cls="chips"), **{"data-label": "Tasks"})
 
 
 def _col_moving(row):
     text = (row["Staging_Moving_Instructions"] or "").strip()
-    return Td(Div(NotStr(text.replace("\n", "<br>")) if text else Span("—", cls="staging-meta"), cls="notes"))
+    return Td(
+        Div(NotStr(text.replace("\n", "<br>")) if text else Span("—", cls="staging-meta"), cls="notes"),
+        cls="col-moving", **{"data-label": "Moving Instructions"},
+    )
 
 
 def _col_notes(row):
-    notes = (row["General_Notes"] or "").strip()
-    return Td(Div(NotStr(notes.replace("\n", "<br>")) if notes else Span("—", cls="staging-meta"), cls="notes"))
+    text = (row["General_Notes"] or "").strip()
+    return Td(
+        Div(NotStr(text.replace("\n", "<br>")) if text else Span("—", cls="staging-meta"), cls="notes"),
+        cls="col-notes", **{"data-label": "General Notes"},
+    )
 
 
 def _col_accounting(row):
@@ -935,6 +870,7 @@ def _col_accounting(row):
             _chip_button(sid, "Invoice_Sent_Date", "Invoice sent", bool(row["Invoice_Sent_Date"])),
             cls="chips", style="margin-top:6px",
         ),
+        **{"data-label": "Accounting"},
     )
 
 
@@ -949,28 +885,34 @@ def _col_listing(row):
         children.append(A("📁 Drive folder", href=pics_folder, target="_blank", cls="btn"))
     children.append(
         Div(
-            _chip_button(sid, "After_Picture_Upload_Date", "After pics up", bool(row["After_Picture_Upload_Date"])),
+            _chip_button(sid, "After_Picture_Upload_Date", "After pics up",
+                         bool(row["After_Picture_Upload_Date"])),
             cls="chips", style="margin-top:6px",
         )
     )
     if mls:
-        children.append(Div(Span("MLS  ", cls="label"), Span(mls, cls="val"), cls="persons", style="margin-top:8px;font-size:12px"))
+        children.append(
+            Div(Span("MLS  ", cls="label"), Span(mls, cls="val"),
+                cls="persons", style="margin-top:8px;font-size:12px")
+        )
     if housesigma:
-        children.append(A("HouseSigma ↗", href=housesigma, target="_blank", cls="btn", style="margin-top:6px"))
+        children.append(A("HouseSigma ↗", href=housesigma, target="_blank",
+                          cls="btn", style="margin-top:6px"))
     children.append(
         A("Update MLS info",
           href=f"/stub?{urlencode({'page':'Staging_Edit','staging_id':sid,'focus':'MLS'})}",
           cls="btn", style="margin-top:6px")
     )
-    return Td(Div(*children, cls="btn-row", style="flex-direction:column;align-items:flex-start"), cls="col-narrow")
+    return Td(
+        Div(*children, cls="btn-row", style="flex-direction:column;align-items:flex-start"),
+        cls="col-narrow col-listing", **{"data-label": "Listing"},
+    )
 
 
-def _row_state(row):
+def _row_state(row, coming):
     today = date.today()
     status = (row["Staging_Status"] or "").lower()
-    sd = _parse_mdy(row["Staging_Date"])
     dd = _parse_mdy(row["Destaging_Date"])
-    coming = _parse_mdy(row["Coming_Staging_Destaging_Date"])
 
     if status == "inquired":
         return "state-inquired"
@@ -981,95 +923,373 @@ def _row_state(row):
     return ""
 
 
-def _desktop_table(grouped, from_d, to_d, today):
+def _build_row(row, serial):
+    coming = _parse_mdy(row["Coming_Staging_Destaging_Date"])
+    coming_iso = coming.isoformat() if coming else ""
+
+    # searchable blob: address, customer, people, notes, status, etc.
+    bits = [
+        row["Staging_Display_Name"] or "",
+        _parse_link(row["Staging_Address"]) or "",
+        f"{row['Customer_First_Name'] or ''} {row['Customer_Last_Name'] or ''}",
+        row["Customer_Phone"] or "",
+        row["Customer_Email"] or "",
+        row["Occupancy_Type"] or "",
+        row["Property_Type"] or "",
+        row["Staging_Type"] or "",
+        row["Staging_Status"] or "",
+        row["MLS"] or "",
+        row["General_Notes"] or "",
+        row["Staging_Moving_Instructions"] or "",
+        row["Destaging_Moving_Instructions"] or "",
+        _fmt_mdy(coming) if coming else "",
+    ]
+    people = []
+    for f in ("Stager", "Staging_Movers", "Destaging_Movers"):
+        people.extend(_parse_people(row[f]))
+    bits.extend(people)
+    if coming:
+        bits.append(coming.strftime("%B"))
+        bits.append(coming.strftime("%A"))
+    searchable = " ".join(x for x in bits if x).lower()
+
+    return Tr(
+        _col_staging(row, serial),
+        _col_persons(row),
+        _col_actions(row),
+        _col_moving(row),
+        _col_notes(row),
+        _col_accounting(row),
+        _col_listing(row),
+        cls=f"data-row {_row_state(row, coming)}",
+        **{
+            "data-date": coming_iso,
+            "data-people": "|".join(p.lower() for p in people),
+            "data-search": searchable,
+        },
+    )
+
+
+def _build_table(grouped):
     headers = Thead(Tr(
         Th("Staging"), Th("Persons"), Th("Tasks"),
-        Th("Moving Instructions"), Th("General Notes"),
-        Th("Accounting"), Th("Listing"),
+        Th("Moving Instructions", cls="col-moving"),
+        Th("General Notes", cls="col-notes"),
+        Th("Accounting"),
+        Th("Listing", cls="col-listing"),
     ))
 
-    by_date = {}
+    body = []
     for date_str, group in grouped:
         d = _parse_mdy(date_str)
-        if d:
-            by_date[d] = (date_str, group)
+        d_iso = d.isoformat() if d else ""
+        banner_text = d.strftime("%A · %B %-d, %Y") if d else date_str
+        if d == date.today():
+            banner_text += "  (today)"
+        body.append(Tr(
+            Td(banner_text, colspan="7"),
+            cls="date-banner", **{"data-date": d_iso},
+        ))
+        for i, r in enumerate(group, start=1):
+            body.append(_build_row(r, i))
 
-    body_rows = []
-    d = from_d
-    while d < to_d:
-        if d in by_date:
-            date_str, group = by_date[d]
-            banner_text = d.strftime("%A · %B %-d, %Y")
-            today_marker = "  (today)" if d == today else ""
-            body_rows.append(Tr(
-                Td(banner_text + today_marker, colspan="7"),
-                cls="date-banner",
-            ))
-            for i, r in enumerate(group, start=1):
-                body_rows.append(Tr(
-                    _col_staging(r, i),
-                    _col_persons(r),
-                    _col_actions(r),
-                    _col_moving(r),
-                    _col_notes(r),
-                    _col_accounting(r),
-                    _col_listing(r),
-                    cls=f"data-row {_row_state(r)}",
-                ))
-        elif d.weekday() < 5:
-            body_rows.append(Tr(
-                Td(d.strftime("%A · %B %-d, %Y") + "  (open)", colspan="7"),
-                cls="date-banner",
-            ))
-            body_rows.append(Tr(
-                Td("No stagings scheduled · 6 slots open", colspan="7"),
-                cls="slot-row",
-            ))
-        d += timedelta(days=1)
+    # Empty-state row — shown by JS when all data rows are hidden
+    body.append(Tr(
+        Td(
+            Span("🔍", cls="emoji"),
+            Div("No stagings match your filters."),
+            Div("Try a wider date range, clear the search, or toggle My Tasks off.",
+                style="font-size:12px;margin-top:4px;color:var(--text-faint)"),
+            colspan="7",
+        ),
+        cls="empty-state",
+        id="empty-state",
+        style="display:none",
+    ))
 
-    return Div(Table(headers, Tbody(*body_rows), cls="board"))
+    return Table(headers, Tbody(*body), cls="board")
 
 
-def _mobile_cards(grouped, from_d, to_d, today):
-    items = []
-    by_date = {_parse_mdy(k): (k, g) for k, g in grouped}
-    by_date.pop(None, None)
+# -------------------- client JS --------------------
 
-    d = from_d
-    while d < to_d:
-        if d in by_date:
-            date_str, group = by_date[d]
-            items.append(Div(d.strftime("%A · %B %-d"), cls="card-date-banner"))
-            for i, r in enumerate(group, start=1):
-                is_today = d == today
-                address = _parse_link(r["Staging_Address"]) or r["Staging_Display_Name"] or "—"
-                stagers = ", ".join(_parse_people(r["Stager"])) or "—"
-                movers = ", ".join(_parse_people(r["Staging_Movers"])) or "—"
-                cust = f"{r['Customer_First_Name'] or ''} {r['Customer_Last_Name'] or ''}".strip() or "—"
-                items.append(Div(
-                    Div(f"Staging {i} · {r['Occupancy_Type'] or ''} {r['Property_Type'] or ''}".strip(" ·"), cls="staging-title"),
-                    Div(address, cls="staging-address"),
-                    Div(
-                        Div(Span("Customer", cls="label"), Span(cust, cls="val"), cls="row"),
-                        Div(Span("Stager", cls="label"), Span(stagers, cls="val"), cls="row"),
-                        Div(Span("Movers", cls="label"), Span(movers, cls="val"), cls="row"),
-                        cls="persons", style="margin-top:10px",
-                    ),
-                    Div(
-                        _sub_page_link("Design", "Staging_Design", staging_id=r["ID"]),
-                        _sub_page_link("Pictures", "Staging_Videos_and_Pictures", staging_id=r["ID"]),
-                        _sub_page_link("Packing", "Packing_Guide_Page", staging_id=r["ID"]),
-                        _sub_page_link("Setup", "Staging_Setup_Guide", staging_id=r["ID"]),
-                        cls="sublinks",
-                    ),
-                    cls=f"card{' today' if is_today else ''}",
-                ))
-        d += timedelta(days=1)
+def _client_script(employees, corpus):
+    # Use JSON embedding so Python string escaping doesn't bite us.
+    employees_json = json.dumps(employees)
+    corpus_json = json.dumps(corpus[:400])  # cap for sanity
 
-    return Div(*items, cls="cards")
+    return Script(
+        # Embed data as JSON strings the JS reads at startup.
+        f"window.TB_EMPLOYEES = {employees_json};\n"
+        f"window.TB_CORPUS = {corpus_json};\n"
+        # Main controller — uses template literals so keep regex-free and
+        # rely on dict-style keys sparingly.
+        r"""
+(function() {
+    const doc = document.documentElement;
+    const K = { THEME:'tb_theme', MODE:'tb_mode', ME:'tb_me', RANGE:'tb_range', MY:'tb_mytasks' };
+
+    // ---------- state ----------
+    const today = new Date(); today.setHours(0,0,0,0);
+    const iso = d => d.toISOString().slice(0,10);
+    const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
+    const fmt = d => d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+    const parseIso = s => { if(!s) return null; const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+
+    const PRESETS = {
+        today:    () => ({ from: iso(today), to: iso(today), label: 'today' }),
+        week:     () => ({ from: iso(addDays(today,-5)), to: iso(addDays(today,13)), label: 'this week' }),
+        month:    () => ({ from: iso(addDays(today,-15)), to: iso(addDays(today,30)), label: 'this month' }),
+        past:     () => ({ from: iso(addDays(today,-90)), to: iso(addDays(today,-1)), label: 'past 90 days' }),
+        upcoming: () => ({ from: iso(today), to: iso(addDays(today,180)), label: 'upcoming 6 months' }),
+        all:      () => ({ from: '1970-01-01', to: '2100-12-31', label: 'all' }),
+    };
+
+    const state = {
+        range: JSON.parse(localStorage.getItem(K.RANGE) || 'null') || PRESETS.week(),
+        search: '',
+        mytasks: localStorage.getItem(K.MY) === '1',
+        me: localStorage.getItem(K.ME) || '',
+    };
+
+    // ---------- theme / mode ----------
+    function applyChrome() {
+        const theme = localStorage.getItem(K.THEME) || 'default';
+        const mode = localStorage.getItem(K.MODE) || 'auto';
+        if (theme === 'default') doc.removeAttribute('data-theme');
+        else doc.setAttribute('data-theme', theme);
+        if (mode === 'auto') doc.removeAttribute('data-mode');
+        else doc.setAttribute('data-mode', mode);
+    }
+    applyChrome();
+
+    // ---------- filtering ----------
+    function matches(tr) {
+        const d = tr.dataset.date;
+        if (d < state.range.from || d > state.range.to) return false;
+        if (state.mytasks && state.me) {
+            const people = tr.dataset.people || '';
+            if (!people.includes(state.me.toLowerCase())) return false;
+        }
+        if (state.search) {
+            const s = tr.dataset.search || '';
+            // simple AND across space-separated tokens
+            const tokens = state.search.toLowerCase().split(/\s+/).filter(Boolean);
+            for (const t of tokens) { if (!s.includes(t)) return false; }
+        }
+        return true;
+    }
+
+    function applyFilters() {
+        const rows = document.querySelectorAll('tr.data-row');
+        let count = 0;
+        rows.forEach(tr => {
+            const ok = matches(tr);
+            tr.style.display = ok ? '' : 'none';
+            if (ok) count++;
+        });
+        // Hide date banners that have no visible rows under them.
+        const banners = document.querySelectorAll('tr.date-banner');
+        banners.forEach(b => {
+            let next = b.nextElementSibling;
+            let anyVisible = false;
+            while (next && !next.classList.contains('date-banner') && !next.classList.contains('empty-state')) {
+                if (next.classList.contains('data-row') && next.style.display !== 'none') { anyVisible = true; break; }
+                next = next.nextElementSibling;
+            }
+            b.style.display = anyVisible ? '' : 'none';
+        });
+        // Empty state when nothing matches
+        const empty = document.getElementById('empty-state');
+        if (empty) empty.style.display = count === 0 ? '' : 'none';
+        updateRangeLabel(count);
+        updateMyTasksBtn();
+    }
+
+    function updateRangeLabel(count) {
+        document.getElementById('range-count').textContent = count;
+        const label = state.range.label || (fmt(parseIso(state.range.from)) + ' → ' + fmt(parseIso(state.range.to)));
+        document.getElementById('range-label').textContent = label;
+    }
+
+    function updateMyTasksBtn() {
+        const btn = document.getElementById('mytasks-btn');
+        btn.classList.toggle('on', state.mytasks && !!state.me);
+        btn.classList.toggle('needs-setup', !state.me);
+        btn.title = state.me ? '' : 'Pick your name in Settings → Who am I?';
+        const lbl = document.getElementById('mytasks-label');
+        if (state.mytasks && state.me) {
+            lbl.textContent = ' ' + state.me.split(' ')[0] + ' ·';
+        } else {
+            lbl.textContent = '';
+        }
+    }
+
+    // ---------- date range controls ----------
+    function setRangePreset(p) {
+        state.range = PRESETS[p]();
+        localStorage.setItem(K.RANGE, JSON.stringify(state.range));
+        const fi = document.getElementById('range-from'); if (fi) fi.value = state.range.from;
+        const ti = document.getElementById('range-to');   if (ti) ti.value = state.range.to;
+        applyFilters();
+        closeModal('date-modal');
+    }
+    function applyCustomRange() {
+        const from = (document.getElementById('range-from').value || '').trim();
+        const to = (document.getElementById('range-to').value || '').trim();
+        if (!from || !to) return;
+        state.range = { from, to, label: fmt(parseIso(from)) + ' → ' + fmt(parseIso(to)) };
+        localStorage.setItem(K.RANGE, JSON.stringify(state.range));
+        applyFilters();
+        closeModal('date-modal');
+    }
+
+    // ---------- search + autocomplete ----------
+    const suggest = () => document.getElementById('search-suggest');
+    let hlIdx = 0;
+
+    function showSuggestions(q) {
+        const el = suggest();
+        if (q.length < 2) { el.classList.remove('open'); return; }
+        const lo = q.toLowerCase();
+        const matches = (window.TB_CORPUS || []).filter(s => s.toLowerCase().includes(lo)).slice(0, 8);
+        if (!matches.length) { el.classList.remove('open'); return; }
+        el.innerHTML = '';
+        matches.forEach((m, i) => {
+            const d = document.createElement('div');
+            d.className = 'item' + (i === 0 ? ' hl' : '');
+            d.textContent = m;
+            d.dataset.idx = i;
+            d.addEventListener('mousedown', e => { e.preventDefault(); completeWith(m); });
+            el.appendChild(d);
+        });
+        const hint = document.createElement('div');
+        hint.className = 'hint';
+        hint.innerHTML = '<kbd>Tab</kbd> autocomplete · <kbd>Enter</kbd> search · <kbd>↑↓</kbd> navigate';
+        el.appendChild(hint);
+        el.classList.add('open');
+        hlIdx = 0;
+    }
+
+    function moveHl(delta) {
+        const items = suggest().querySelectorAll('.item');
+        if (!items.length) return;
+        items[hlIdx]?.classList.remove('hl');
+        hlIdx = (hlIdx + delta + items.length) % items.length;
+        items[hlIdx]?.classList.add('hl');
+    }
+
+    function highlighted() {
+        return suggest().querySelector('.item.hl')?.textContent || '';
+    }
+
+    function completeWith(term) {
+        const inp = document.getElementById('tb-search');
+        inp.value = term;
+        state.search = term;
+        suggest().classList.remove('open');
+        applyFilters();
+        inp.focus();
+    }
+
+    // ---------- my tasks ----------
+    function toggleMyTasks() {
+        if (!state.me) {
+            // force open settings so user can pick a name
+            openModal('settings-modal');
+            return;
+        }
+        state.mytasks = !state.mytasks;
+        localStorage.setItem(K.MY, state.mytasks ? '1' : '0');
+        applyFilters();
+    }
+
+    function setMe(v) {
+        state.me = v;
+        localStorage.setItem(K.ME, v);
+        updateMyTasksBtn();
+        applyFilters();
+    }
+
+    // ---------- modals ----------
+    function openModal(id) {
+        refreshModalState();
+        const dlg = document.getElementById(id);
+        if (dlg && dlg.showModal) dlg.showModal();
+    }
+    function closeModal(id) {
+        const dlg = document.getElementById(id);
+        if (dlg && dlg.close) dlg.close();
+    }
+    document.addEventListener('click', e => {
+        // backdrop click closes any open dialog
+        document.querySelectorAll('dialog.modal').forEach(dlg => {
+            if (dlg.open && e.target === dlg) dlg.close();
+        });
+    });
+
+    function refreshModalState() {
+        // theme cards
+        const theme = localStorage.getItem(K.THEME) || 'default';
+        document.querySelectorAll('.theme-card').forEach(el => el.classList.toggle('active', el.dataset.theme === theme));
+        // mode segments
+        const mode = localStorage.getItem(K.MODE) || 'auto';
+        document.querySelectorAll('.mode-seg button').forEach(el => el.classList.toggle('on', el.dataset.mode === mode));
+        // me select
+        const sel = document.getElementById('me-select');
+        if (sel) sel.value = state.me;
+        // date inputs
+        const fi = document.getElementById('range-from'); if (fi && !fi.value) fi.value = state.range.from;
+        const ti = document.getElementById('range-to');   if (ti && !ti.value) ti.value = state.range.to;
+    }
+
+    // ---------- wiring ----------
+    window.TB = {
+        setTheme(t){ localStorage.setItem(K.THEME,t); applyChrome(); refreshModalState(); },
+        setMode(m){ localStorage.setItem(K.MODE,m); applyChrome(); refreshModalState(); },
+        setMe,
+        setRangePreset,
+        applyCustomRange,
+        toggleMyTasks,
+        openModal,
+        closeModal,
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const inp = document.getElementById('tb-search');
+        inp.addEventListener('input', e => {
+            showSuggestions(e.target.value);
+            // live-filter as user types
+            state.search = e.target.value;
+            applyFilters();
+        });
+        inp.addEventListener('keydown', e => {
+            const el = suggest();
+            const open = el.classList.contains('open');
+            if (e.key === 'ArrowDown' && open) { e.preventDefault(); moveHl(1); }
+            else if (e.key === 'ArrowUp' && open) { e.preventDefault(); moveHl(-1); }
+            else if (e.key === 'Tab' && open) { e.preventDefault(); completeWith(highlighted() || inp.value); }
+            else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (open && highlighted()) completeWith(highlighted());
+                else { state.search = inp.value; applyFilters(); el.classList.remove('open'); }
+            }
+            else if (e.key === 'Escape') { el.classList.remove('open'); }
+        });
+        inp.addEventListener('blur', () => { setTimeout(() => suggest().classList.remove('open'), 150); });
+
+        // populate me-select if employees list is available
+        // (already populated server-side)
+        const sel = document.getElementById('me-select');
+        if (sel) sel.value = state.me;
+
+        applyFilters();
+    });
+})();
+"""
+    )
 
 
-# -------------------- route --------------------
+# -------------------- page assembly --------------------
 
 def _page_head(title):
     return Head(
@@ -1083,15 +1303,13 @@ def _page_head(title):
             href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
         ),
         _style_block(),
-        _script_block(),
     )
 
 
-def _full_page(title, *body_children):
-    """Build a complete <html> document, bypassing fast_app's Pico wrapper."""
+def _full_page(title, body_children, extra_scripts=()):
     doc = Html(
         _page_head(title),
-        Body(*body_children),
+        Body(*body_children, *extra_scripts),
         lang="en",
     )
     rendered = to_xml(doc)
@@ -1100,41 +1318,29 @@ def _full_page(title, *body_children):
     return HTMLResponse(rendered)
 
 
+# -------------------- routes --------------------
+
 def register(rt):
 
     @rt("/staging_task_board")
-    def task_board(request: Request,
-                   display: str = "",
-                   show_period: str = "",
-                   show_only_my_tasks: str = "",
-                   show_stars: str = "",
-                   my_name: str = ""):
-        display_mode = (display or "desktop").lower()
-        if display_mode not in ("desktop", "mobile"):
-            display_mode = "desktop"
-        period = show_period.lower() if show_period else "this_week"
-        if period not in _PERIOD_RANGES:
-            period = "this_week"
-        show_my = show_only_my_tasks.lower() in ("yes", "true", "1")
-        stars = show_stars.lower() in ("yes", "true", "1")
-
-        rows, from_d, to_d, today = _fetch_stagings(period, show_my, stars, my_name.strip())
+    def task_board(request: Request):
+        rows = _fetch_all_stagings()
+        employees = _fetch_employees()
+        corpus = _build_autocomplete_corpus(rows, employees)
         grouped = _group_by_date(rows)
 
-        body_content = (
-            _mobile_cards(grouped, from_d, to_d, today)
-            if display_mode == "mobile"
-            else _desktop_table(grouped, from_d, to_d, today)
-        )
+        table = _build_table(grouped)
 
         return _full_page(
             "Staging Task Board",
-            Div(
-                _toolbar(display_mode, period, show_my, len(rows), from_d, to_d, today),
-                Div(body_content, cls="scroll-area"),
-                _modal(),
+            [Div(
+                _toolbar(),
+                Div(table, cls="scroll-area"),
+                _date_modal(),
+                _settings_modal(employees),
                 cls="app-shell",
-            ),
+            )],
+            extra_scripts=[_client_script(employees, corpus)],
         )
 
     @rt("/staging_task_board/set_date", methods=["POST"])
@@ -1156,37 +1362,27 @@ def register(rt):
             c.execute(f"UPDATE Staging_Report SET {field} = ? WHERE ID = ?", (new_value, sid))
             c.commit()
 
-        qs = {
-            "display": request.query_params.get("display", ""),
-            "show_period": request.query_params.get("show_period", ""),
-            "show_only_my_tasks": request.query_params.get("show_only_my_tasks", ""),
-        }
-        qs = {k: v for k, v in qs.items() if v}
-        path = "/staging_task_board"
-        if qs:
-            path += "?" + urlencode(qs)
-        return RedirectResponse(path, status_code=303)
+        return RedirectResponse("/staging_task_board", status_code=303)
 
     @rt("/stub")
     def stub_page(request: Request):
         params = dict(request.query_params)
         page = params.pop("page", "Unknown")
-        items = [
-            Li(NotStr(f'<span>{k}</span> = {v}')) for k, v in params.items()
-        ] if params else [Li(NotStr('<span>no params</span>'))]
+        items = [Li(NotStr(f'<span>{k}</span> = {v}')) for k, v in params.items()] \
+                if params else [Li(NotStr('<span>no params</span>'))]
         return _full_page(
             f"Not ported · {page}",
-            Div(
+            [Div(
                 Div(
                     Div("Coming soon", cls="pill"),
                     H1(page),
                     P("This page is linked from the Staging Task Board but hasn't been ported yet.",
                       cls="modal-sub"),
                     Ul(*items, cls="params"),
-                    A("← Back to Task Board", href="/staging_task_board", cls="toolbar-btn accent",
-                      style="margin-top:20px"),
+                    A("← Back to Task Board", href="/staging_task_board",
+                      cls="tbtn accent", style="margin-top:20px"),
                     cls="stub-card",
                 ),
                 cls="stub-wrap",
-            ),
+            )],
         )
