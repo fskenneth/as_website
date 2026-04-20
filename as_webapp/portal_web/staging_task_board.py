@@ -461,21 +461,72 @@ def _style_block():
     .modal-sub { font-size: 13px; color: var(--text-muted); margin: 0 0 20px; }
     .modal-section { margin-top: 20px; }
     .modal-section h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 0 0 10px; }
-    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; position: sticky; bottom: -24px; background: var(--surface); padding: 16px 0 0; border-top: 1px solid var(--border); margin-bottom: -24px; padding-bottom: 24px; z-index: 2; }
 
     /* date-range modal */
-    .preset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .preset-grid .tbtn { justify-content: center; padding: 10px; font-size: 13px; }
-    .date-inputs { display: flex; gap: 12px; margin-top: 16px; }
-    .date-inputs > div { flex: 1; }
-    .date-inputs label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; margin-bottom: 4px; }
-    .date-inputs input[type="date"] {
-        width: 100%; padding: 8px 10px;
-        background: var(--surface-2); color: var(--text);
-        border: 1px solid var(--border); border-radius: var(--radius-sm);
-        font-family: inherit; font-size: 13px;
+    .preset-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 4px; }
+    .preset-row .tbtn { justify-content: center; padding: 10px; font-size: 13px; }
+    .preset-row .tbtn.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+
+    .cal-wrap { position: relative; margin-top: 14px; }
+    .cal-nav {
+        all: unset; position: absolute; top: 8px; z-index: 2;
+        width: 28px; height: 28px; line-height: 24px; text-align: center;
+        font-size: 20px; font-weight: 400; color: var(--text-muted);
+        background: var(--surface-2); border: 1px solid var(--border);
+        border-radius: 999px; cursor: pointer; transition: all 140ms ease;
     }
-    .date-inputs input[type="date"]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .cal-nav:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+    .cal-nav.prev { left: 8px; }
+    .cal-nav.next { right: 8px; }
+
+    .tb-calendar {
+        display: flex; flex-direction: column; gap: 12px;
+        padding: 4px;
+    }
+    .cal-month {
+        background: var(--surface-2); border: 1px solid var(--border);
+        border-radius: var(--radius-md); padding: 14px;
+    }
+    .cal-month-title {
+        text-align: center; font-weight: 700; font-size: 14px;
+        color: var(--text); margin: 0 0 10px; letter-spacing: -0.01em;
+    }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+    .cal-dow {
+        text-align: center; padding: 6px 0; font-size: 11px;
+        color: var(--text-faint); font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .cal-day {
+        all: unset; box-sizing: border-box;
+        display: flex; align-items: center; justify-content: center;
+        aspect-ratio: 1; min-height: 34px;
+        font-size: 13px; color: var(--text);
+        border-radius: var(--radius-sm); cursor: pointer;
+        transition: all 120ms ease; position: relative;
+    }
+    .cal-day.empty { visibility: hidden; pointer-events: none; }
+    .cal-day:hover { background: var(--accent-soft); }
+    .cal-day.today { font-weight: 700; color: var(--accent); }
+    .cal-day.today::after {
+        content: ''; position: absolute; bottom: 3px; left: 50%;
+        transform: translateX(-50%); width: 4px; height: 4px;
+        border-radius: 50%; background: var(--accent);
+    }
+    .cal-day.in-range { background: var(--accent-soft); border-radius: 0; }
+    .cal-day.range-start { background: var(--accent); color: var(--accent-fg); font-weight: 600; border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+    .cal-day.range-end { background: var(--accent); color: var(--accent-fg); font-weight: 600; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+    .cal-day.range-start.range-end { border-radius: var(--radius-sm); }
+    .cal-day.range-start.today::after, .cal-day.range-end.today::after { background: var(--accent-fg); }
+
+    .range-summary {
+        margin-top: 14px; padding: 10px 14px; font-size: 13px;
+        background: var(--surface-2); border: 1px solid var(--border);
+        border-radius: var(--radius-md); color: var(--text-muted);
+        text-align: center; font-variant-numeric: tabular-nums;
+    }
+    .range-summary strong { color: var(--text); font-weight: 600; }
 
     /* settings modal — theme grid */
     .theme-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
@@ -576,42 +627,35 @@ def _date_modal():
     return Dialog(
         Div(
             H2("Date Range", cls="modal-title"),
-            P("Filter stagings by date. Quick presets, or pick a custom range.",
+            P("Filter stagings by date. Pick a preset or click days on the calendar.",
               cls="modal-sub"),
 
             Div(
-                H3("Quick"),
-                Div(
-                    Button("Today", type="button", cls="tbtn", onclick="TB.setRangePreset('today')"),
-                    Button("Week", type="button", cls="tbtn", onclick="TB.setRangePreset('week')"),
-                    Button("Month", type="button", cls="tbtn", onclick="TB.setRangePreset('month')"),
-                    Button("Past", type="button", cls="tbtn", onclick="TB.setRangePreset('past')"),
-                    Button("Upcoming", type="button", cls="tbtn", onclick="TB.setRangePreset('upcoming')"),
-                    Button("All", type="button", cls="tbtn", onclick="TB.setRangePreset('all')"),
-                    cls="preset-grid",
-                ),
-                cls="modal-section",
+                Button("Today", type="button", cls="tbtn", id="preset-today",
+                       onclick="TB.stagePreset('today')"),
+                Button("Week", type="button", cls="tbtn", id="preset-week",
+                       onclick="TB.stagePreset('week')"),
+                Button("All Time", type="button", cls="tbtn", id="preset-all",
+                       onclick="TB.stagePreset('all')"),
+                cls="preset-row",
             ),
 
             Div(
-                H3("Custom"),
-                Div(
-                    Div(
-                        Label("From", **{"for": "range-from"}),
-                        Input(type="date", id="range-from"),
-                    ),
-                    Div(
-                        Label("To", **{"for": "range-to"}),
-                        Input(type="date", id="range-to"),
-                    ),
-                    cls="date-inputs",
-                ),
-                cls="modal-section",
+                Button(NotStr("‹"), type="button", cls="cal-nav prev",
+                       onclick="TB.calMonth(-1)", **{"aria-label": "Previous month"}),
+                Div(id="tb-calendar", cls="tb-calendar"),
+                Button(NotStr("›"), type="button", cls="cal-nav next",
+                       onclick="TB.calMonth(1)", **{"aria-label": "Next month"}),
+                cls="cal-wrap",
             ),
 
+            Div(id="tb-range-summary", cls="range-summary"),
+
             Div(
-                Button("Cancel", type="button", cls="tbtn", onclick="TB.closeModal('date-modal')"),
-                Button("Apply", type="button", cls="tbtn accent", onclick="TB.applyCustomRange()"),
+                Button("Cancel", type="button", cls="tbtn",
+                       onclick="TB.closeModal('date-modal')"),
+                Button("Apply", type="button", cls="tbtn accent",
+                       onclick="TB.applyStagedRange()"),
                 cls="modal-actions",
             ),
             cls="modal-card",
@@ -699,7 +743,7 @@ def _toolbar():
                         '<span id="range-label">this week</span>')),
             type="button", cls="tbtn range-btn",
             id="range-btn",
-            onclick="TB.openModal('date-modal')",
+            onclick="TB.openDateModal()",
         ),
 
         Div(
@@ -1038,10 +1082,7 @@ def _client_script(employees, corpus):
     const PRESETS = {
         today:    () => ({ from: iso(today), to: iso(today), label: 'today' }),
         week:     () => ({ from: iso(addDays(today,-5)), to: iso(addDays(today,13)), label: 'this week' }),
-        month:    () => ({ from: iso(addDays(today,-15)), to: iso(addDays(today,30)), label: 'this month' }),
-        past:     () => ({ from: iso(addDays(today,-90)), to: iso(addDays(today,-1)), label: 'past 90 days' }),
-        upcoming: () => ({ from: iso(today), to: iso(addDays(today,180)), label: 'upcoming 6 months' }),
-        all:      () => ({ from: '1970-01-01', to: '2100-12-31', label: 'all' }),
+        all:      () => ({ from: '1970-01-01', to: '2100-12-31', label: 'all time' }),
     };
 
     const state = {
@@ -1124,20 +1165,156 @@ def _client_script(employees, corpus):
         }
     }
 
-    // ---------- date range controls ----------
-    function setRangePreset(p) {
-        state.range = PRESETS[p]();
-        localStorage.setItem(K.RANGE, JSON.stringify(state.range));
-        const fi = document.getElementById('range-from'); if (fi) fi.value = state.range.from;
-        const ti = document.getElementById('range-to');   if (ti) ti.value = state.range.to;
-        applyFilters();
-        closeModal('date-modal');
+    // ---------- date range controls (staged until Apply) ----------
+    // Staged range only lives while the modal is open. Applied to state.range
+    // on "Apply", discarded on "Cancel" / close.
+    let staged = { from: state.range.from, to: state.range.to, label: state.range.label };
+    let anchorMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    // Flip-flops between 'ready' (next click = new start) and 'pending'
+    // (next click = end of the range). Preset clicks and modal-open reset
+    // it to 'ready', so the next day-click starts fresh.
+    let clickState = 'ready';
+
+    function openDateModal() {
+        staged = { from: state.range.from, to: state.range.to, label: state.range.label };
+        const a = parseIso(staged.from) || today;
+        anchorMonth = new Date(a.getFullYear(), a.getMonth(), 1);
+        clickState = 'ready';
+        renderCalendar();
+        refreshPresetButtons();
+        openModal('date-modal');
     }
-    function applyCustomRange() {
-        const from = (document.getElementById('range-from').value || '').trim();
-        const to = (document.getElementById('range-to').value || '').trim();
-        if (!from || !to) return;
-        state.range = { from, to, label: fmt(parseIso(from)) + ' → ' + fmt(parseIso(to)) };
+
+    function stagePreset(p) {
+        const r = PRESETS[p]();
+        staged = { from: r.from, to: r.to, label: r.label };
+        const a = (p === 'all') ? today : parseIso(staged.from);
+        anchorMonth = new Date(a.getFullYear(), a.getMonth(), 1);
+        clickState = 'ready';
+        renderCalendar();
+        refreshPresetButtons();
+    }
+
+    function refreshPresetButtons() {
+        ['today','week','all'].forEach(p => {
+            const r = PRESETS[p]();
+            const btn = document.getElementById('preset-' + p);
+            if (btn) btn.classList.toggle('on', r.from === staged.from && r.to === staged.to);
+        });
+    }
+
+    function calMonth(delta) {
+        anchorMonth = new Date(anchorMonth.getFullYear(), anchorMonth.getMonth() + delta, 1);
+        renderCalendar();
+    }
+
+    function renderCalendar() {
+        const host = document.getElementById('tb-calendar');
+        host.innerHTML = '';
+        // Render 2 months: anchorMonth and anchorMonth+1
+        for (let off = 0; off < 2; off++) {
+            const m = new Date(anchorMonth.getFullYear(), anchorMonth.getMonth() + off, 1);
+            host.appendChild(buildMonth(m));
+        }
+        updateRangeSummary();
+    }
+
+    const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+    function buildMonth(firstDay) {
+        const month = firstDay.getMonth();
+        const year = firstDay.getFullYear();
+        const wrap = document.createElement('div');
+        wrap.className = 'cal-month';
+        const title = document.createElement('div');
+        title.className = 'cal-month-title';
+        title.textContent = MONTHS[month] + ' ' + year;
+        wrap.appendChild(title);
+        const grid = document.createElement('div');
+        grid.className = 'cal-grid';
+        DOW.forEach(d => {
+            const h = document.createElement('div');
+            h.className = 'cal-dow';
+            h.textContent = d;
+            grid.appendChild(h);
+        });
+        // leading empty cells to align weekday
+        const leading = firstDay.getDay(); // 0=Sun
+        for (let i = 0; i < leading; i++) {
+            const c = document.createElement('div');
+            c.className = 'cal-day empty';
+            grid.appendChild(c);
+        }
+        // days
+        const fromD = parseIso(staged.from);
+        const toD = parseIso(staged.to);
+        const todayIso = iso(today);
+        for (let day = 1; ; day++) {
+            const d = new Date(year, month, day);
+            if (d.getMonth() !== month) break;
+            const cell = document.createElement('button');
+            cell.type = 'button';
+            cell.className = 'cal-day';
+            cell.textContent = String(day);
+            const cellIso = iso(d);
+            if (cellIso === todayIso) cell.classList.add('today');
+            if (fromD && toD) {
+                const a = fromD <= toD ? fromD : toD;
+                const b = fromD <= toD ? toD : fromD;
+                if (d >= a && d <= b) cell.classList.add('in-range');
+                if (cellIso === iso(a)) cell.classList.add('range-start');
+                if (cellIso === iso(b)) cell.classList.add('range-end');
+            }
+            cell.addEventListener('click', () => onDayClick(cellIso));
+            grid.appendChild(cell);
+        }
+        wrap.appendChild(grid);
+        return wrap;
+    }
+
+    function onDayClick(dIso) {
+        if (clickState === 'ready') {
+            // Start a new range. Show a single-day selection until next click.
+            staged = { from: dIso, to: dIso, label: '' };
+            clickState = 'pending';
+        } else {
+            // Complete the range. Swap endpoints if second click is earlier.
+            if (dIso < staged.from) {
+                staged = { from: dIso, to: staged.from, label: '' };
+            } else {
+                staged = { from: staged.from, to: dIso, label: '' };
+            }
+            clickState = 'ready';
+        }
+        renderCalendar();
+        refreshPresetButtons();
+    }
+
+    function updateRangeSummary() {
+        const el = document.getElementById('tb-range-summary');
+        if (!el) return;
+        const a = parseIso(staged.from);
+        const b = parseIso(staged.to);
+        if (!a || !b) { el.innerHTML = '<span>No range selected</span>'; return; }
+        if (staged.label && staged.label !== '') {
+            el.innerHTML = '<strong>' + staged.label + '</strong> · ' + fmt(a) + ' → ' + fmt(b);
+        } else if (iso(a) === iso(b)) {
+            el.innerHTML = '<strong>' + a.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'}) + '</strong>';
+        } else {
+            const days = Math.round((b - a) / 86400000) + 1;
+            el.innerHTML = '<strong>' + fmt(a) + ' → ' + fmt(b) + '</strong> · ' + days + ' days';
+        }
+    }
+
+    function applyStagedRange() {
+        if (!staged.from || !staged.to) return;
+        const a = staged.from <= staged.to ? staged.from : staged.to;
+        const b = staged.from <= staged.to ? staged.to : staged.from;
+        state.range = {
+            from: a, to: b,
+            label: staged.label || (fmt(parseIso(a)) + ' → ' + fmt(parseIso(b))),
+        };
         localStorage.setItem(K.RANGE, JSON.stringify(state.range));
         applyFilters();
         closeModal('date-modal');
@@ -1237,9 +1414,6 @@ def _client_script(employees, corpus):
         // me select
         const sel = document.getElementById('me-select');
         if (sel) sel.value = state.me;
-        // date inputs
-        const fi = document.getElementById('range-from'); if (fi && !fi.value) fi.value = state.range.from;
-        const ti = document.getElementById('range-to');   if (ti && !ti.value) ti.value = state.range.to;
     }
 
     // ---------- wiring ----------
@@ -1247,8 +1421,10 @@ def _client_script(employees, corpus):
         setTheme(t){ localStorage.setItem(K.THEME,t); applyChrome(); refreshModalState(); },
         setMode(m){ localStorage.setItem(K.MODE,m); applyChrome(); refreshModalState(); },
         setMe,
-        setRangePreset,
-        applyCustomRange,
+        openDateModal,
+        stagePreset,
+        calMonth,
+        applyStagedRange,
         toggleMyTasks,
         openModal,
         closeModal,
