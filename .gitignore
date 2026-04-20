@@ -78,3 +78,7 @@ tools/model_3d/batch_log.txt
 tools/model_3d/convert_batch.txt
 tools/model_3d/run_batch.sh
 .claude/
+
+# Zoho Creator source dump — reference material, not for public repo
+as_webapp/Staging_Manager.ds
+as_webapp/*.ds

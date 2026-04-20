@@ -36,6 +36,7 @@ from tools.zoho_sync.page_sync_service import PageSyncService
 
 from as_webapp.as_portal_api import routes as portal_api
 from as_webapp.portal_web import routes as portal_web
+from as_webapp.portal_web import staging_task_board
 
 
 app, rt = fast_app(live=False)
@@ -133,17 +134,27 @@ async def background_multi_report_sync():
             print(f"[Multi Sync] Loop error: {e}")
 
 
+# Auto-sync is DISABLED during the UI-design / testing phase — see auto-memory
+# "as_webapp sync intervals" for the values to restore before going to production.
+# The task-board / portal writes straight to data/zoho_sync.db; no pushes to Zoho
+# and no pulls either, so staged data in the local DB is stable for testing.
+AUTO_SYNC_ENABLED = False
+
+
 @app.on_event("startup")
 async def startup():
     await zoho_db.connect()
     await write_service.init_tables()
 
-    _background_tasks.extend([
-        asyncio.create_task(background_page_sync()),
-        asyncio.create_task(background_zoho_write_sync()),
-        asyncio.create_task(background_multi_report_sync()),
-    ])
-    print("[Background Sync] Started page sync (30s), write sync (30s), and multi-report sync (60s check) tasks")
+    if AUTO_SYNC_ENABLED:
+        _background_tasks.extend([
+            asyncio.create_task(background_page_sync()),
+            asyncio.create_task(background_zoho_write_sync()),
+            asyncio.create_task(background_multi_report_sync()),
+        ])
+        print("[Background Sync] Started page sync (30s), write sync (30s), and multi-report sync (60s check) tasks")
+    else:
+        print("[Background Sync] DISABLED (testing mode). Flip AUTO_SYNC_ENABLED in as_webapp/main.py to re-enable.")
 
 
 @app.on_event("shutdown")
@@ -164,8 +175,9 @@ async def shutdown():
 
 
 # Register routes
-portal_api.register(rt)       # /api/v1/* (Bearer token — iOS + Android)
-portal_web.register(app, rt)  # /signin, /portal, /api/auth/*, admin, 3D, stagings
+portal_api.register(rt)               # /api/v1/* (Bearer token — iOS + Android)
+portal_web.register(app, rt)          # /signin, /portal, /api/auth/*, admin, 3D, stagings
+staging_task_board.register(rt)       # /staging_task_board (+ /stub, /set_date)
 
 
 if __name__ == "__main__":
