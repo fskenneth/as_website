@@ -46,7 +46,7 @@ struct TaskBoardView: View {
                     listView
                 }
             }
-            .navigationTitle("Task Board")
+            .navigationTitle("Tasks")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Toggle(isOn: $mine) { Text("Mine").font(.subheadline) }

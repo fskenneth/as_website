@@ -111,7 +111,7 @@ private fun HeaderBar(
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Task Board", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
+            Text("Tasks", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
             Text("Mine", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(end = 8.dp))
             Switch(checked = mine, onCheckedChange = onMineChange)
         }
