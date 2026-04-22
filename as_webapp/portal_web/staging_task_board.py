@@ -514,11 +514,11 @@ def _style_block():
         transform: translateX(-50%); width: 4px; height: 4px;
         border-radius: 50%; background: var(--accent);
     }
-    .cal-day.in-range { background: var(--accent-soft); border-radius: 0; }
+    .cal-day.in-range { background: var(--accent); color: var(--accent-fg); border-radius: 0; }
     .cal-day.range-start { background: var(--accent); color: var(--accent-fg); font-weight: 600; border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
     .cal-day.range-end { background: var(--accent); color: var(--accent-fg); font-weight: 600; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
     .cal-day.range-start.range-end { border-radius: var(--radius-sm); }
-    .cal-day.range-start.today::after, .cal-day.range-end.today::after { background: var(--accent-fg); }
+    .cal-day.in-range.today::after, .cal-day.range-start.today::after, .cal-day.range-end.today::after { background: var(--accent-fg); }
 
     .range-summary {
         margin-top: 14px; padding: 10px 14px; font-size: 13px;
