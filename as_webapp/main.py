@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import asyncio
+import os
 
 from fasthtml.common import fast_app
 from starlette.responses import JSONResponse
@@ -37,6 +38,7 @@ from tools.zoho_sync.page_sync_service import PageSyncService
 from as_webapp.as_portal_api import routes as portal_api
 from as_webapp.portal_web import routes as portal_web
 from as_webapp.portal_web import staging_task_board
+from as_webapp.portal_web import toky_call_intake
 
 
 app, rt = fast_app(live=False)
@@ -137,6 +139,227 @@ async def background_multi_report_sync():
 AUTO_SYNC_ENABLED = True
 
 
+def _toky_process_one_sync(db_path: str) -> dict | None:
+    """One iteration of the Toky worker, pure-sync so it runs cleanly in
+    `asyncio.to_thread`. Opens its own sqlite connection (SQLite disallows
+    cross-thread connection reuse). Returns the summary dict if a call was
+    processed, None if the queue was empty."""
+    import sqlite3 as _sqlite
+    from as_webapp.as_portal_api import toky_service
+    conn = _sqlite.connect(db_path)
+    try:
+        cdr = toky_service.claim_next_pending(conn)
+        if not cdr:
+            return None
+        try:
+            return toky_service.process_call(conn, cdr)
+        except Exception as e:
+            toky_service.mark_done(
+                conn, cdr["callid"], status="error", error=str(e)[:500],
+            )
+            raise
+    finally:
+        conn.close()
+
+
+async def background_toky_worker():
+    """Drain toky_calls rows with status='pending': download → Deepgram →
+    Sonnet → write derived rows → optional Telegram ping. Runs forever."""
+    from as_webapp.as_portal_api.routes import ZOHO_DB_PATH
+
+    print("[Toky Worker] started")
+    while True:
+        try:
+            try:
+                summary = await asyncio.to_thread(_toky_process_one_sync, ZOHO_DB_PATH)
+            except Exception as e:
+                print(f"[Toky Worker] call failed: {e}")
+                await asyncio.sleep(3)
+                continue
+
+            if summary:
+                await _maybe_ping_telegram(summary)
+                await _maybe_email_draft(summary)
+                print(f"[Toky Worker] {summary.get('callid')} "
+                      f"type={summary.get('call_type')} "
+                      f"cs={summary.get('cs_task', False)}")
+            else:
+                await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"[Toky Worker] loop error: {e}")
+            await asyncio.sleep(10)
+
+
+async def _maybe_ping_telegram(summary: dict) -> None:
+    """Fire a Telegram notification via the configured bot for the calls
+    that deserve human eyes. Silent failure — never crash the worker."""
+    call_type = summary.get("call_type")
+    if not call_type or call_type in ("voicemail_or_failed", "cold_call_inbound", "other"):
+        return
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    if not token or not chat_id:
+        return
+    import httpx as _httpx
+    emoji = {"customer_service_issue": "🚨", "sales_new_lead": "🟢",
+             "sales_follow_up": "📞", "scheduling": "🗓️"}.get(call_type, "📋")
+    lines = [
+        f"{emoji} *{call_type.replace('_', ' ')}*",
+        f"callid: `{summary.get('callid')}`",
+        f"{summary.get('summary', '')[:400]}",
+    ]
+    if summary.get("cs_task"):
+        lines.insert(1, "🛠 *CS task auto-created*")
+    text = "\n".join(lines)
+    try:
+        async with _httpx.AsyncClient(timeout=10.0) as c:
+            await c.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+            )
+    except Exception as e:
+        print(f"[Toky Worker] telegram ping failed: {e}")
+
+
+def _send_draft_email_sync(callid: str) -> None:
+    """Send a digest email to kenneth@astrastaging.com for a newly-created
+    staging draft. Runs inside asyncio.to_thread (uses requests under the
+    hood via tools.email_service). Silent on failure — logs only."""
+    import json as _json
+    import sqlite3 as _sqlite
+    try:
+        from tools.email_service import EmailService
+    except Exception as e:
+        print(f"[Toky Worker] email import failed: {e}")
+        return
+
+    from as_webapp.as_portal_api.routes import ZOHO_DB_PATH
+    conn = _sqlite.connect(ZOHO_DB_PATH)
+    conn.row_factory = _sqlite.Row
+    try:
+        draft_row = conn.execute(
+            "SELECT * FROM toky_staging_drafts WHERE callid = ? ORDER BY created_at DESC LIMIT 1",
+            (callid,),
+        ).fetchone()
+        if not draft_row:
+            return
+        draft = dict(draft_row)
+        call_row = conn.execute("SELECT * FROM toky_calls WHERE callid = ?", (callid,)).fetchone()
+        call = dict(call_row) if call_row else {}
+        extract_row = conn.execute(
+            "SELECT extract_json FROM toky_extracts WHERE callid = ?", (callid,),
+        ).fetchone()
+        try:
+            extract = _json.loads(extract_row["extract_json"]) if extract_row else {}
+        except (TypeError, _json.JSONDecodeError):
+            extract = {}
+    finally:
+        conn.close()
+
+    portal_base = os.getenv("PORTAL_PUBLIC_URL", "http://100.114.47.80:5002")
+    portal_link = f"{portal_base}/toky_call_intake/{callid}"
+
+    ct = extract.get("call_type") or "unknown"
+    badge = {"sales_new_lead": "#10b981", "sales_follow_up": "#3b82f6",
+             "scheduling": "#8b5cf6", "customer_service_issue": "#dc2626",
+             }.get(ct, "#6b7280")
+
+    cust = extract.get("customer") if isinstance(extract.get("customer"), dict) else {}
+    prop = extract.get("property") if isinstance(extract.get("property"), dict) else {}
+    sales_signal = extract.get("sales_signal") if isinstance(extract.get("sales_signal"), dict) else {}
+    try:
+        rooms = _json.loads(draft.get("rooms_discussed_json") or "[]")
+    except Exception:
+        rooms = []
+    kp = extract.get("key_points") or []
+    ai = extract.get("action_items") or []
+    obj = sales_signal.get("objections_raised") or []
+
+    kp_html = "".join(f"<li>{k}</li>" for k in kp) or "<li><em>none extracted</em></li>"
+    ai_html = "".join(f"<li>{a}</li>" for a in ai) or "<li><em>none</em></li>"
+    obj_html = "".join(f"<li>{o}</li>" for o in obj)
+
+    html = f"""<!doctype html><html><body style="margin:0;padding:0;background:#f4f5f7;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#111;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:24px 0;"><tr><td align="center">
+<table width="640" cellpadding="0" cellspacing="0" style="max-width:640px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden;">
+<tr><td style="padding:22px 28px;border-bottom:1px solid #e4e7eb;">
+<div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;font-weight:600;">Toky Call Intake · New draft</div>
+<h1 style="margin:4px 0 0;font-size:20px;line-height:1.3;">{(extract.get('summary') or '(no summary)')[:180]}</h1>
+<div style="margin-top:8px;">
+<span style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;color:#fff;background:{badge};text-transform:uppercase;letter-spacing:.03em;">{ct.replace('_',' ')}</span>
+<span style="color:#6b7280;font-size:12px;margin-left:6px;">confidence {int((extract.get('confidence') or 0) * 100)}% · {call.get('direction','?')} · {call.get('duration_s','?')}s · agent: {call.get('agent_id','?')}</span>
+</div></td></tr>
+<tr><td style="padding:18px 28px 4px;">
+<h2 style="margin:0 0 6px;font-size:13px;letter-spacing:.04em;color:#6b7280;text-transform:uppercase;">Customer &amp; property</h2>
+<table cellpadding="4" cellspacing="0" style="font-size:13px;width:100%;">
+<tr><td style="color:#6b7280;width:120px;">name</td><td>{cust.get('name') or '—'}</td></tr>
+<tr><td style="color:#6b7280;">phone</td><td>{cust.get('phone') or '—'}</td></tr>
+<tr><td style="color:#6b7280;">email</td><td>{cust.get('email') or '—'}</td></tr>
+<tr><td style="color:#6b7280;">address</td><td>{prop.get('address') or '—'}</td></tr>
+<tr><td style="color:#6b7280;">type</td><td>{prop.get('property_type') or '—'}</td></tr>
+<tr><td style="color:#6b7280;">occupancy</td><td>{prop.get('occupancy') or '—'}</td></tr>
+<tr><td style="color:#6b7280;">rooms</td><td>{', '.join(rooms) or '—'}</td></tr>
+<tr><td style="color:#6b7280;">next step</td><td>{draft.get('next_step') or '—'}</td></tr>
+<tr><td style="color:#6b7280;">zoho match</td><td>{draft.get('zoho_match_hint') or '—'}</td></tr>
+</table></td></tr>
+<tr><td style="padding:18px 28px 4px;">
+<h2 style="margin:0 0 6px;font-size:13px;letter-spacing:.04em;color:#6b7280;text-transform:uppercase;">Key points</h2>
+<ul style="margin:0;padding-left:20px;font-size:13.5px;line-height:1.55;">{kp_html}</ul></td></tr>
+<tr><td style="padding:18px 28px 4px;">
+<h2 style="margin:0 0 6px;font-size:13px;letter-spacing:.04em;color:#6b7280;text-transform:uppercase;">Action items</h2>
+<ul style="margin:0;padding-left:20px;font-size:13.5px;line-height:1.55;">{ai_html}</ul></td></tr>
+{"" if not obj_html else f'<tr><td style="padding:18px 28px 4px;"><h2 style="margin:0 0 6px;font-size:13px;letter-spacing:.04em;color:#6b7280;text-transform:uppercase;">Objections raised</h2><ul style="margin:0;padding-left:20px;font-size:13.5px;line-height:1.55;">{obj_html}</ul></td></tr>'}
+<tr><td style="padding:20px 28px 24px;text-align:center;border-top:1px solid #e4e7eb;">
+<a href="{portal_link}" style="display:inline-block;padding:10px 22px;background:#3b82f6;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">Review &amp; approve →</a>
+<div style="margin-top:10px;font-size:12px;color:#6b7280;">callid: <code>{callid}</code></div>
+</td></tr>
+</table></td></tr></table></body></html>"""
+
+    text_body = (
+        f"New {ct} draft from Toky.\n\n"
+        f"{extract.get('summary', '')}\n\n"
+        f"Customer: {cust.get('name','—')}  {cust.get('phone','—')}\n"
+        f"Property:  {prop.get('address','—')} ({prop.get('property_type','—')}, {prop.get('occupancy','—')})\n"
+        f"Next step: {draft.get('next_step','—')}\n\n"
+        f"Review: {portal_link}\n"
+    )
+
+    subject = f"[Astra Toky] {ct.replace('_',' ').title()} — {call.get('from_number') or call.get('to_number') or callid[:8]}"
+    try:
+        svc = EmailService()
+        res = svc.send_email(
+            to_email=os.getenv("TOKY_DRAFT_EMAIL_TO", "kenneth@astrastaging.com"),
+            subject=subject,
+            html_content=html,
+            text_content=text_body,
+        )
+        if res.get("success"):
+            print(f"[Toky Worker] draft email sent for {callid}: {res.get('message_id')}")
+        else:
+            print(f"[Toky Worker] draft email FAILED for {callid}: {res.get('error')}")
+    except Exception as e:
+        print(f"[Toky Worker] draft email threw for {callid}: {e}")
+
+
+async def _maybe_email_draft(summary: dict) -> None:
+    """Send a draft digest email for every processed sales/scheduling call
+    that produced a staging draft. CS issues also get a notification. Off
+    by default unless TOKY_DRAFT_EMAIL_ENABLED is truthy in .env — stops
+    us from blasting 500 emails the first time a backfill runs."""
+    if os.getenv("TOKY_DRAFT_EMAIL_ENABLED", "").strip().lower() not in ("1", "true", "yes"):
+        return
+    call_type = summary.get("call_type")
+    # Skip noise; only email on calls that produce a draft or CS task.
+    if call_type in ("voicemail_or_failed", "cold_call_inbound"):
+        return
+    callid = summary.get("callid")
+    if not callid or summary.get("skipped"):
+        return
+    await asyncio.to_thread(_send_draft_email_sync, callid)
+
+
 @app.on_event("startup")
 async def startup():
     await zoho_db.connect()
@@ -151,8 +374,10 @@ async def startup():
         _background_tasks.extend([
             # asyncio.create_task(background_zoho_write_sync()),  # DISABLED — read-only
             asyncio.create_task(background_multi_report_sync()),
+            asyncio.create_task(background_toky_worker()),
         ])
-        print("[Background Sync] Read-only mode. Write sync DISABLED. Multi-report (Zoho→m4) sync ON.")
+        print("[Background Sync] Read-only mode. Write sync DISABLED. "
+              "Multi-report (Zoho→m4) sync ON. Toky worker ON.")
     else:
         print("[Background Sync] DISABLED (testing mode). Flip AUTO_SYNC_ENABLED in as_webapp/main.py to re-enable.")
 
@@ -178,6 +403,7 @@ async def shutdown():
 portal_api.register(rt)               # /api/v1/* (Bearer token — iOS + Android)
 portal_web.register(app, rt)          # /signin, /portal, /api/auth/*, admin, 3D, stagings
 staging_task_board.register(rt)       # /staging_task_board (+ /stub, /set_date)
+toky_call_intake.register(rt)         # /toky_call_intake (+ detail, cs/draft actions)
 
 
 if __name__ == "__main__":

@@ -163,6 +163,20 @@ def _ensure_line_items_table():
 _ensure_line_items_table()
 
 
+def _ensure_toky_tables():
+    """Create the Toky call-intelligence tables. Imports toky_service lazily
+    so routes.py can still load if Toky env vars aren't configured yet."""
+    from . import toky_service
+    conn = sqlite3.connect(ZOHO_DB_PATH)
+    try:
+        toky_service.ensure_tables(conn)
+    finally:
+        conn.close()
+
+
+_ensure_toky_tables()
+
+
 # ---------------- quote catalog + pricing ----------------
 # Mirrors page/staging_inquiry.py (items_data + getBaseFee + getAreaPrice).
 # Single source of truth for mobile consultations; if the website's list
@@ -1881,3 +1895,295 @@ def register(rt):
                 "count": r["item_count"],
             })
         return JSONResponse({"items": items, "total": len(items)})
+
+    # ---------------- Toky call-intelligence pipeline ----------------
+
+    @rt("/api/v1/toky/webhook", methods=["POST"])
+    async def v1_toky_webhook(request: Request):
+        """Toky fires this on call-ended events. We insert the CDR into
+        toky_calls with status=pending and return 200 immediately — the
+        background worker in main.py drains the queue.
+
+        Security: no HMAC is documented by Toky, so we IP-allowlist
+        unless TOKY_WEBHOOK_BYPASS is set for local testing.
+        """
+        allowlist = (os.getenv("TOKY_WEBHOOK_IPS") or "").split(",")
+        allowlist = [a.strip() for a in allowlist if a.strip()]
+        if allowlist and not os.getenv("TOKY_WEBHOOK_BYPASS"):
+            peer = request.client.host if request.client else ""
+            # X-Forwarded-For wins if present (behind Tailscale funnel / Cloudflare).
+            fwd = request.headers.get("x-forwarded-for", "")
+            source = (fwd.split(",")[0].strip() or peer) if fwd else peer
+            if source not in allowlist:
+                return JSONResponse({"error": "forbidden"}, status_code=403)
+
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse({"error": "invalid JSON"}, status_code=400)
+
+        # Toky payload shapes vary across events. Accept either a bare CDR
+        # dict or a wrapped {event, data} structure.
+        cdr = body.get("data") if isinstance(body, dict) and "data" in body else body
+        if not isinstance(cdr, dict) or not (cdr.get("callid") or cdr.get("id")):
+            return JSONResponse({"error": "missing callid"}, status_code=400)
+
+        from . import toky_service
+        conn = sqlite3.connect(ZOHO_DB_PATH)
+        try:
+            callid = toky_service.insert_cdr(conn, cdr)
+        except toky_service.TokyServiceError as e:
+            conn.close()
+            return JSONResponse({"error": str(e)}, status_code=400)
+        finally:
+            conn.close()
+        return JSONResponse({"ok": True, "callid": callid, "queued": True})
+
+    @rt("/api/v1/toky/calls")
+    def v1_toky_calls(request: Request, call_type: str = "", status: str = "", limit: int = 100):
+        """List recent Toky calls with their extraction summary. Supports
+        filtering by call_type ('sales_new_lead', 'customer_service_issue',
+        etc.) and by processing status ('pending', 'processing', 'done')."""
+        user = _api_user(request)
+        if not user:
+            return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+        conn = sqlite3.connect(ZOHO_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        try:
+            query = """
+                SELECT c.callid, c.direction, c.agent_id, c.from_number,
+                       c.to_number, c.duration_s, c.init_dt, c.status,
+                       c.error, c.received_at, c.processed_at,
+                       e.call_type, e.confidence, e.summary, e.extract_json
+                FROM toky_calls c
+                LEFT JOIN toky_extracts e ON e.callid = c.callid
+                WHERE 1 = 1
+            """
+            params: list = []
+            if call_type:
+                query += " AND e.call_type = ?"
+                params.append(call_type)
+            if status:
+                query += " AND c.status = ?"
+                params.append(status)
+            query += " ORDER BY c.received_at DESC LIMIT ?"
+            params.append(max(1, min(limit, 500)))
+            rows = conn.execute(query, params).fetchall()
+        finally:
+            conn.close()
+
+        out = []
+        for r in rows:
+            extract = None
+            if r["extract_json"]:
+                try:
+                    extract = json.loads(r["extract_json"])
+                except json.JSONDecodeError:
+                    extract = None
+            out.append({
+                "callid": r["callid"],
+                "direction": r["direction"],
+                "agent_id": r["agent_id"],
+                "from": r["from_number"],
+                "to": r["to_number"],
+                "duration_s": r["duration_s"],
+                "init_dt": r["init_dt"],
+                "status": r["status"],
+                "error": r["error"],
+                "received_at": r["received_at"],
+                "processed_at": r["processed_at"],
+                "call_type": r["call_type"],
+                "confidence": r["confidence"],
+                "summary": r["summary"],
+                "extract": extract,
+            })
+        return JSONResponse({"calls": out, "total": len(out)})
+
+    @rt("/api/v1/toky/calls/{callid}")
+    def v1_toky_call_detail(request: Request, callid: str):
+        """Full detail: CDR + transcript + extract + any derived CS task / draft."""
+        user = _api_user(request)
+        if not user:
+            return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+        conn = sqlite3.connect(ZOHO_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        try:
+            call = conn.execute(
+                "SELECT * FROM toky_calls WHERE callid = ?", (callid,),
+            ).fetchone()
+            if not call:
+                return JSONResponse({"error": "not found"}, status_code=404)
+            transcript_row = conn.execute(
+                "SELECT transcript_text, duration_s FROM toky_transcripts WHERE callid = ?",
+                (callid,),
+            ).fetchone()
+            extract_row = conn.execute(
+                "SELECT extract_json FROM toky_extracts WHERE callid = ?", (callid,),
+            ).fetchone()
+            cs_tasks = conn.execute(
+                "SELECT * FROM toky_cs_tasks WHERE callid = ? ORDER BY created_at DESC",
+                (callid,),
+            ).fetchall()
+            drafts = conn.execute(
+                "SELECT * FROM toky_staging_drafts WHERE callid = ? ORDER BY created_at DESC",
+                (callid,),
+            ).fetchall()
+        finally:
+            conn.close()
+
+        extract = None
+        if extract_row and extract_row["extract_json"]:
+            try:
+                extract = json.loads(extract_row["extract_json"])
+            except json.JSONDecodeError:
+                extract = None
+
+        return JSONResponse({
+            "call": {k: call[k] for k in call.keys()},
+            "transcript": transcript_row["transcript_text"] if transcript_row else None,
+            "transcript_duration_s": transcript_row["duration_s"] if transcript_row else None,
+            "extract": extract,
+            "cs_tasks": [{k: t[k] for k in t.keys()} for t in cs_tasks],
+            "staging_drafts": [
+                {**{k: d[k] for k in d.keys()},
+                 "rooms_discussed": json.loads(d["rooms_discussed_json"] or "[]"),
+                 "quote_lines": json.loads(d["quote_lines_json"] or "[]")}
+                for d in drafts
+            ],
+        })
+
+    @rt("/api/v1/toky/cs-tasks")
+    def v1_toky_cs_tasks_list(request: Request, status: str = "open", limit: int = 100):
+        """List CS tasks pulled from Toky calls. Default: only open ones."""
+        user = _api_user(request)
+        if not user:
+            return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+        conn = sqlite3.connect(ZOHO_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        try:
+            query = """
+                SELECT t.*, c.from_number, c.init_dt, e.summary AS call_summary
+                FROM toky_cs_tasks t
+                JOIN toky_calls c ON c.callid = t.callid
+                LEFT JOIN toky_extracts e ON e.callid = t.callid
+                WHERE 1 = 1
+            """
+            params: list = []
+            if status:
+                query += " AND t.status = ?"
+                params.append(status)
+            query += " ORDER BY CASE t.severity "
+            query += " WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, "
+            query += " t.created_at DESC LIMIT ?"
+            params.append(max(1, min(limit, 500)))
+            rows = conn.execute(query, params).fetchall()
+        finally:
+            conn.close()
+
+        return JSONResponse({
+            "tasks": [{k: r[k] for k in r.keys()} for r in rows],
+            "total": len(rows),
+        })
+
+    @rt("/api/v1/toky/cs-tasks/{task_id}", methods=["POST"])
+    async def v1_toky_cs_task_update(request: Request, task_id: str):
+        """Update a CS task — typically mark as resolved or change assignee.
+        Body: `{"status": "in_progress|resolved|open", "assignee": "..."}`."""
+        user = _api_user(request)
+        if not user:
+            return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse({"error": "invalid JSON"}, status_code=400)
+
+        status = (body.get("status") or "").strip().lower()
+        assignee = (body.get("assignee") or "").strip() or None
+        allowed = {"open", "in_progress", "resolved"}
+        if status and status not in allowed:
+            return JSONResponse({"error": f"status must be one of {sorted(allowed)}"}, status_code=400)
+
+        conn = sqlite3.connect(ZOHO_DB_PATH)
+        try:
+            resolved_at = datetime.utcnow().isoformat() if status == "resolved" else None
+            conn.execute("""
+                UPDATE toky_cs_tasks
+                SET status = COALESCE(NULLIF(?, ''), status),
+                    assignee = COALESCE(?, assignee),
+                    resolved_at = COALESCE(?, resolved_at)
+                WHERE id = ?
+            """, (status, assignee, resolved_at, task_id))
+            conn.commit()
+        finally:
+            conn.close()
+        return JSONResponse({"ok": True})
+
+    @rt("/api/v1/toky/drafts")
+    def v1_toky_drafts_list(request: Request, status: str = "draft", limit: int = 100):
+        """List staging-project drafts generated from sales calls."""
+        user = _api_user(request)
+        if not user:
+            return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+        conn = sqlite3.connect(ZOHO_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        try:
+            query = """
+                SELECT d.*, c.init_dt, c.agent_id, c.from_number,
+                       e.summary AS call_summary, e.confidence
+                FROM toky_staging_drafts d
+                JOIN toky_calls c ON c.callid = d.callid
+                LEFT JOIN toky_extracts e ON e.callid = d.callid
+                WHERE 1 = 1
+            """
+            params: list = []
+            if status:
+                query += " AND d.status = ?"
+                params.append(status)
+            query += " ORDER BY d.created_at DESC LIMIT ?"
+            params.append(max(1, min(limit, 500)))
+            rows = conn.execute(query, params).fetchall()
+        finally:
+            conn.close()
+        out = []
+        for r in rows:
+            base = {k: r[k] for k in r.keys()}
+            base["rooms_discussed"] = json.loads(r["rooms_discussed_json"] or "[]")
+            base["quote_lines"] = json.loads(r["quote_lines_json"] or "[]")
+            out.append(base)
+        return JSONResponse({"drafts": out, "total": len(out)})
+
+    @rt("/api/v1/toky/drafts/{draft_id}", methods=["POST"])
+    async def v1_toky_draft_update(request: Request, draft_id: str):
+        """Approve / reject a staging draft. Zoho writes are still manual —
+        this only flips the local draft status so it disappears from review.
+        Body: `{"status": "approved|rejected|draft"}`."""
+        user = _api_user(request)
+        if not user:
+            return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse({"error": "invalid JSON"}, status_code=400)
+
+        status = (body.get("status") or "").strip().lower()
+        allowed = {"draft", "approved", "rejected"}
+        if status not in allowed:
+            return JSONResponse({"error": f"status must be one of {sorted(allowed)}"}, status_code=400)
+
+        conn = sqlite3.connect(ZOHO_DB_PATH)
+        try:
+            approved_at = datetime.utcnow().isoformat() if status == "approved" else None
+            conn.execute(
+                "UPDATE toky_staging_drafts SET status = ?, approved_at = ? WHERE id = ?",
+                (status, approved_at, draft_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        return JSONResponse({"ok": True})

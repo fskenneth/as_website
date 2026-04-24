@@ -83,3 +83,17 @@ tools/model_3d/run_batch.sh
 # Zoho Creator source dump — reference material, not for public repo
 as_webapp/Staging_Manager.ds
 as_webapp/*.ds
+
+# Toky POC output — regenerable data, not source
+tools/toky_poc/out/*.mp3
+tools/toky_poc/out/*.dg.json
+tools/toky_poc/out/*.dg.txt
+tools/toky_poc/out/*.txt
+tools/toky_poc/out/*.extract.json
+tools/toky_poc/out/backfill_log.jsonl
+tools/toky_poc/out/cdrs.json
+tools/toky_poc/out/summary.json
+tools/toky_poc/out/deepgram_summary.json
+tools/toky_poc/out/backfill_summary.json
+# Audio storage for production (will fill up fast)
+data/toky_audio/
