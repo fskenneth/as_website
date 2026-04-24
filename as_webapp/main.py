@@ -224,9 +224,10 @@ async def _maybe_ping_telegram(summary: dict) -> None:
 
 
 def _send_draft_email_sync(callid: str) -> None:
-    """Send a digest email to kenneth@astrastaging.com for a newly-created
-    staging draft. Runs inside asyncio.to_thread (uses requests under the
-    hood via tools.email_service). Silent on failure — logs only."""
+    """Send a digest email to kenneth@astrastaging.com for a newly-processed
+    Toky call. Handles both sales/scheduling calls (has a staging draft row)
+    and customer-service calls (has a CS task row). Runs inside
+    asyncio.to_thread. Silent on failure — logs only."""
     import json as _json
     import sqlite3 as _sqlite
     try:
@@ -239,13 +240,23 @@ def _send_draft_email_sync(callid: str) -> None:
     conn = _sqlite.connect(ZOHO_DB_PATH)
     conn.row_factory = _sqlite.Row
     try:
+        # Prefer the draft (sales/scheduling). Fall back to an empty shell
+        # synthesized from the CS task so we still email on complaints.
         draft_row = conn.execute(
             "SELECT * FROM toky_staging_drafts WHERE callid = ? ORDER BY created_at DESC LIMIT 1",
             (callid,),
         ).fetchone()
-        if not draft_row:
+        cs_row = conn.execute(
+            "SELECT * FROM toky_cs_tasks WHERE callid = ? ORDER BY created_at DESC LIMIT 1",
+            (callid,),
+        ).fetchone()
+        if not draft_row and not cs_row:
             return
-        draft = dict(draft_row)
+        draft = dict(draft_row) if draft_row else {
+            "callid": callid, "rooms_discussed_json": "[]",
+            "next_step": (cs_row["description"] if cs_row else None),
+            "zoho_match_hint": None,
+        }
         call_row = conn.execute("SELECT * FROM toky_calls WHERE callid = ?", (callid,)).fetchone()
         call = dict(call_row) if call_row else {}
         extract_row = conn.execute(

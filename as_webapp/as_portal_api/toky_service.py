@@ -402,6 +402,8 @@ def insert_cdr(conn: sqlite3.Connection, cdr: dict) -> str:
     except (ValueError, TypeError):
         duration = 0
     record_url = (cdr.get("record_url") or cdr.get("recording_url") or "")
+    # CDR field names differ: webhook uses `from_number`/`agent`, /cdrs uses
+    # `from`/`agent_id`. Accept either.
     conn.execute("""
         INSERT OR IGNORE INTO toky_calls (
             callid, direction, agent_id, from_number, to_number,
@@ -409,10 +411,16 @@ def insert_cdr(conn: sqlite3.Connection, cdr: dict) -> str:
             raw_cdr_json, status
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
     """, (
-        callid, cdr.get("direction"), cdr.get("agent_id"),
-        cdr.get("from"), cdr.get("to_number") or cdr.get("received_on_number"),
-        duration, cdr.get("init_dt") or cdr.get("date"), cdr.get("end_time"),
-        record_url, cdr.get("disposition_code"),
+        callid,
+        cdr.get("direction"),
+        cdr.get("agent_id") or cdr.get("agent"),
+        cdr.get("from") or cdr.get("from_number"),
+        cdr.get("to_number") or cdr.get("received_on_number"),
+        duration,
+        cdr.get("init_dt") or cdr.get("date"),
+        cdr.get("end_time"),
+        record_url,
+        cdr.get("disposition_code"),
         json.dumps(cdr),
     ))
     conn.commit()
@@ -476,8 +484,19 @@ def process_call(conn: sqlite3.Connection, cdr: dict) -> dict:
         mark_done(conn, callid, status="done")
         return {"callid": callid, "call_type": "voicemail_or_failed", "skipped": True}
 
-    # 1. Resolve recording URL + download
-    url = cdr.get("record_url") or fetch_recording_url(callid)
+    # 1. Resolve recording URL + download.
+    # Prefer `record_url_raw` (direct S3) — the webhook's `record_url` points
+    # at the app.toky.co HTML page, which Deepgram can't decode. Fall back to
+    # GET /recordings/{callid} for list-originated CDRs that only have the
+    # app URL.
+    raw_url = cdr.get("record_url_raw")
+    app_url = cdr.get("record_url")
+    if raw_url and "tokystorage" in raw_url:
+        url = raw_url
+    elif app_url and "tokystorage" in app_url:
+        url = app_url
+    else:
+        url = fetch_recording_url(callid)
     if not url:
         mark_done(conn, callid, status="no_recording", error="recording url not available")
         return {"callid": callid, "error": "no_recording"}
