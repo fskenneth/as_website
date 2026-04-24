@@ -338,18 +338,25 @@ def _send_draft_email_sync(callid: str) -> None:
     )
 
     subject = f"[Astra Toky] {ct.replace('_',' ').title()} — {call.get('from_number') or call.get('to_number') or callid[:8]}"
+    recipients = [
+        r.strip() for r in os.getenv(
+            "TOKY_DRAFT_EMAIL_TO",
+            "kenneth@astrastaging.com,clara@astrastaging.com",
+        ).split(",") if r.strip()
+    ]
     try:
         svc = EmailService()
-        res = svc.send_email(
-            to_email=os.getenv("TOKY_DRAFT_EMAIL_TO", "kenneth@astrastaging.com"),
-            subject=subject,
-            html_content=html,
-            text_content=text_body,
-        )
-        if res.get("success"):
-            print(f"[Toky Worker] draft email sent for {callid}: {res.get('message_id')}")
-        else:
-            print(f"[Toky Worker] draft email FAILED for {callid}: {res.get('error')}")
+        for to_email in recipients:
+            res = svc.send_email(
+                to_email=to_email,
+                subject=subject,
+                html_content=html,
+                text_content=text_body,
+            )
+            if res.get("success"):
+                print(f"[Toky Worker] draft email sent to {to_email} for {callid}: {res.get('message_id')}")
+            else:
+                print(f"[Toky Worker] draft email FAILED to {to_email} for {callid}: {res.get('error')}")
     except Exception as e:
         print(f"[Toky Worker] draft email threw for {callid}: {e}")
 
