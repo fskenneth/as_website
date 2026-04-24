@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,24 +23,31 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Brush
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.LocalShipping
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,10 +55,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,6 +82,9 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+/** Webapp's --accent rose #E11D48 — matches the "Task Board" word and active-toggle highlight. */
+private val AccentRose = Color(0xFFE11D48)
+
 @Composable
 fun TaskBoardScreen(user: ApiUser, token: String, modifier: Modifier = Modifier) {
     val vm: TaskBoardViewModel = viewModel(
@@ -72,22 +92,41 @@ fun TaskBoardScreen(user: ApiUser, token: String, modifier: Modifier = Modifier)
         factory = viewModelFactory { initializer { TaskBoardViewModel(token) } },
     )
     val state by vm.state.collectAsStateWithLifecycle()
+    var search by remember { mutableStateOf("") }
+    var searchOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { vm.load() }
 
+    val filtered by remember(state.stagings, search) {
+        derivedStateOf { filterStagings(state.stagings, search) }
+    }
+
     Column(modifier = modifier.fillMaxSize()) {
-        HeaderBar(
+        HeaderBanner(
             period = state.period,
             mine = state.mine,
+            count = filtered.size,
+            search = search,
+            searchOpen = searchOpen,
             onPeriodChange = vm::setPeriod,
-            onMineChange = vm::setMine,
+            onMineToggle = { vm.setMine(!state.mine) },
+            onSearchChange = { search = it },
+            onSearchToggle = {
+                // If the field is already visible with no query, tapping hides it.
+                // Otherwise open it; the field itself handles focus on appear.
+                searchOpen = !(searchOpen && search.isEmpty())
+            },
+            onSearchClose = {
+                search = ""
+                searchOpen = false
+            },
         )
         when {
             state.isLoading && state.stagings.isEmpty() -> LoadingState()
             state.error != null && state.stagings.isEmpty() -> ErrorState(state.error!!, onRetry = vm::load)
-            state.stagings.isEmpty() -> EmptyState()
+            filtered.isEmpty() -> EmptyState(hasSearch = search.isNotBlank())
             else -> StagingList(
-                stagings = state.stagings,
+                stagings = filtered,
                 serverToday = state.serverToday,
                 period = state.period,
                 togglingField = state.togglingField,
@@ -98,38 +137,222 @@ fun TaskBoardScreen(user: ApiUser, token: String, modifier: Modifier = Modifier)
 }
 
 @Composable
-private fun HeaderBar(
+private fun HeaderBanner(
     period: TaskPeriod,
     mine: Boolean,
+    count: Int,
+    search: String,
+    searchOpen: Boolean,
     onPeriodChange: (TaskPeriod) -> Unit,
-    onMineChange: (Boolean) -> Unit,
+    onMineToggle: () -> Unit,
+    onSearchChange: (String) -> Unit,
+    onSearchToggle: () -> Unit,
+    onSearchClose: () -> Unit,
 ) {
+    val showSearch = searchOpen || search.isNotEmpty()
     Column(
         Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Tasks", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
-            Text("Mine", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(end = 8.dp))
-            Switch(checked = mine, onCheckedChange = onMineChange)
-        }
-        Spacer(Modifier.height(8.dp))
+        // Title: "Staging " + "Task Board" (accent)
+        Text(
+            text = titleAnnotated(),
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+        )
+
+        // Controls: date range on left; my tasks + search toggle anchored right so
+        // the changing stagings-count text can't nudge them.
         Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            TaskPeriod.entries.forEach { p ->
-                FilterChip(
-                    selected = period == p,
-                    onClick = { onPeriodChange(p) },
-                    label = { Text(p.label) },
-                    colors = FilterChipDefaults.filterChipColors(),
+            RangePill(period = period, count = count, onChange = onPeriodChange)
+            Spacer(Modifier.weight(1f))
+            MineToggle(mine = mine, onToggle = onMineToggle)
+            Spacer(Modifier.width(8.dp))
+            SearchTogglePill(
+                active = showSearch,
+                onClick = onSearchToggle,
+                modifier = Modifier.fillMaxHeight(),
+            )
+        }
+
+        // Search — only rendered when the user opens it (or has a query).
+        if (showSearch) {
+            SearchField(
+                value = search,
+                onChange = onSearchChange,
+                onClose = onSearchClose,
+                autoFocus = searchOpen,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchTogglePill(active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val bg = if (active) AccentRose.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant
+    val border = if (active) AccentRose else MaterialTheme.colorScheme.outlineVariant
+    val borderWidth = if (active) 1.dp else 0.5.dp
+    val fg = if (active) AccentRose else MaterialTheme.colorScheme.onSurface
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(bg)
+            .border(borderWidth, border, RoundedCornerShape(50))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Filled.Search,
+            contentDescription = if (active) "Close search" else "Open search",
+            modifier = Modifier.size(14.dp),
+            tint = fg,
+        )
+    }
+}
+
+private fun titleAnnotated(): AnnotatedString = buildAnnotatedString {
+    append("Staging ")
+    withStyle(SpanStyle(color = AccentRose)) { append("Task Board") }
+}
+
+@Composable
+private fun RangePill(
+    period: TaskPeriod,
+    count: Int,
+    onChange: (TaskPeriod) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(50))
+                .clickable { open = true }
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Filled.CalendarToday,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = rangeLabelAnnotated(count, period),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            TaskPeriod.BANNER_CHOICES.forEach { p ->
+                DropdownMenuItem(
+                    text = {
+                        val marker = if (p == period) "✓  " else "    "
+                        Text("$marker${p.menuLabel}")
+                    },
+                    onClick = {
+                        open = false
+                        if (p != period) onChange(p)
+                    },
                 )
             }
         }
     }
+}
+
+private fun rangeLabelAnnotated(count: Int, period: TaskPeriod): AnnotatedString = buildAnnotatedString {
+    withStyle(SpanStyle(color = AccentRose, fontWeight = FontWeight.SemiBold)) {
+        append(count.toString())
+    }
+    append(" stagings · ")
+    append(period.phrase)
+}
+
+@Composable
+private fun MineToggle(mine: Boolean, onToggle: () -> Unit) {
+    val bg = if (mine) AccentRose.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant
+    val border = if (mine) AccentRose else MaterialTheme.colorScheme.outlineVariant
+    val borderWidth = if (mine) 1.dp else 0.5.dp
+    val fg = if (mine) AccentRose else MaterialTheme.colorScheme.onSurface
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(bg)
+            .border(borderWidth, border, RoundedCornerShape(50))
+            .clickable { onToggle() }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Outlined.Person,
+            contentDescription = null,
+            modifier = Modifier.size(14.dp),
+            tint = fg,
+        )
+        Spacer(Modifier.width(4.dp))
+        Text("My tasks", style = MaterialTheme.typography.bodyMedium, color = fg)
+    }
+}
+
+@Composable
+private fun SearchField(
+    value: String,
+    onChange: (String) -> Unit,
+    onClose: () -> Unit,
+    autoFocus: Boolean,
+) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(autoFocus) {
+        if (autoFocus) focusRequester.requestFocus()
+    }
+    TextField(
+        value = value,
+        onValueChange = onChange,
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(focusRequester),
+        placeholder = {
+            Text(
+                "Search address, person, date, notes",
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        leadingIcon = {
+            Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+        },
+        trailingIcon = {
+            Icon(
+                Icons.Filled.Close,
+                contentDescription = "Close search",
+                modifier = Modifier
+                    .size(18.dp)
+                    .clickable { onClose() },
+            )
+        },
+        singleLine = true,
+        shape = RoundedCornerShape(10.dp),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            disabledIndicatorColor = Color.Transparent,
+        ),
+    )
 }
 
 @Composable
@@ -140,15 +363,19 @@ private fun LoadingState() {
 }
 
 @Composable
-private fun EmptyState() {
+private fun EmptyState(hasSearch: Boolean) {
     Column(
         Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("No stagings for this period", style = MaterialTheme.typography.titleMedium)
         Text(
-            "Try a different period or toggle Mine.",
+            if (hasSearch) "No stagings match your search" else "No stagings for this period",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            if (hasSearch) "Try a wider range, clear the search, or toggle My tasks off."
+            else "Try a different date range or toggle My tasks off.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -167,6 +394,26 @@ private fun ErrorState(message: String, onRetry: () -> Unit) {
         Text("Couldn't load", style = MaterialTheme.typography.titleMedium)
         Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.padding(vertical = 8.dp))
         Button(onClick = onRetry) { Text("Retry") }
+    }
+}
+
+private fun filterStagings(stagings: List<Staging>, search: String): List<Staging> {
+    val query = search.trim().lowercase()
+    if (query.isEmpty()) return stagings
+    val tokens = query.split(Regex("\\s+")).filter { it.isNotEmpty() }
+    return stagings.filter { s ->
+        val people = (s.stagers + s.staging_movers + s.destaging_movers)
+            .mapNotNull { it.name }
+            .joinToString(" ")
+        val parts = listOfNotNull(
+            s.address, s.name, s.staging_date, s.destaging_date,
+            s.property_type, s.occupancy, s.staging_type, s.status,
+            s.general_notes, s.moving_instructions, s.mls,
+            s.customer.fullName, s.customer.email, s.customer.phone,
+            s.staging_eta, s.destaging_eta, people,
+        )
+        val haystack = parts.joinToString(" ").lowercase()
+        tokens.all { haystack.contains(it) }
     }
 }
 

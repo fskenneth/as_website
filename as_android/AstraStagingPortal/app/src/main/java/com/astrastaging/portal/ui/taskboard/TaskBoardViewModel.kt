@@ -10,17 +10,26 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-enum class TaskPeriod(val wire: String, val label: String) {
-    TODAY("today", "Today"),
-    WEEK("week", "Week"),
-    UPCOMING("upcoming", "Upcoming"),
-    PAST("past", "Past"),
-    ALL("all", "All"),
+/**
+ * Matches the webapp banner's three presets — today, week, all — and the phrases
+ * used in the "N stagings · <phrase>" pill. PAST kept so the list-sort branch in
+ * TaskBoardScreen can still inspect it; not exposed in the banner dropdown.
+ */
+enum class TaskPeriod(val wire: String, val menuLabel: String, val phrase: String) {
+    TODAY("today", "Today", "today"),
+    WEEK("week", "This Week", "this week"),
+    ALL("all", "All Time", "all time"),
+    PAST("past", "Past", "past");
+
+    companion object {
+        /** Options shown in the banner date-range menu. */
+        val BANNER_CHOICES = listOf(TODAY, WEEK, ALL)
+    }
 }
 
 class TaskBoardViewModel(private val token: String) : ViewModel() {
     data class State(
-        val period: TaskPeriod = TaskPeriod.UPCOMING,
+        val period: TaskPeriod = TaskPeriod.WEEK,
         val mine: Boolean = false,
         val stagings: List<Staging> = emptyList(),
         val serverToday: String = "",

@@ -9,5 +9,13 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Astra Staging Portal uses the camera to capture photos and videos of the staging, grouped by area.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Microphone access is used while recording walk-through videos and dictating consultation notes.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Optional — lets you save a copy of captured photos to your library.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Speech recognition shows a live preview transcript while you dictate consultation notes. The final transcript is created on our server.</string>
 </dict>
 </plist>

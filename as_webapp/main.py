@@ -144,11 +144,15 @@ async def startup():
 
     if AUTO_SYNC_ENABLED:
         # Item_Report is now in SYNC_SCHEDULE (API path) — Playwright page_sync disabled.
+        # Zoho WRITE sync intentionally disabled: m4 is the test environment
+        # and must never push changes back to the live Zoho Creator tenant.
+        # The pending_zoho_updates table can still accumulate rows for
+        # debugging, but the drainer stays off.
         _background_tasks.extend([
-            asyncio.create_task(background_zoho_write_sync()),
+            # asyncio.create_task(background_zoho_write_sync()),  # DISABLED — read-only
             asyncio.create_task(background_multi_report_sync()),
         ])
-        print("[Background Sync] Started write sync (30s) and multi-report sync (60s check) tasks")
+        print("[Background Sync] Read-only mode. Write sync DISABLED. Multi-report (Zoho→m4) sync ON.")
     else:
         print("[Background Sync] DISABLED (testing mode). Flip AUTO_SYNC_ENABLED in as_webapp/main.py to re-enable.")
 

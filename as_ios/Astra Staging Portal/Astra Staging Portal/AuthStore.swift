@@ -43,9 +43,13 @@ final class AuthStore {
             let me = try await APIClient.shared.me(token: saved)
             self.token = saved
             self.user = me.user
-        } catch {
-            // Token stale or server down — clear it so user sees login
+        } catch APIError.badStatus(401, _) {
+            // Server actively rejected the token — it's stale. Clear it.
             Keychain.delete(tokenKey)
+        } catch {
+            // Transport / non-401 failure (offline, VPN not up, server down, etc.).
+            // DO NOT clear the token — the session is likely still valid. User
+            // will see login this launch but the next good launch auto-restores.
         }
     }
 

@@ -42,8 +42,11 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                     val me = ApiClient.me(bypass)
                     _state.value = State(user = me.user, token = bypass, isLoading = false)
                     return@launch
+                } catch (_: ApiError.BadStatus) {
+                    // Server actually rejected the bypass — fall through.
                 } catch (_: Throwable) {
-                    // Bypass token rejected by server — fall through to normal flow
+                    // Transport / unknown failure (e.g. Tailscale not up yet) —
+                    // fall through to the saved-token path; don't touch state.
                 }
             }
 
@@ -55,9 +58,18 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val me = ApiClient.me(saved)
                 _state.value = State(user = me.user, token = saved, isLoading = false)
+            } catch (e: ApiError.BadStatus) {
+                if (e.code == 401) {
+                    // Server actively rejected the token — it's stale. Clear it.
+                    tokenStore.clear()
+                }
+                _state.value = State(isLoading = false)
             } catch (_: Throwable) {
-                // Token stale or server down — clear it so user sees login
-                tokenStore.clear()
+                // Transport error — phone is offline, Tailscale is off, or the
+                // server is down. DO NOT clear the token: the session is likely
+                // still valid and will auto-restore on a later launch. The user
+                // will see the login screen this time, but their next good
+                // launch picks up where they left off.
                 _state.value = State(isLoading = false)
             }
         }

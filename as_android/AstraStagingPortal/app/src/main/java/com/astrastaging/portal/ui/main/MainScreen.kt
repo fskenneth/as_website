@@ -81,7 +81,7 @@ import com.astrastaging.portal.data.ApiUser
 import com.astrastaging.portal.data.MenuPreferencesStore
 import com.astrastaging.portal.ui.items.ItemsScreen
 import com.astrastaging.portal.ui.me.MeScreen
-import com.astrastaging.portal.ui.stubs.ConsultationScreen
+import com.astrastaging.portal.ui.consultation.ConsultationScreen
 import com.astrastaging.portal.ui.stubs.HRAccountingScreen
 import com.astrastaging.portal.ui.stubs.SalesManagementScreen
 import com.astrastaging.portal.ui.taskboard.TaskBoardScreen
@@ -197,7 +197,7 @@ private fun ScreenSwitcher(
         MenuItem.TASKS -> TaskBoardScreen(user = user, token = token, modifier = modifier)
         MenuItem.ITEMS -> ItemsScreen(token = token, modifier = modifier)
         MenuItem.ME -> MeScreen(user = user, onLogout = onLogout, modifier = modifier)
-        MenuItem.CONSULTATION -> ConsultationScreen(modifier = modifier)
+        MenuItem.CONSULTATION -> ConsultationScreen(token = token, modifier = modifier)
         MenuItem.SALES -> SalesManagementScreen(modifier = modifier)
         MenuItem.HR -> HRAccountingScreen(modifier = modifier)
     }
@@ -276,11 +276,11 @@ private fun DockButton(
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(24.dp))
+        Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(30.dp))
         Spacer(Modifier.height(2.dp))
         Text(
             label,
-            fontSize = 10.sp,
+            fontSize = 11.sp,
             color = tint,
             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
         )

@@ -477,6 +477,14 @@ struct MeView: View {
                     }
                 }
 
+                Section {
+                    NavigationLink {
+                        SettingsView()
+                    } label: {
+                        Label("Settings", systemImage: "gear")
+                    }
+                }
+
                 Section("Coming soon") {
                     Label("Working Time Tracker", systemImage: "clock")
                         .foregroundStyle(.secondary)

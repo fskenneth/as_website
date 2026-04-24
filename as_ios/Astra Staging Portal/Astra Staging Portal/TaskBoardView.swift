@@ -3,75 +3,252 @@
 //  Astra Staging Portal
 //
 //  Staging Task Board — cards grouped by date, milestone chips per staging.
-//  Mirrors the functional elements of Zoho's Staging_Task_Board: period filter
-//  (Today/Week/Upcoming/All), "My Tasks" toggle, and per-staging milestone state
-//  (Design / Pictures / Packing / Setup) driven by date-field presence.
+//  Mirrors Zoho's Staging_Task_Board and the FastHTML webapp's head banner:
+//  title with "Task Board" accent, date-range preset button showing live count,
+//  "My tasks" toggle, and a unified search field. Date presets map to the
+//  existing /api/v1/tasks/board `period` parameter; search filters client-side
+//  across address, people, dates, and notes.
 //
 
 import SwiftUI
 
 enum TaskPeriod: String, CaseIterable, Identifiable {
-    case today, week, upcoming, past, all
+    case today, week, all
     var id: String { rawValue }
-    var label: String {
+    var apiValue: String { rawValue }
+
+    /// Phrase used in the banner after the count, e.g. "24 stagings · this week".
+    var phrase: String {
+        switch self {
+        case .today: return "today"
+        case .week:  return "this week"
+        case .all:   return "all time"
+        }
+    }
+
+    var menuLabel: String {
         switch self {
         case .today: return "Today"
-        case .week: return "Week"
-        case .upcoming: return "Upcoming"
-        case .past: return "Past"
-        case .all: return "All"
+        case .week:  return "This Week"
+        case .all:   return "All Time"
         }
     }
 }
 
 struct TaskBoardView: View {
     @Environment(AuthStore.self) private var auth
-    @State private var period: TaskPeriod = .upcoming
+    @State private var period: TaskPeriod = .week
     @State private var mine: Bool = false
+    @State private var search: String = ""
+    @State private var searchOpen: Bool = false
+    @FocusState private var searchFocused: Bool
     @State private var stagings: [Staging] = []
     @State private var isLoading = false
     @State private var error: String?
     @State private var serverToday: String = ""
 
+    /// Accent used for the "Task Board" word, count, and active toggle — mirrors
+    /// the webapp's rose accent (--accent #e11d48).
+    private static let accent = Color(red: 225/255, green: 29/255, blue: 72/255)
+
     var body: some View {
-        NavigationStack {
-            Group {
-                if isLoading && stagings.isEmpty {
-                    ProgressView("Loading...").frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let error, stagings.isEmpty {
-                    errorState(error)
-                } else if stagings.isEmpty {
-                    emptyState
-                } else {
-                    listView
-                }
+        VStack(spacing: 0) {
+            headerBanner
+            Divider().opacity(0.3)
+            content
+        }
+        .background(Color(.systemBackground))
+        .task { await load() }
+    }
+
+    // MARK: - Header Banner
+
+    private var headerBanner: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            titleRow
+            controlsRow
+            if searchOpen || !search.isEmpty {
+                searchField
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            .navigationTitle("Tasks")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Toggle(isOn: $mine) { Text("Mine").font(.subheadline) }
-                        .toggleStyle(.button)
-                        .onChange(of: mine) { _, _ in Task { await load() } }
-                }
-            }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                periodPicker
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                    .background(.ultraThinMaterial)
-            }
-            .task { await load() }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
+        .background(Color(.systemBackground))
+        .animation(.easeInOut(duration: 0.18), value: searchOpen)
+    }
+
+    private var titleRow: some View {
+        HStack(spacing: 0) {
+            Text("Staging ")
+                .font(.title2.weight(.bold))
+                .foregroundStyle(Color.primary)
+            Text("Task Board")
+                .font(.title2.weight(.bold))
+                .foregroundStyle(Self.accent)
+            Spacer(minLength: 0)
         }
     }
 
-    private var periodPicker: some View {
-        Picker("Period", selection: $period) {
-            ForEach(TaskPeriod.allCases) { p in
-                Text(p.label).tag(p)
-            }
+    private var controlsRow: some View {
+        HStack(spacing: 8) {
+            rangeButton
+            mineButton
+            searchToggleButton
+            Spacer(minLength: 0)
         }
-        .pickerStyle(.segmented)
-        .onChange(of: period) { _, _ in Task { await load() } }
+    }
+
+    /// Magnifying-glass icon that expands/collapses the search field.
+    /// If there's a query already, tapping won't collapse — the field stays
+    /// visible until the user clears it.
+    private var searchToggleButton: some View {
+        Button {
+            if searchOpen && search.isEmpty {
+                searchOpen = false
+                searchFocused = false
+            } else {
+                searchOpen = true
+                // Delay focus so the field is mounted before becoming first responder.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    searchFocused = true
+                }
+            }
+        } label: {
+            Image(systemName: "magnifyingglass")
+                .font(.footnote)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .foregroundStyle(searchOpen || !search.isEmpty ? Self.accent : Color.primary)
+                .background(
+                    (searchOpen || !search.isEmpty)
+                        ? Self.accent.opacity(0.12)
+                        : Color(.secondarySystemBackground)
+                )
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule().strokeBorder(
+                        (searchOpen || !search.isEmpty) ? Self.accent : Color(.separator).opacity(0.5),
+                        lineWidth: (searchOpen || !search.isEmpty) ? 1 : 0.5
+                    )
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(searchOpen ? "Close search" : "Open search")
+    }
+
+    private var rangeButton: some View {
+        Menu {
+            ForEach(TaskPeriod.allCases) { p in
+                Button {
+                    if period != p {
+                        period = p
+                        Task { await load() }
+                    }
+                } label: {
+                    if period == p {
+                        Label(p.menuLabel, systemImage: "checkmark")
+                    } else {
+                        Text(p.menuLabel)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "calendar")
+                    .font(.footnote)
+                (
+                    Text("\(filteredStagings.count)")
+                        .foregroundStyle(Self.accent)
+                        .fontWeight(.semibold)
+                    + Text(" stagings ")
+                        .foregroundStyle(Color.primary)
+                    + Text("· ")
+                        .foregroundStyle(Color.secondary)
+                    + Text(period.phrase)
+                        .foregroundStyle(Color.primary)
+                )
+                .font(.subheadline)
+                .lineLimit(1)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(Capsule())
+            .overlay(Capsule().strokeBorder(Color(.separator).opacity(0.5), lineWidth: 0.5))
+            .foregroundStyle(Color.primary)
+        }
+    }
+
+    private var mineButton: some View {
+        Button {
+            mine.toggle()
+            Task { await load() }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "person")
+                    .font(.footnote)
+                Text("My tasks")
+                    .font(.subheadline)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .foregroundStyle(mine ? Self.accent : Color.primary)
+            .background(mine ? Self.accent.opacity(0.12) : Color(.secondarySystemBackground))
+            .clipShape(Capsule())
+            .overlay(
+                Capsule().strokeBorder(
+                    mine ? Self.accent : Color(.separator).opacity(0.5),
+                    lineWidth: mine ? 1 : 0.5
+                )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            TextField("Search address, person, date, notes", text: $search)
+                .textFieldStyle(.plain)
+                .font(.subheadline)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .submitLabel(.search)
+                .lineLimit(1)
+                .focused($searchFocused)
+            Button {
+                search = ""
+                searchOpen = false
+                searchFocused = false
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    // MARK: - Content
+
+    @ViewBuilder
+    private var content: some View {
+        if isLoading && stagings.isEmpty {
+            ProgressView("Loading...").frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let error, stagings.isEmpty {
+            errorState(error)
+        } else if filteredStagings.isEmpty {
+            emptyState
+        } else {
+            listView
+        }
     }
 
     private var listView: some View {
@@ -100,13 +277,18 @@ struct TaskBoardView: View {
 
     private var emptyState: some View {
         VStack(spacing: 12) {
-            Image(systemName: "tray")
+            Image(systemName: search.isEmpty ? "tray" : "magnifyingglass")
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
-            Text("No stagings for this period").font(.headline)
-            Text("Try a different period or toggle Mine.")
+            Text(search.isEmpty ? "No stagings for this period" : "No stagings match your search")
+                .font(.headline)
+            Text(search.isEmpty
+                 ? "Try a different date range or toggle My tasks off."
+                 : "Try a wider range, clear the search, or toggle My tasks off.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -121,12 +303,37 @@ struct TaskBoardView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    // MARK: - Filtering
+
+    /// Client-side search over the fields the webapp banner advertises:
+    /// address, person, date, notes. Space-separated tokens are AND-matched.
+    private var filteredStagings: [Staging] {
+        let query = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else { return stagings }
+        let tokens = query.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+
+        return stagings.filter { s in
+            let people = (s.stagers + s.staging_movers + s.destaging_movers)
+                .compactMap { $0.name }
+                .joined(separator: " ")
+            let parts: [String?] = [
+                s.address, s.name, s.staging_date, s.destaging_date,
+                s.property_type, s.occupancy, s.staging_type, s.status,
+                s.general_notes, s.moving_instructions, s.mls,
+                s.customer.fullName, s.customer.email, s.customer.phone,
+                s.staging_eta, s.destaging_eta, people,
+            ]
+            let haystack = parts.compactMap { $0 }.joined(separator: " ").lowercased()
+            return tokens.allSatisfy { haystack.contains($0) }
+        }
+    }
+
     private func groupedByDate() -> [(String, [Staging])] {
-        let grouped = Dictionary(grouping: stagings) { $0.staging_date ?? "—" }
+        let grouped = Dictionary(grouping: filteredStagings) { $0.staging_date ?? "—" }
         return grouped.sorted { a, b in
-            // Sort upcoming ascending, others descending
-            if period == .past || period == .all { return a.key > b.key }
-            return a.key < b.key
+            // Upcoming-leaning presets sort ascending; "all time" falls back
+            // to ascending too since there's no single natural direction.
+            a.key < b.key
         }.map { (prettyDate($0.key), $0.value) }
     }
 
@@ -144,13 +351,15 @@ struct TaskBoardView: View {
         return fmt.date(from: iso)
     }
 
+    // MARK: - Load / mutate
+
     private func load() async {
         guard let token = auth.token else { return }
         isLoading = true
         error = nil
         defer { isLoading = false }
         do {
-            let resp = try await APIClient.shared.taskBoard(period: period.rawValue, mine: mine, token: token)
+            let resp = try await APIClient.shared.taskBoard(period: period.apiValue, mine: mine, token: token)
             stagings = resp.stagings
             serverToday = resp.today
         } catch let APIError.badStatus(code, _) where code == 401 {
