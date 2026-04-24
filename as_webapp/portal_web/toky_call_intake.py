@@ -369,6 +369,44 @@ def _render_analytics_report() -> str:
 
 
 def register(rt):
+    @rt("/staff")
+    def staff_home(request: Request):
+        """Quick-link dashboard for staff tools (bypasses the customer-style
+        /portal view which isn't useful to owners/admins)."""
+        user = _current_user(request)
+        if not user:
+            return RedirectResponse("/signin", status_code=302)
+        name = user.get("first_name") or "there" if isinstance(user, dict) else "there"
+        role = user.get("user_role", "staff") if isinstance(user, dict) else "staff"
+
+        tiles = [
+            ("Call Intake", "/toky_call_intake", "All Toky calls. Review drafts, resolve CS tickets."),
+            ("Toky Analytics", "/toky_analytics", "Opus Workstream A report — sales patterns, objections, scorecards."),
+            ("Staging Task Board", "/staging_task_board", "Daily schedule + milestones per staging."),
+        ]
+
+        tile_html = Div(
+            *[A(
+                H2(name, style="margin:0 0 4px;font-size:16px;"),
+                P(desc, style="margin:0;color:var(--muted);font-size:13px;"),
+                href=url,
+                style=("display:block;padding:16px;background:var(--surface);"
+                       "border:1px solid var(--border);border-radius:10px;"
+                       "color:inherit;text-decoration:none;"),
+            ) for (name, url, desc) in tiles],
+            style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;",
+        )
+
+        return _page(
+            "Staff Home",
+            Div(
+                H1(f"Hi {name}", style="margin:0 0 4px;font-size:20px;"),
+                P(f"Signed in as {role}. Your tools:", cls="meta", style="margin:0 0 14px;"),
+                tile_html,
+                cls="section",
+            ),
+        )
+
     @rt("/toky_call_intake")
     def intake_list(request: Request):
         user = _current_user(request)
