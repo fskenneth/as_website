@@ -505,7 +505,9 @@ def process_call(conn: sqlite3.Connection, cdr: dict) -> dict:
         mark_done(conn, callid, status="download_err", error="recording download failed")
         return {"callid": callid, "error": "download_err"}
 
-    # 2. Deepgram
+    # 2. Deepgram — commit immediately so we don't hold the write lock
+    # across the ~5-15s Sonnet API call that follows. Parallel workers
+    # would otherwise hit "database is locked" on each other.
     transcript_text, dg_json = deepgram_transcribe(mp3)
     dg_duration = dg_json.get("metadata", {}).get("duration", duration)
     conn.execute("""
@@ -513,6 +515,7 @@ def process_call(conn: sqlite3.Connection, cdr: dict) -> dict:
             (callid, transcript_text, deepgram_json, duration_s)
         VALUES (?, ?, ?, ?)
     """, (callid, transcript_text, json.dumps(dg_json), float(dg_duration or 0)))
+    conn.commit()
 
     # 3. Sonnet extraction
     extract, usage = sonnet_extract(transcript_text, cdr)
@@ -526,6 +529,7 @@ def process_call(conn: sqlite3.Connection, cdr: dict) -> dict:
         extract.get("summary"), json.dumps(extract),
         int(usage.get("input_tokens") or 0), int(usage.get("output_tokens") or 0),
     ))
+    conn.commit()
 
     # 4. Derived rows
     _maybe_insert_cs_task(conn, callid, extract)

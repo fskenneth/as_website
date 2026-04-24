@@ -146,7 +146,10 @@ def _toky_process_one_sync(db_path: str) -> dict | None:
     processed, None if the queue was empty."""
     import sqlite3 as _sqlite
     from as_webapp.as_portal_api import toky_service
-    conn = _sqlite.connect(db_path)
+    conn = _sqlite.connect(db_path, timeout=30)
+    # Let concurrent writers wait instead of failing with "database is
+    # locked" — matters when a bulk backfill script is also writing.
+    conn.execute("PRAGMA busy_timeout = 30000")
     try:
         cdr = toky_service.claim_next_pending(conn)
         if not cdr:
@@ -224,16 +227,24 @@ async def _maybe_ping_telegram(summary: dict) -> None:
 
 
 def _send_draft_email_sync(callid: str) -> None:
-    """Send a digest email to kenneth@astrastaging.com for a newly-processed
-    Toky call. Handles both sales/scheduling calls (has a staging draft row)
-    and customer-service calls (has a CS task row). Runs inside
-    asyncio.to_thread. Silent on failure — logs only."""
+    """Send a digest email for a newly-processed Toky call. Handles both
+    sales/scheduling (has a staging draft row) and customer-service (has
+    a CS task row). Runs inside asyncio.to_thread. Silent on failure.
+
+    Provider choice controlled by TOKY_EMAIL_PROVIDER in .env:
+      'gmail' (default) — authentic sales@ mailbox via SMTP; shows in Sent.
+      'mailgun'         — legacy path via tools.email_service.
+    """
     import json as _json
     import sqlite3 as _sqlite
+    provider = os.getenv("TOKY_EMAIL_PROVIDER", "gmail").strip().lower()
     try:
-        from tools.email_service import EmailService
+        if provider == "mailgun":
+            from tools.email_service import EmailService as _Sender
+        else:
+            from tools.gmail_sender import GmailSender as _Sender
     except Exception as e:
-        print(f"[Toky Worker] email import failed: {e}")
+        print(f"[Toky Worker] email import ({provider}) failed: {e}")
         return
 
     from as_webapp.as_portal_api.routes import ZOHO_DB_PATH
@@ -345,7 +356,7 @@ def _send_draft_email_sync(callid: str) -> None:
         ).split(",") if r.strip()
     ]
     try:
-        svc = EmailService()
+        svc = _Sender()
         for to_email in recipients:
             res = svc.send_email(
                 to_email=to_email,
@@ -354,11 +365,11 @@ def _send_draft_email_sync(callid: str) -> None:
                 text_content=text_body,
             )
             if res.get("success"):
-                print(f"[Toky Worker] draft email sent to {to_email} for {callid}: {res.get('message_id')}")
+                print(f"[Toky Worker] email sent ({provider}) to {to_email} for {callid}: {res.get('message_id')}")
             else:
-                print(f"[Toky Worker] draft email FAILED to {to_email} for {callid}: {res.get('error')}")
+                print(f"[Toky Worker] email FAILED ({provider}) to {to_email} for {callid}: {res.get('error')}")
     except Exception as e:
-        print(f"[Toky Worker] draft email threw for {callid}: {e}")
+        print(f"[Toky Worker] email threw for {callid}: {e}")
 
 
 async def _maybe_email_draft(summary: dict) -> None:
