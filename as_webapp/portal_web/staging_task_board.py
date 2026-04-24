@@ -24,7 +24,7 @@ from datetime import date, datetime, timedelta
 import json
 import os
 import sqlite3
-from urllib.parse import urlencode
+from urllib.parse import quote_plus, urlencode
 
 from fasthtml.common import (
     A, Body, Button, Dialog, Div, Form, H1, H2, H3, Head, Html, Input,
@@ -114,6 +114,25 @@ def _money(s):
 
 def _iso(d):
     return d.strftime("%Y-%m-%d")
+
+
+def _fmt_time_short(s):
+    """'14:00' -> '2PM'; '09:30' -> '9:30AM'. Preserves input if unparseable."""
+    if not s:
+        return ""
+    s = s.strip()
+    for fmt in ("%H:%M", "%I:%M %p", "%H:%M:%S"):
+        try:
+            t = datetime.strptime(s, fmt)
+            break
+        except ValueError:
+            continue
+    else:
+        return s
+    h, m = t.hour, t.minute
+    ampm = "AM" if h < 12 else "PM"
+    h12 = h % 12 or 12
+    return f"{h12}:{m:02d}{ampm}" if m else f"{h12}{ampm}"
 
 
 def _fetch_all_stagings():
@@ -395,10 +414,10 @@ def _style_block():
 
     tr.date-banner td {
         background: var(--date-bg); color: var(--date-text);
-        font-weight: 700; font-size: 13px;
-        text-transform: uppercase; letter-spacing: 0.08em;
-        text-align: center; padding: 10px;
-        border-top: 2px solid var(--date-border);
+        font-weight: 700; font-size: 12px;
+        text-transform: uppercase; letter-spacing: 0.06em;
+        text-align: left; padding: 5px 14px;
+        border-top: 1px solid var(--date-border);
         border-bottom: 1px solid var(--date-border);
         position: sticky; top: 41px; z-index: 4;
     }
@@ -410,10 +429,43 @@ def _style_block():
     tr.empty-state .emoji { font-size: 32px; display: block; margin-bottom: 8px; opacity: 0.7; }
 
     /* row cell content */
-    .staging-title { font-weight: 700; font-size: 14px; color: var(--text); margin-bottom: 4px; }
+    .staging-title { font-weight: 700; font-size: 14px; color: var(--text); margin-bottom: 4px; letter-spacing: -0.01em; }
     .staging-meta { color: var(--text-muted); font-size: 12px; margin-bottom: 2px; }
+    .staging-items {
+        font-size: 12px; color: var(--text-muted); margin-bottom: 4px;
+        font-variant-numeric: tabular-nums;
+    }
+    .staging-address-row {
+        display: flex; align-items: center; gap: 6px; flex-wrap: nowrap;
+        font-size: 13px; margin-bottom: 2px; min-width: 0;
+    }
+    .staging-address-row .st-time {
+        font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums;
+        white-space: nowrap; flex-shrink: 0;
+    }
+    .staging-address-row .st-addr {
+        font-weight: 600; color: var(--text);
+        flex: 1 1 auto; min-width: 0;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .staging-address-row .map-link,
+    .staging-address-row .st-drive { flex-shrink: 0; }
+    .staging-address-row .st-drive {
+        font-size: 11px; color: var(--text-muted);
+        padding: 1px 7px; background: var(--surface-2);
+        border-radius: 999px; border: 1px solid var(--border);
+        font-variant-numeric: tabular-nums;
+    }
+    .map-link {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 22px; height: 22px; border-radius: var(--radius-sm);
+        text-decoration: none; color: var(--text-muted);
+        transition: all 140ms ease; font-size: 14px; line-height: 1;
+    }
+    .map-link:hover { background: var(--accent-soft); color: var(--accent); }
     .staging-address { font-weight: 600; color: var(--text); margin-top: 2px; }
-    .sublinks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .sublinks { display: flex; flex-wrap: nowrap; gap: 6px; margin-top: 8px; min-width: 0; }
+    .sublinks .sublink { flex-shrink: 0; }
     .sublink { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--accent); text-decoration: none; transition: background 140ms ease; }
     .sublink:hover { background: var(--accent); color: var(--accent-fg); }
 
@@ -455,6 +507,7 @@ def _style_block():
 
     /* modals */
     dialog.modal { border: 0; padding: 0; background: transparent; max-width: min(520px, 94vw); width: 100%; }
+    dialog#date-modal { max-width: min(760px, 94vw); }
     dialog.modal::backdrop { background: rgba(15,23,42,.5); backdrop-filter: blur(4px); }
     dialog.modal .modal-card { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); padding: 24px; max-height: 85vh; overflow-y: auto; }
     .modal-title { font-size: 18px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.01em; }
@@ -481,28 +534,28 @@ def _style_block():
     .cal-nav.next { right: 8px; }
 
     .tb-calendar {
-        display: flex; flex-direction: column; gap: 12px;
+        display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
         padding: 4px;
     }
     .cal-month {
         background: var(--surface-2); border: 1px solid var(--border);
-        border-radius: var(--radius-md); padding: 14px;
+        border-radius: var(--radius-md); padding: 10px;
     }
     .cal-month-title {
-        text-align: center; font-weight: 700; font-size: 14px;
-        color: var(--text); margin: 0 0 10px; letter-spacing: -0.01em;
+        text-align: center; font-weight: 700; font-size: 13px;
+        color: var(--text); margin: 0 0 6px; letter-spacing: -0.01em;
     }
-    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; }
     .cal-dow {
-        text-align: center; padding: 6px 0; font-size: 11px;
+        text-align: center; padding: 3px 0; font-size: 10px;
         color: var(--text-faint); font-weight: 600;
         text-transform: uppercase; letter-spacing: 0.04em;
     }
     .cal-day {
         all: unset; box-sizing: border-box;
         display: flex; align-items: center; justify-content: center;
-        aspect-ratio: 1; min-height: 34px;
-        font-size: 13px; color: var(--text);
+        aspect-ratio: 1; min-height: 26px;
+        font-size: 12px; color: var(--text);
         border-radius: var(--radius-sm); cursor: pointer;
         transition: all 120ms ease; position: relative;
     }
@@ -570,6 +623,103 @@ def _style_block():
     .scroll-area::-webkit-scrollbar, .modal-card::-webkit-scrollbar, .notes::-webkit-scrollbar, .search-suggest::-webkit-scrollbar { width: 10px; height: 10px; }
     .scroll-area::-webkit-scrollbar-thumb, .modal-card::-webkit-scrollbar-thumb, .notes::-webkit-scrollbar-thumb, .search-suggest::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; border: 2px solid var(--bg); }
 
+    /* ---------- view switcher ---------- */
+    .view-seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 3px; gap: 2px; }
+    .view-seg button {
+        all: unset; box-sizing: border-box; cursor: pointer; font-family: inherit;
+        padding: 6px 12px; font-size: 12px; font-weight: 500; color: var(--text-muted);
+        border-radius: 7px; display: inline-flex; align-items: center; gap: 5px;
+        transition: all 140ms ease;
+    }
+    .view-seg button:hover { color: var(--text); }
+    .view-seg button.on { background: var(--surface); color: var(--accent); box-shadow: var(--shadow-sm); font-weight: 600; }
+    .view-seg svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+    /* ---------- view panes ---------- */
+    .view-area { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+    .view-pane { display: none; flex: 1; min-height: 0; overflow: hidden; flex-direction: column; }
+    .view-pane.active { display: flex; }
+    .view-pane .scroll-area { flex: 1; overflow: auto; background: var(--bg); }
+
+    /* ---------- calendar view ---------- */
+    .cal-view-toolbar {
+        display: flex; align-items: center; gap: 8px; padding: 10px 16px;
+        background: var(--surface); border-bottom: 1px solid var(--border);
+        flex-shrink: 0; flex-wrap: wrap;
+    }
+    .cal-view-toolbar .spacer { flex: 1; }
+    .cal-view-title { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
+    .cal-view-toolbar .mode-seg button { padding: 6px 12px; font-size: 12px; font-weight: 500; }
+
+    .cal-view-scroll { flex: 1; overflow: auto; padding: 14px 14px 20px; background: var(--bg); }
+    .cal-view-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+    .cal-view-dow {
+        text-align: center; padding: 4px 0 6px; font-size: 11px;
+        font-weight: 600; color: var(--text-faint);
+        text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .cal-view-day {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius-md); min-height: 130px; padding: 6px;
+        display: flex; flex-direction: column; gap: 4px;
+        transition: border-color 120ms ease, background 120ms ease;
+    }
+    .cal-view-day.weekend { background: var(--surface-2); }
+    .cal-view-day.today { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+    .cal-view-day.drop-over { border-color: var(--accent); background: var(--accent-soft); }
+
+    .cal-view-day-head {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 0 2px 2px; font-size: 10px; color: var(--text-muted);
+        text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;
+    }
+    .cal-view-day-num { font-size: 13px; font-weight: 700; color: var(--text); }
+    .cal-view-day.today .cal-view-day-num,
+    .cal-view-day.today .cal-view-day-head { color: var(--accent); }
+
+    .cal-cards-source { display: none; }
+
+    .cal-card {
+        display: flex; flex-direction: column; gap: 2px;
+        padding: 6px 8px; border-radius: var(--radius-sm);
+        background: var(--surface); border: 1px solid var(--border);
+        border-left: 3px solid var(--accent);
+        cursor: grab; font-size: 12px; color: var(--text);
+        transition: box-shadow 140ms ease, transform 140ms ease;
+    }
+    .cal-card:hover { box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+    .cal-card:active { cursor: grabbing; }
+    .cal-card.dragging { opacity: 0.4; }
+    .cal-card.state-today { border-left-color: var(--accent); background: var(--accent-soft); }
+    .cal-card.state-destage { border-left-color: var(--warning); background: var(--warning-soft); }
+    .cal-card.state-inquired { border-left-color: var(--text-faint); }
+
+    .cal-card-head {
+        display: flex; justify-content: space-between; align-items: center;
+        gap: 6px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+        text-transform: uppercase; color: var(--text-muted);
+    }
+    .cal-card.state-destage .cal-card-head { color: var(--warning); }
+    .cal-card.state-today .cal-card-head { color: var(--accent); }
+    .cal-card-cust {
+        color: var(--text); font-weight: 600; font-size: 11px;
+        text-transform: none; letter-spacing: 0;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        max-width: 60%;
+    }
+    .cal-card-addr {
+        font-weight: 600; color: var(--text); font-size: 12px; line-height: 1.3;
+        overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+        -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    }
+    .cal-card-meta {
+        font-size: 10px; color: var(--text-muted); white-space: nowrap;
+        overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* hide date-range button in Calendar view */
+    html[data-view="calendar"] #range-btn { display: none; }
+
     /* ---------- responsive: auto collapse at narrow viewports ---------- */
     @media (max-width: 960px) {
         /* Hide lower-priority columns in desktop table */
@@ -597,6 +747,18 @@ def _style_block():
         table.board tbody tr.date-banner td::before { display: none; }
         .theme-grid { grid-template-columns: repeat(2, 1fr); }
         .preset-grid { grid-template-columns: repeat(2, 1fr); }
+        .tb-calendar { grid-template-columns: 1fr; gap: 12px; }
+        .cal-month { padding: 14px; }
+        .cal-month-title { font-size: 14px; margin: 0 0 10px; }
+        .cal-grid { gap: 2px; }
+        .cal-dow { padding: 6px 0; font-size: 11px; }
+        .cal-day { min-height: 34px; font-size: 13px; }
+
+        /* Calendar view: stack days vertically on narrow screens */
+        .cal-view-grid { grid-template-columns: 1fr; }
+        .cal-view-dow { display: none; }
+        .cal-view-day { min-height: auto; }
+        .cal-view-day-head { border-bottom: 1px solid var(--border); padding-bottom: 4px; margin-bottom: 2px; }
     }
     """)
 
@@ -736,6 +898,14 @@ def _toolbar():
     return Div(
         Div(NotStr("Staging "), Span("Task Board", cls="accent"), cls="toolbar-title"),
 
+        Div(
+            Button("Table", type="button",
+                   **{"data-view": "table", "onclick": "TB.setView('table')"}),
+            Button("Calendar", type="button",
+                   **{"data-view": "calendar", "onclick": "TB.setView('calendar')"}),
+            cls="view-seg", id="view-seg",
+        ),
+
         Button(
             _icon(_ICON_CAL),
             Span(NotStr('<span id="range-count" class="range-count">—</span> stagings '
@@ -796,43 +966,65 @@ def _chip_button(staging_id, field, label, done):
 
 def _col_staging(row, serial):
     d = _parse_mdy(row["Coming_Staging_Destaging_Date"])
-    occ = row["Occupancy_Type"] or ""
-    prop = row["Property_Type"] or ""
-    sd = _parse_mdy(row["Staging_Date"])
+    occ = (row["Occupancy_Type"] or "").strip()
+    prop = (row["Property_Type"] or "").strip()
     dd = _parse_mdy(row["Destaging_Date"])
-    today = date.today()
-    is_destage = dd and d == dd and (not sd or sd != dd)
-    kind = "Destaging" if is_destage else "Staging"
+    is_destage = bool(dd and d == dd)
 
-    remaining_days = None
-    if sd and dd:
-        remaining_days = (dd - max(sd, today)).days if today >= sd else (dd - sd).days
+    # Line 1: "Apr 22 Wed  Vacant Condo"  (flag Destage days up front)
+    title_bits = []
+    if d:
+        title_bits.append(d.strftime("%b %-d %a"))
+    if is_destage:
+        title_bits.append("(Destage)")
+    if occ:
+        title_bits.append(occ)
+    if prop:
+        title_bits.append(prop)
+    title_line = " ".join(title_bits)
+
+    # Line 2: "— Remaining / 9 in Design".
+    # TODO: "Remaining" = items at warehouse that belong to this staging.
+    # Needs a staging→items linkage we don't yet have on this page (Item_Report
+    # only knows Current_Location). Will wire up when the Design view ships.
     try:
-        item_count = int(str(row["Total_Item_Number"] or 0).split(".")[0])
+        in_design = int(str(row["Total_Item_Number"] or 0).split(".")[0])
     except Exception:
-        item_count = 0
+        in_design = 0
+    items_line = f"— Remaining / {in_design} in Design"
 
+    # Line 3: "12PM  917-25 Cole St, Toronto  🗺  40mins"
+    eta = _fmt_time_short(row["Staging_ETA"] or "")
+    drive = (row["Driving_Time"] or "").strip()
     address = _parse_link(row["Staging_Address"]) or row["Staging_Display_Name"] or "—"
-    eta = row["Staging_ETA"] or ""
-    drive = row["Driving_Time"] or ""
+    maps_url = (
+        "https://www.google.com/maps/dir/?api=1&destination=" + quote_plus(address)
+        if address and address != "—" else ""
+    )
 
-    meta_bits = []
-    if occ or prop: meta_bits.append(f"{occ} {prop}".strip())
-    if eta: meta_bits.append(eta)
-    if drive: meta_bits.append(f"{drive} min drive")
+    addr_children = []
+    if eta:
+        addr_children.append(Span(eta, cls="st-time"))
+    addr_children.append(Span(address, cls="st-addr"))
+    if maps_url:
+        addr_children.append(
+            A(NotStr("🗺"), href=maps_url, target="_blank",
+              cls="map-link", title="Open directions in Google Maps")
+        )
+    if drive:
+        addr_children.append(Span(f"{drive}mins", cls="st-drive"))
 
+    sid = row["ID"]
     return Td(
-        Div(f"{kind} {serial}", cls="staging-title"),
-        Div(f"{remaining_days if remaining_days is not None else '—'} days remaining · {item_count} items",
-            cls="staging-meta"),
-        Div(address, cls="staging-address"),
-        *([Div(" · ".join(meta_bits), cls="staging-meta")] if meta_bits else []),
+        Div(title_line, cls="staging-title"),
+        Div(items_line, cls="staging-items"),
+        Div(*addr_children, cls="staging-address-row"),
         Div(
-            A("Edit", href=f"/stub?{urlencode({'page':'Staging_Edit','staging_id':row['ID']})}", cls="sublink"),
-            _sub_page_link("Design", "Staging_Design", staging_id=row["ID"]),
-            _sub_page_link("Pictures", "Staging_Videos_and_Pictures", staging_id=row["ID"]),
-            _sub_page_link("Packing", "Packing_Guide_Page", staging_id=row["ID"], staging_type="Staging"),
-            _sub_page_link("Setup", "Staging_Setup_Guide", staging_id=row["ID"]),
+            _sub_page_link("Staging", "Staging_Edit", staging_id=sid),
+            _sub_page_link("Design", "Staging_Design", staging_id=sid),
+            _sub_page_link("Pictures", "Staging_Videos_and_Pictures", staging_id=sid),
+            _sub_page_link("Packing", "Packing_Guide_Page", staging_id=sid, staging_type="Staging"),
+            _sub_page_link("Setup", "Staging_Setup_Guide", staging_id=sid),
             cls="sublinks",
         ),
         cls="col-wide", **{"data-label": "Staging"},
@@ -1007,6 +1199,7 @@ def _build_row(row, serial):
         _col_listing(row),
         cls=f"data-row {_row_state(row, coming)}",
         **{
+            "data-record": "table",
             "data-date": coming_iso,
             "data-people": "|".join(p.lower() for p in people),
             "data-search": searchable,
@@ -1054,6 +1247,110 @@ def _build_table(grouped):
     return Table(headers, Tbody(*body), cls="board")
 
 
+# -------------------- shared record data --------------------
+
+def _record_data(row):
+    """Shared data-* attrs used by all three views. Keeps filters consistent."""
+    coming = _parse_mdy(row["Coming_Staging_Destaging_Date"])
+    coming_iso = coming.isoformat() if coming else ""
+    people = []
+    for f in ("Stager", "Staging_Movers", "Destaging_Movers"):
+        people.extend(_parse_people(row[f]))
+    bits = [
+        _parse_link(row["Staging_Address"]) or "",
+        row["Staging_Display_Name"] or "",
+        f"{row['Customer_First_Name'] or ''} {row['Customer_Last_Name'] or ''}",
+        row["Customer_Phone"] or "",
+        row["Customer_Email"] or "",
+        row["Occupancy_Type"] or "",
+        row["Property_Type"] or "",
+        row["Staging_Type"] or "",
+        row["Staging_Status"] or "",
+        row["MLS"] or "",
+        row["General_Notes"] or "",
+        _fmt_mdy(coming) if coming else "",
+    ]
+    bits.extend(people)
+    if coming:
+        bits.append(coming.strftime("%B"))
+        bits.append(coming.strftime("%A"))
+    return {
+        "date_iso": coming_iso,
+        "people_blob": "|".join(p.lower() for p in people),
+        "search_blob": " ".join(x for x in bits if x).lower(),
+    }
+
+
+# -------------------- calendar view --------------------
+
+def _build_calendar_card(row):
+    coming = _parse_mdy(row["Coming_Staging_Destaging_Date"])
+    sid = row["ID"]
+    addr = _parse_link(row["Staging_Address"]) or row["Staging_Display_Name"] or "—"
+    cust_last = (row["Customer_Last_Name"] or "").strip()
+    dd = _parse_mdy(row["Destaging_Date"])
+    kind = "Destage" if (dd and coming == dd) else "Staging"
+    stagers = _parse_people(row["Stager"])
+    stager_short = stagers[0].split()[0] if stagers else ""
+    try:
+        items = int(str(row["Total_Item_Number"] or 0).split(".")[0])
+    except Exception:
+        items = 0
+
+    meta_bits = []
+    if stager_short:
+        meta_bits.append(stager_short)
+    meta_bits.append(f"{items} item{'s' if items != 1 else ''}")
+
+    rec = _record_data(row)
+
+    return Div(
+        Div(
+            Span(kind),
+            Span(cust_last or "—", cls="cal-card-cust"),
+            cls="cal-card-head",
+        ),
+        Div(addr, cls="cal-card-addr"),
+        Div(" · ".join(meta_bits), cls="cal-card-meta"),
+        cls=f"cal-card {_row_state(row, coming)}",
+        draggable="true",
+        **{
+            "data-record": "cal",
+            "data-sid": str(sid),
+            "data-date": rec["date_iso"],
+            "data-people": rec["people_blob"],
+            "data-search": rec["search_blob"],
+        },
+    )
+
+
+def _build_calendar_view(rows):
+    cards = [_build_calendar_card(r) for r in rows if r["Coming_Staging_Destaging_Date"]]
+    toolbar = Div(
+        Button("Today", type="button", cls="tbtn", onclick="TB.calViewToday()"),
+        Button(NotStr("‹"), type="button", cls="tbtn",
+               onclick="TB.calViewShift(-1)", **{"aria-label": "Previous week"}),
+        Button(NotStr("›"), type="button", cls="tbtn",
+               onclick="TB.calViewShift(1)", **{"aria-label": "Next week"}),
+        Div(id="cal-view-title", cls="cal-view-title", style="margin-left:6px"),
+        Div(cls="spacer"),
+        Div(
+            Button("Week", type="button", id="cal-mode-week",
+                   onclick="TB.calViewMode('week')"),
+            Button("Month", type="button", id="cal-mode-month",
+                   onclick="TB.calViewMode('month')"),
+            cls="mode-seg",
+        ),
+        cls="cal-view-toolbar",
+    )
+    scroll = Div(
+        Div(id="cal-view-grid", cls="cal-view-grid"),
+        cls="cal-view-scroll",
+    )
+    source = Div(*cards, id="cal-cards-source", cls="cal-cards-source")
+    return toolbar, scroll, source
+
+
 # -------------------- client JS --------------------
 
 def _client_script(employees, corpus):
@@ -1070,7 +1367,7 @@ def _client_script(employees, corpus):
         r"""
 (function() {
     const doc = document.documentElement;
-    const K = { THEME:'tb_theme', MODE:'tb_mode', ME:'tb_me', RANGE:'tb_range', MY:'tb_mytasks' };
+    const K = { THEME:'tb_theme', MODE:'tb_mode', ME:'tb_me', RANGE:'tb_range', MY:'tb_mytasks', VIEW:'tb_view', CAL_MODE:'tb_cal_mode' };
 
     // ---------- state ----------
     const today = new Date(); today.setHours(0,0,0,0);
@@ -1085,11 +1382,28 @@ def _client_script(employees, corpus):
         all:      () => ({ from: '1970-01-01', to: '2100-12-31', label: 'all time' }),
     };
 
+    // Migrate the old 'original' view key → 'table' (view was renamed).
+    const storedView = localStorage.getItem(K.VIEW);
+    const initialView = (storedView === 'calendar') ? 'calendar' : 'table';
+
     const state = {
         range: JSON.parse(localStorage.getItem(K.RANGE) || 'null') || PRESETS.week(),
         search: '',
         mytasks: localStorage.getItem(K.MY) === '1',
         me: localStorage.getItem(K.ME) || '',
+        view: initialView,
+    };
+
+    // Calendar view state. Anchor is the Sunday at the top of the visible window.
+    function sundayOf(d) {
+        const x = new Date(d);
+        x.setDate(x.getDate() - x.getDay());
+        x.setHours(0, 0, 0, 0);
+        return x;
+    }
+    const cal = {
+        mode: localStorage.getItem(K.CAL_MODE) || 'week',
+        anchor: sundayOf(today),
     };
 
     // ---------- theme / mode ----------
@@ -1104,45 +1418,48 @@ def _client_script(employees, corpus):
     applyChrome();
 
     // ---------- filtering ----------
-    function matches(tr) {
-        const d = tr.dataset.date;
-        if (d < state.range.from || d > state.range.to) return false;
+    function matches(el) {
+        // Calendar cells already bound the date window, so skip range filter there.
+        const isCal = el.dataset.record === 'cal';
+        if (!isCal) {
+            const d = el.dataset.date;
+            if (d < state.range.from || d > state.range.to) return false;
+        }
         if (state.mytasks && state.me) {
-            const people = tr.dataset.people || '';
+            const people = el.dataset.people || '';
             if (!people.includes(state.me.toLowerCase())) return false;
         }
         if (state.search) {
-            const s = tr.dataset.search || '';
-            // simple AND across space-separated tokens
+            const s = el.dataset.search || '';
             const tokens = state.search.toLowerCase().split(/\s+/).filter(Boolean);
             for (const t of tokens) { if (!s.includes(t)) return false; }
         }
         return true;
     }
 
-    function applyFilters() {
-        const rows = document.querySelectorAll('tr.data-row');
-        let count = 0;
-        rows.forEach(tr => {
-            const ok = matches(tr);
-            tr.style.display = ok ? '' : 'none';
-            if (ok) count++;
-        });
-        // Hide date banners that have no visible rows under them.
-        const banners = document.querySelectorAll('tr.date-banner');
-        banners.forEach(b => {
+    function hideEmptyGroupHeaders(headerSel, rowCls) {
+        document.querySelectorAll(headerSel).forEach(b => {
             let next = b.nextElementSibling;
             let anyVisible = false;
-            while (next && !next.classList.contains('date-banner') && !next.classList.contains('empty-state')) {
-                if (next.classList.contains('data-row') && next.style.display !== 'none') { anyVisible = true; break; }
+            while (next && !next.matches(headerSel)) {
+                if (next.classList.contains(rowCls) && next.style.display !== 'none') { anyVisible = true; break; }
                 next = next.nextElementSibling;
             }
             b.style.display = anyVisible ? '' : 'none';
         });
-        // Empty state when nothing matches
+    }
+
+    function applyFilters() {
+        let countTable = 0;
+        document.querySelectorAll('[data-record]').forEach(el => {
+            const ok = matches(el);
+            el.style.display = ok ? '' : 'none';
+            if (ok && el.dataset.record === 'table') countTable++;
+        });
+        hideEmptyGroupHeaders('tr.date-banner', 'data-row');
         const empty = document.getElementById('empty-state');
-        if (empty) empty.style.display = count === 0 ? '' : 'none';
-        updateRangeLabel(count);
+        if (empty) empty.style.display = countTable === 0 ? '' : 'none';
+        updateRangeLabel(countTable);
         updateMyTasksBtn();
     }
 
@@ -1416,6 +1733,153 @@ def _client_script(employees, corpus):
         if (sel) sel.value = state.me;
     }
 
+    // ---------- view switching ----------
+    function setView(v) {
+        state.view = v;
+        localStorage.setItem(K.VIEW, v);
+        doc.setAttribute('data-view', v);
+        document.querySelectorAll('.view-pane').forEach(p => {
+            p.classList.toggle('active', p.dataset.view === v);
+        });
+        document.querySelectorAll('#view-seg button').forEach(b => {
+            b.classList.toggle('on', b.dataset.view === v);
+        });
+        if (v === 'calendar') renderCalendarGrid();
+        applyFilters();
+    }
+
+    // ---------- calendar view: grid render ----------
+    function renderCalendarGrid() {
+        const grid = document.getElementById('cal-view-grid');
+        const src = document.getElementById('cal-cards-source');
+        if (!grid || !src) return;
+
+        // Move live cards back to source so we can rebuild the grid from scratch.
+        grid.querySelectorAll('.cal-card').forEach(c => src.appendChild(c));
+        grid.innerHTML = '';
+
+        // Weekday header row (7 cells).
+        DOW.forEach(d => {
+            const h = document.createElement('div');
+            h.className = 'cal-view-dow';
+            h.textContent = d;
+            grid.appendChild(h);
+        });
+
+        const weeks = cal.mode === 'week' ? 2 : 4;
+        const totalDays = weeks * 7;
+        const cellByIso = new Map();
+        const todayIso = iso(today);
+
+        for (let i = 0; i < totalDays; i++) {
+            const d = new Date(cal.anchor);
+            d.setDate(cal.anchor.getDate() + i);
+            const cellIso = iso(d);
+            const cell = document.createElement('div');
+            cell.className = 'cal-view-day';
+            cell.dataset.date = cellIso;
+            const dow = d.getDay();
+            if (dow === 0 || dow === 6) cell.classList.add('weekend');
+            if (cellIso === todayIso) cell.classList.add('today');
+
+            const head = document.createElement('div');
+            head.className = 'cal-view-day-head';
+            const mlabel = document.createElement('span');
+            mlabel.textContent = MONTHS[d.getMonth()].slice(0, 3);
+            const num = document.createElement('span');
+            num.className = 'cal-view-day-num';
+            num.textContent = String(d.getDate());
+            head.appendChild(mlabel);
+            head.appendChild(num);
+            cell.appendChild(head);
+
+            wireCellDrop(cell);
+            grid.appendChild(cell);
+            cellByIso.set(cellIso, cell);
+        }
+
+        // Place cards into cells by data-date. Cards with dates outside
+        // the window stay in the hidden source div.
+        Array.from(src.querySelectorAll('.cal-card')).forEach(card => {
+            const d = card.dataset.date;
+            const cell = cellByIso.get(d);
+            if (cell) {
+                cell.appendChild(card);
+                wireCardDrag(card);
+            }
+        });
+
+        // Title: "Apr 19 – May 2, 2026"
+        const first = cal.anchor;
+        const last = new Date(cal.anchor);
+        last.setDate(last.getDate() + totalDays - 1);
+        const title = document.getElementById('cal-view-title');
+        if (title) title.textContent = fmt(first) + ' – ' + fmt(last) + ', ' + last.getFullYear();
+
+        // Reflect mode in the seg buttons.
+        const mw = document.getElementById('cal-mode-week');
+        const mm = document.getElementById('cal-mode-month');
+        if (mw) mw.classList.toggle('on', cal.mode === 'week');
+        if (mm) mm.classList.toggle('on', cal.mode === 'month');
+
+        applyFilters();
+    }
+
+    // ---------- calendar: drag-drop (local only, no DB) ----------
+    let draggedCard = null;
+    function wireCardDrag(card) {
+        if (card._dragWired) return;
+        card._dragWired = true;
+        card.addEventListener('dragstart', e => {
+            draggedCard = card;
+            card.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            try { e.dataTransfer.setData('text/plain', card.dataset.sid || ''); } catch(_) {}
+        });
+        card.addEventListener('dragend', () => {
+            card.classList.remove('dragging');
+            draggedCard = null;
+        });
+    }
+    function wireCellDrop(cell) {
+        cell.addEventListener('dragover', e => {
+            if (!draggedCard) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            cell.classList.add('drop-over');
+        });
+        cell.addEventListener('dragleave', () => cell.classList.remove('drop-over'));
+        cell.addEventListener('drop', e => {
+            e.preventDefault();
+            cell.classList.remove('drop-over');
+            if (!draggedCard) return;
+            const newDate = cell.dataset.date;
+            if (draggedCard.dataset.date !== newDate) {
+                draggedCard.dataset.date = newDate;
+                cell.appendChild(draggedCard);
+            }
+        });
+    }
+
+    // ---------- calendar: navigation ----------
+    function calViewShift(delta) {
+        // Shift one week at a time (feels natural in both modes).
+        const d = new Date(cal.anchor);
+        d.setDate(d.getDate() + delta * 7);
+        cal.anchor = d;
+        renderCalendarGrid();
+    }
+    function calViewToday() {
+        cal.anchor = sundayOf(today);
+        renderCalendarGrid();
+    }
+    function calViewMode(m) {
+        cal.mode = m;
+        localStorage.setItem(K.CAL_MODE, m);
+        cal.anchor = sundayOf(today);
+        renderCalendarGrid();
+    }
+
     // ---------- wiring ----------
     window.TB = {
         setTheme(t){ localStorage.setItem(K.THEME,t); applyChrome(); refreshModalState(); },
@@ -1428,6 +1892,10 @@ def _client_script(employees, corpus):
         toggleMyTasks,
         openModal,
         closeModal,
+        setView,
+        calViewToday,
+        calViewShift,
+        calViewMode,
     };
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -1458,7 +1926,7 @@ def _client_script(employees, corpus):
         const sel = document.getElementById('me-select');
         if (sel) sel.value = state.me;
 
-        applyFilters();
+        setView(state.view);
     });
 })();
 """
@@ -1505,13 +1973,26 @@ def register(rt):
         corpus = _build_autocomplete_corpus(rows, employees)
         grouped = _group_by_date(rows)
 
-        table = _build_table(grouped)
+        table_view = _build_table(grouped)
+        cal_toolbar, cal_scroll, cal_source = _build_calendar_view(rows)
 
         return _full_page(
             "Staging Task Board",
             [Div(
                 _toolbar(),
-                Div(table, cls="scroll-area"),
+                Div(
+                    Div(
+                        Div(table_view, cls="scroll-area"),
+                        id="view-table", cls="view-pane",
+                        **{"data-view": "table"},
+                    ),
+                    Div(
+                        cal_toolbar, cal_scroll, cal_source,
+                        id="view-calendar", cls="view-pane",
+                        **{"data-view": "calendar"},
+                    ),
+                    cls="view-area",
+                ),
                 _date_modal(),
                 _settings_modal(employees),
                 cls="app-shell",
