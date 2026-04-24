@@ -57,6 +57,7 @@ logs/
 data/
 users.db
 user_data.db
+as_webapp/*.db
 
 # Staging area photos (user uploads)
 static/images/areas/
