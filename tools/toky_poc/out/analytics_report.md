@@ -19,9 +19,9 @@
 - **Outbound:** ~45% (follow-ups, return calls)
 
 ### Agent Workload
-Primary agents identified: **Ashika/Aashika** (dominant - handles ~85% of transcribed calls), **Clara/Claire** (backup/overflow)
+Primary agents identified: **Aashika/Aashika** (dominant - handles ~85% of transcribed calls), **Clara/Clara** (backup/overflow)
 
-Ashika handles the vast majority of both inbound and outbound calls. Clara appears primarily on scheduling and some new leads.
+Aashika handles the vast majority of both inbound and outbound calls. Clara appears primarily on scheduling and some new leads.
 
 ### Actionable vs. Noise (Inbound)
 - **Actionable:** ~72% (genuine sales inquiries, scheduling, CS requiring resolution)
@@ -114,7 +114,7 @@ Ashika handles the vast majority of both inbound and outbound calls. Clara appea
 
 ## 4. Agent Scorecard
 
-### Ashika (Primary Agent)
+### Aashika (Primary Agent)
 
 | Metric | Value |
 |--------|-------|
@@ -130,9 +130,9 @@ Ashika handles the vast majority of both inbound and outbound calls. Clara appea
 **Weaknesses:**
 - Occasionally answers phone incorrectly: "Hello. Advanced Locksmith" — `78c6ee08`
 - Sometimes doesn't push for deposit commitment on strong calls
-- Quote from `f8a5d468`: customer wanted design preview, Ashika defaulted to "design links are sent 24-48 hours before staging" without offering alternatives sooner
+- Quote from `f8a5d468`: customer wanted design preview, Aashika defaulted to "design links are sent 24-48 hours before staging" without offering alternatives sooner
 
-**Distinctive pattern:** Ashika uses "Mhmm" extensively (20+ times per call average) — creates conversational flow but occasionally sounds disengaged on playback.
+**Distinctive pattern:** Aashika uses "Mhmm" extensively (20+ times per call average) — creates conversational flow but occasionally sounds disengaged on playback.
 
 ### Clara (Secondary Agent)
 
@@ -204,7 +204,7 @@ Ashika handles the vast majority of both inbound and outbound calls. Clara appea
 ---
 
 ### 2. Create "Price Objection Playbook" with Pre-Approved Tiers
-**Data:** 18 price objections recorded. Ashika successfully negotiates ~60% by offering:
+**Data:** 18 price objections recorded. Aashika successfully negotiates ~60% by offering:
 - Reduced scope (main floor only): `4dca6b46`
 - Extended term (45 days instead of 30): `d1c911b5`
 - Photography bundle: `5da13ea0`
@@ -233,7 +233,7 @@ Quote from `592b93dd`: "I could share some recent MLS listings with you" — thi
 ---
 
 ### 5. Deposit Collection Enforcement
-**Data:** `n8pt8cmpg` — Lucy confirmed for Monday staging, deposit never collected. Ashika discovered mid-follow-up: "I just realized deposit had not yet been received."
+**Data:** `n8pt8cmpg` — Lucy confirmed for Monday staging, deposit never collected. Aashika discovered mid-follow-up: "I just realized deposit had not yet been received."
 
 **Action:** Automate deposit reminder 72 hours before staging. Block calendar slot release until deposit confirmed in system. Quote from that call: "If you can kindly make the deposit to confirm and book your spot."
 

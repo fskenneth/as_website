@@ -45,7 +45,9 @@ DEEPGRAM_PARAMS = {
     "diarize": "true",
     "utterances": "true",
     "multichannel": "true",
-    "keyterm": "Astra",
+    # Proper-noun boost — "Astra", "Aashika", "Clara" otherwise come out as
+    # "Astro/Ashupeshay", "Ashika", "Claire" roughly half the time.
+    "keyterm": "Astra,Aashika,Clara",
 }
 
 SONNET_MODEL = "claude-sonnet-4-5"
@@ -64,7 +66,7 @@ _CATALOG_NAMES = [
     "Desk", "Chair", "Patio Set",
 ]
 
-_SONNET_SYSTEM = f"""You analyze phone-call transcripts from Astra Staging, a Toronto home-staging company. Toky records stereo; Ch0 = agent, Ch1 = caller. Trust channel labels. Agents include Clara, Claire, Ashika; they self-identify as 'Astra Staging'.
+_SONNET_SYSTEM = f"""You analyze phone-call transcripts from Astra Staging, a Toronto home-staging company. Toky records stereo; Ch0 = agent, Ch1 = caller. Trust channel labels. The two staff agents are Clara and Aashika (sometimes mis-transcribed as "Claire" or "Ashika" — always use the canonical Clara / Aashika in any extracted text). They self-identify as calling from 'Astra Staging'.
 
 Populate record_call_analysis. Be conservative:
 - voicemail/system-message/hang-up → call_type=voicemail_or_failed, empty fields
