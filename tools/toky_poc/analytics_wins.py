@@ -1,4 +1,4 @@
-"""Run Opus over just the win-cohort calls (n=~185 after backfill
+"""Run Sonnet 4.6 over just the win-cohort calls (n=~185 after backfill
 completed). Reuses the corpus-builder from analytics_opus.py but
 filters to callids in wins_mapping.json."""
 import json, os, sqlite3, sys, time
@@ -116,7 +116,7 @@ Dense markdown, no fluff. Quote callid prefixes (first 8 chars)."""
 USER = f"Corpus ({len(rows)} won calls):\n\n{corpus}"
 
 payload = {
-    "model": "claude-opus-4-5",
+    "model": "claude-sonnet-4-6",
     "max_tokens": 16000,
     "system": SYSTEM,
     "messages": [{"role": "user", "content": USER}],
@@ -127,7 +127,7 @@ headers = {
     "content-type": "application/json",
 }
 
-print("calling Opus...")
+print("calling Sonnet 4.6...")
 t0 = time.time()
 with httpx.Client(timeout=600.0) as c:
     r = c.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
