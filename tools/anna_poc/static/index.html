@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Anna voice test</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 520px;
+         margin: 80px auto; padding: 0 24px; color: #222; }
+  h1 { font-weight: 600; letter-spacing: -0.02em; }
+  button { font: inherit; padding: 14px 28px; border-radius: 999px; border: 0;
+           background: #111; color: #fff; cursor: pointer; }
+  button[disabled] { opacity: 0.4; cursor: default; }
+  button.stop { background: #c33; }
+  label { display: block; margin-top: 18px; font-size: 14px; color: #444; }
+  select { font: inherit; padding: 10px 12px; border-radius: 8px;
+           border: 1px solid #ccc; background: #fff; min-width: 280px;
+           margin-top: 6px; }
+  select[disabled] { opacity: 0.5; }
+  #status { margin-top: 24px; color: #666; font-size: 14px; }
+  #latency { margin-top: 8px; color: #666; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+         background: #ccc; margin-right: 8px; vertical-align: middle; }
+  .dot.live { background: #2c2; box-shadow: 0 0 0 4px rgba(34, 204, 34, 0.18); }
+</style>
+</head>
+<body>
+<h1>Anna — voice test</h1>
+<p>Click <strong>Start</strong>, allow the mic, and start talking. Anna will greet you, then chat about anything.</p>
+<label for="voice">Voice (Deepgram Aura-2)</label>
+<select id="voice">
+  <option value="aura-2-thalia-en">Thalia — clear, conversational (default)</option>
+  <option value="aura-2-luna-en">Luna — friendly, younger female</option>
+  <option value="aura-2-asteria-en">Asteria — warm, polished female</option>
+  <option value="aura-2-stella-en">Stella — bright, upbeat female</option>
+  <option value="aura-2-athena-en">Athena — mature, professional female</option>
+  <option value="aura-2-hera-en">Hera — smooth, mid-range female</option>
+  <option value="aura-2-orion-en">Orion — friendly, natural male</option>
+  <option value="aura-2-arcas-en">Arcas — conversational male</option>
+  <option value="aura-2-zeus-en">Zeus — deep, authoritative male</option>
+</select>
+<p style="margin-top: 24px;"><button id="btn">Start</button></p>
+<p id="status"><span class="dot" id="dot"></span><span id="statusText">idle</span></p>
+<p id="latency"></p>
+<audio id="audio" autoplay></audio>
+
+<script>
+const btn = document.getElementById('btn');
+const audio = document.getElementById('audio');
+const statusText = document.getElementById('statusText');
+const dot = document.getElementById('dot');
+const latencyEl = document.getElementById('latency');
+const voiceSel = document.getElementById('voice');
+
+// Remember last choice across reloads
+const savedVoice = localStorage.getItem('annaVoice');
+if (savedVoice) voiceSel.value = savedVoice;
+voiceSel.addEventListener('change', () => localStorage.setItem('annaVoice', voiceSel.value));
+
+let pc = null;
+let micStream = null;
+let lastUserSpeechEnd = 0;
+let firstAudioAt = 0;
+
+function setStatus(text, live=false) {
+  statusText.textContent = text;
+  dot.classList.toggle('live', live);
+}
+
+async function start() {
+  btn.disabled = true;
+  setStatus('requesting mic…');
+  micStream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+  });
+
+  pc = new RTCPeerConnection();
+
+  // play remote audio (Anna)
+  pc.ontrack = (ev) => {
+    audio.srcObject = ev.streams[0];
+    // crude latency probe: time from when remote audio starts flowing
+    const track = ev.track;
+    track.addEventListener('unmute', () => {
+      const now = performance.now();
+      if (lastUserSpeechEnd && !firstAudioAt) {
+        firstAudioAt = now;
+        const ms = (now - lastUserSpeechEnd).toFixed(0);
+        latencyEl.textContent = `first response audio: ${ms} ms after you stopped talking`;
+      }
+    });
+  };
+
+  // local mic monitor — detect when user stops speaking, for latency timing
+  const ac = new (window.AudioContext || window.webkitAudioContext)();
+  const src = ac.createMediaStreamSource(micStream);
+  const analyzer = ac.createAnalyser();
+  analyzer.fftSize = 1024;
+  src.connect(analyzer);
+  const buf = new Uint8Array(analyzer.frequencyBinCount);
+  let speaking = false;
+  setInterval(() => {
+    analyzer.getByteTimeDomainData(buf);
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) { const v = (buf[i]-128)/128; sum += v*v; }
+    const rms = Math.sqrt(sum / buf.length);
+    const isSpeaking = rms > 0.04;
+    if (speaking && !isSpeaking) {
+      lastUserSpeechEnd = performance.now();
+      firstAudioAt = 0;
+    }
+    speaking = isSpeaking;
+  }, 50);
+
+  micStream.getTracks().forEach(t => pc.addTrack(t, micStream));
+  pc.addTransceiver('audio', { direction: 'recvonly' });
+
+  pc.onconnectionstatechange = () => {
+    setStatus(`peer: ${pc.connectionState}`, pc.connectionState === 'connected');
+    if (pc.connectionState === 'failed' || pc.connectionState === 'closed') stop();
+  };
+
+  setStatus('negotiating…');
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+
+  const resp = await fetch('/offer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sdp: pc.localDescription.sdp,
+      type: pc.localDescription.type,
+      requestData: { voice: voiceSel.value },
+    }),
+  });
+  const answer = await resp.json();
+  await pc.setRemoteDescription(answer);
+
+  voiceSel.disabled = true;
+  btn.textContent = 'Stop';
+  btn.classList.add('stop');
+  btn.disabled = false;
+  btn.onclick = stop;
+}
+
+function stop() {
+  if (pc) { pc.close(); pc = null; }
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  voiceSel.disabled = false;
+  btn.textContent = 'Start';
+  btn.classList.remove('stop');
+  btn.onclick = start;
+  setStatus('idle');
+  latencyEl.textContent = '';
+}
+
+btn.onclick = start;
+</script>
+</body>
+</html>
