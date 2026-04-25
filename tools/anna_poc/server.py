@@ -9,9 +9,10 @@ import asyncio
 import os
 from pathlib import Path
 
+import httpx
 from aiortc import RTCIceServer
-from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
@@ -39,6 +40,62 @@ _STUN_URLS = os.getenv(
 webrtc_handler = SmallWebRTCRequestHandler(
     ice_servers=[RTCIceServer(urls=u.strip()) for u in _STUN_URLS if u.strip()],
 )
+
+
+# --- Voice preview ----------------------------------------------------------
+# When the dropdown changes, the page hits /preview?voice=... so the user
+# hears each Aura-2 voice without starting a real WebRTC session. We cache
+# the audio bytes per voice in-memory; same text every time (~9 voices total).
+PREVIEW_TEXT = (
+    "Hi, I'm Anna from Astra Staging. How can I help you today?"
+)
+PREVIEW_VOICES: set[str] = {
+    "aura-2-thalia-en",
+    "aura-2-luna-en",
+    "aura-2-asteria-en",
+    "aura-2-stella-en",
+    "aura-2-athena-en",
+    "aura-2-hera-en",
+    "aura-2-orion-en",
+    "aura-2-arcas-en",
+    "aura-2-zeus-en",
+}
+_preview_cache: dict[str, bytes] = {}
+_preview_lock = asyncio.Lock()
+
+
+async def _fetch_preview(voice: str) -> bytes:
+    """Call Deepgram's HTTP TTS endpoint and return MP3 bytes."""
+    api_key = os.environ["DEEPGRAM_API_KEY"]
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            "https://api.deepgram.com/v1/speak",
+            params={"model": voice, "encoding": "mp3"},
+            headers={"Authorization": f"Token {api_key}"},
+            json={"text": PREVIEW_TEXT},
+        )
+        resp.raise_for_status()
+        return resp.content
+
+
+@app.get("/preview")
+async def preview(voice: str):
+    if voice not in PREVIEW_VOICES:
+        raise HTTPException(status_code=400, detail="unknown voice")
+    if voice not in _preview_cache:
+        async with _preview_lock:
+            # Double-check inside the lock — concurrent first hits.
+            if voice not in _preview_cache:
+                try:
+                    _preview_cache[voice] = await _fetch_preview(voice)
+                except httpx.HTTPError as e:
+                    logger.warning(f"preview fetch failed for {voice}: {e}")
+                    raise HTTPException(status_code=502, detail="tts upstream error")
+    return Response(
+        content=_preview_cache[voice],
+        media_type="audio/mpeg",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @app.get("/")

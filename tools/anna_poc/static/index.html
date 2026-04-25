@@ -99,7 +99,45 @@ const voiceSel = document.getElementById('voice');
 // Remember voice across reloads.
 const savedVoice = localStorage.getItem('annaVoice');
 if (savedVoice) voiceSel.value = savedVoice;
-voiceSel.addEventListener('change', () => localStorage.setItem('annaVoice', voiceSel.value));
+
+// Voice preview: when the user picks a voice, play a short sample so they
+// can audition without starting a real call. Server caches the audio so
+// repeats are instant.
+const previewAudio = new Audio();
+previewAudio.preload = 'none';
+let previewAbort = null;
+
+function stopPreview() {
+  if (previewAbort) { previewAbort.abort(); previewAbort = null; }
+  previewAudio.pause();
+  if (previewAudio.src && previewAudio.src.startsWith('blob:')) {
+    URL.revokeObjectURL(previewAudio.src);
+  }
+  previewAudio.removeAttribute('src');
+}
+
+async function playPreview(voice) {
+  stopPreview();
+  previewAbort = new AbortController();
+  try {
+    const resp = await fetch(`/preview?voice=${encodeURIComponent(voice)}`, {
+      signal: previewAbort.signal,
+    });
+    if (!resp.ok) return;
+    const blob = await resp.blob();
+    previewAudio.src = URL.createObjectURL(blob);
+    await previewAudio.play();
+  } catch (err) {
+    if (err.name !== 'AbortError') console.warn('preview failed', err);
+  }
+}
+
+voiceSel.addEventListener('change', () => {
+  localStorage.setItem('annaVoice', voiceSel.value);
+  // Don't auto-preview during an active call — the dropdown is disabled
+  // then anyway, but be defensive.
+  if (!voiceSel.disabled) playPreview(voiceSel.value);
+});
 
 let pc = null;
 let micStream = null;
@@ -141,6 +179,7 @@ function checkSupport() {
 async function start() {
   if (!checkSupport()) return;
   clearError();
+  stopPreview();
   btn.disabled = true;
   setStatus('requesting mic…');
 
