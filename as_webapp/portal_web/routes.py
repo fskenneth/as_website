@@ -905,17 +905,18 @@ def register(app, rt):
         # If already signed in, redirect to portal
         user = get_current_user(req)
         if user:
-            return RedirectResponse('/portal', status_code=302)
+            return RedirectResponse('/', status_code=302)
         return signin_page()
 
 
     @rt('/portal')
     def portal(req: Request):
-        """User portal page"""
-        # If not signed in, redirect to signin
+        """Customer-portal page — disabled on portal.astrastaging.com
+        (staff host). Redirect to staff home. If we ever bring the
+        customer dashboard back, re-enable portal_page(user) here."""
         user = get_current_user(req)
         if not user:
             return RedirectResponse('/signin', status_code=302)
-        return portal_page(user)
+        return RedirectResponse('/', status_code=302)
 
 

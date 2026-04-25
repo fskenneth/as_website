@@ -363,7 +363,7 @@ def get_signin_scripts():
             if (result.success) {{
                 showMessage('Sign in successful! Redirecting...', 'success');
                 setTimeout(() => {{
-                    window.location.href = '/portal';
+                    window.location.href = '/';
                 }}, 1000);
             }} else {{
                 showMessage(result.error || 'Sign in failed', 'error');
@@ -425,7 +425,7 @@ def get_signin_scripts():
             if (result.success) {{
                 showMessage('Account created! Redirecting...', 'success');
                 setTimeout(() => {{
-                    window.location.href = '/portal';
+                    window.location.href = '/';
                 }}, 1000);
             }} else {{
                 showMessage(result.error || 'Registration failed', 'error');
@@ -451,7 +451,7 @@ def get_signin_scripts():
             if (result.success) {{
                 showMessage('Sign in successful! Redirecting...', 'success');
                 setTimeout(() => {{
-                    window.location.href = '/portal';
+                    window.location.href = '/';
                 }}, 1000);
             }} else {{
                 showMessage(result.error || 'Google sign in failed', 'error');
