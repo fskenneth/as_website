@@ -268,16 +268,24 @@ def _render_card(row: dict):
     )
 
 
-def _render_analytics_report() -> str:
+_ANALYTICS_VIEWS = {
+    "all":    ("analytics_report.md",          "tools/toky_poc/analytics_opus.py"),
+    "wins":   ("wins_only_analytics.md",       "tools/toky_poc/analytics_wins.py"),
+    "emails": ("email_analytics_report.md",    "tools/toky_poc/analytics_opus_emails.py"),
+}
+
+
+def _render_analytics_report(view: str = "all") -> str:
     """Minimal markdown → HTML converter for the Opus analytics report.
     Supports: # / ## / ### headings, **bold**, tables, ordered/unordered lists,
     blockquotes, inline code. Anything fancier and we'd add a real lib."""
     import html as _html
     import re
 
-    path = os.path.join(ROOT, "tools", "toky_poc", "out", "analytics_report.md")
+    fname, runner = _ANALYTICS_VIEWS.get(view, _ANALYTICS_VIEWS["all"])
+    path = os.path.join(ROOT, "tools", "toky_poc", "out", fname)
     if not os.path.exists(path):
-        return "<p>No analytics report has been generated yet. Run <code>tools/toky_poc/analytics_opus.py</code>.</p>"
+        return f"<p>No report yet for this view. Run <code>{runner}</code>.</p>"
     md = open(path).read()
     lines = md.split("\n")
     out: list[str] = []
@@ -620,10 +628,14 @@ def register(rt):
 
     @rt("/analytics")
     def analytics(request: Request):
-        """Render the Opus analytics report (500-call Workstream A signal)."""
+        """Render the Opus analytics report. Three views via ?view=all|wins|emails."""
         user = _current_user(request)
         if not user:
             return RedirectResponse("/signin", status_code=302)
+
+        view = (request.query_params.get("view") or "all").lower()
+        if view not in _ANALYTICS_VIEWS:
+            view = "all"
 
         # Rough stats strip at the top
         with _conn() as conn:
@@ -651,7 +663,19 @@ def register(rt):
             cls="section",
         )
 
-        report_html = _render_analytics_report()
+        tabs = Div(
+            *[
+                A(
+                    label,
+                    href=f"/analytics?view={key}",
+                    cls=f"tab{' active' if view == key else ''}",
+                )
+                for key, label in (("all", "All Calls"), ("wins", "Won Deals"), ("emails", "Emails"))
+            ],
+            cls="tabs",
+        )
+
+        report_html = _render_analytics_report(view)
         body = Div(
             A("← Back to Call Intake", href="/calls", cls="meta"),
             cls="section",
@@ -676,9 +700,14 @@ def register(rt):
                 .report ul, .report ol { margin:6px 0; padding-left:24px; line-height:1.6; }
                 .report hr { border:0; border-top:1px solid var(--border); margin:20px 0; }
                 .tablewrap { overflow-x:auto; }
+                .tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin:6px 0 0; padding:0 16px; }
+                .tabs .tab { padding:10px 16px; font-size:14px; color:var(--muted); text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-1px; }
+                .tabs .tab:hover { color:var(--text); }
+                .tabs .tab.active { color:var(--text); font-weight:600; border-bottom-color:var(--accent); }
             """),
             body,
             stats,
+            tabs,
             Div(NotStr(report_html), cls="section report"),
         )
 

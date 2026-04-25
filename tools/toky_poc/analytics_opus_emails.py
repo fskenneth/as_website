@@ -193,7 +193,9 @@ Write in dense, scannable markdown. Expect a savvy business reader who hates flu
     USER = f"Corpus below. Each block starts with '## email <email_id>'.\n\n{corpus}"
 
     payload = {
-        "model": "claude-opus-4-5",
+        # Sonnet 4.6 with 1M context — Opus tops out at 200k and the email
+        # corpus runs ~400k tokens. Sonnet 4.6 is also ~5x cheaper for input.
+        "model": "claude-sonnet-4-6",
         "max_tokens": 16000,
         "system": SYSTEM,
         "messages": [{"role": "user", "content": USER}],
@@ -217,7 +219,9 @@ Write in dense, scannable markdown. Expect a savvy business reader who hates flu
     usage = body.get("usage", {})
     in_toks = usage.get("input_tokens", 0) + usage.get("cache_read_input_tokens", 0) + usage.get("cache_creation_input_tokens", 0)
     out_toks = usage.get("output_tokens", 0)
-    cost = in_toks / 1_000_000 * 15.0 + out_toks / 1_000_000 * 75.0
+    in_rate = 6.0 if in_toks > 200_000 else 3.0
+    out_rate = 22.50 if in_toks > 200_000 else 15.0
+    cost = in_toks / 1_000_000 * in_rate + out_toks / 1_000_000 * out_rate
 
     text = "\n\n".join(b["text"] for b in body.get("content", []) if b.get("type") == "text")
     path = OUT / "email_analytics_report.md"
