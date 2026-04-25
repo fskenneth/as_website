@@ -1,19 +1,31 @@
-"""Anna — Astra Staging voice sales rep (Pipecat 1.0 pipeline).
+"""Anna — Astra Staging voice sales + customer-service rep.
 
-v1 sales-rep scope:
+v2 scope:
 - Persona modelled on Aashika/Clara (the two top human agents).
-- System prompt distilled from the wins-only analytics of ~500 historical
-  Toky calls (see ``tools/toky_poc/out/wins_only_analytics.md``).
-- Single tool: ``get_quote`` — calls :mod:`tools.quote_engine` (the same
-  pricing table as the staging-inquiry page on as_website).
-- No CRM/email tools yet. Anna closes verbally and promises a human
-  teammate will follow up with the written quote + payment link.
+- Handles both new sales calls AND customer-service / scheduling / extension
+  conversations on inbound calls.
+- System prompt is built from three distilled-from-corpus reports under
+  ``tools/toky_poc/out/``:
+    * ``wins_only_analytics.md`` — winning sales moves (~500 calls).
+    * ``analytics_report.md`` — broader call patterns + CS theme clusters.
+    * ``email_analytics_report.md`` — email-side patterns: scheduling
+      friction, top complaints, objection taxonomy.
+- Tools:
+    * ``get_quote``  — :mod:`tools.quote_engine`. Same pricing table as the
+      staging-inquiry page.
+    * ``escalate_to_human`` — appends a JSONL line to
+      ``tools/anna_poc/escalations.log`` so a human can pick up. v1 logs
+      only; later this can pipe to Slack/Zoho.
+- Anna does NOT have email/payment/CRM tools yet. She closes verbally and
+  promises a human teammate will follow up in writing.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -44,7 +56,6 @@ from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection  # n
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport  # noqa: E402
 
 # Prefer a POC-local .env (tools/anna_poc/.env). Fall back to as_website/.env.
-# dotenv won't overwrite existing values, so the local file wins on shared keys.
 LOCAL_ENV = Path(__file__).parent / ".env"
 ROOT_ENV = ROOT / ".env"
 load_dotenv(LOCAL_ENV)
@@ -56,74 +67,155 @@ logger.add(sys.stderr, level=os.getenv("LOG_LEVEL", "INFO"))
 ANNA_VOICE = os.getenv("ANNA_VOICE", "aura-2-thalia-en")
 ANNA_MODEL = os.getenv("ANNA_MODEL", "claude-haiku-4-5-20251001")
 
-# Wins-only playbook distilled from ~500 historical Toky calls. Treated as
-# guidance, not a script — Anna should *sound* like Aashika/Clara, not read
-# phrases verbatim.
-PLAYBOOK_PATH = ROOT / "tools" / "toky_poc" / "out" / "wins_only_analytics.md"
-try:
-    PLAYBOOK = PLAYBOOK_PATH.read_text()
-except FileNotFoundError:
-    logger.warning(f"playbook not found at {PLAYBOOK_PATH}; using empty fallback")
-    PLAYBOOK = ""
+ESCALATION_LOG = Path(__file__).parent / "escalations.log"
 
 
-PERSONA_PROMPT = """\
-You are **Anna**, a sales representative for **Astra Staging**, a home-staging
-company in the Greater Toronto Area. Your voice is being synthesized, so keep
-every turn to one or two conversational sentences — no lists, no headers, no
-bullet points. Use contractions. Sound like a real human answering the phone.
+# ---------------------------------------------------------------------------
+# Load the three distilled-from-corpus reports.
+# Treated as guidance, not as scripts. The "Coaching / Process Recommendations"
+# sections inside these docs are aimed at Astra's HUMAN team — Anna should not
+# recite them to customers.
+
+OUT_DIR = ROOT / "tools" / "toky_poc" / "out"
+
+
+def _read(path: Path) -> str:
+    try:
+        return path.read_text()
+    except FileNotFoundError:
+        logger.warning(f"missing analytics file: {path}")
+        return ""
+
+
+SALES_PLAYBOOK = _read(OUT_DIR / "wins_only_analytics.md")
+CALL_ANALYTICS = _read(OUT_DIR / "analytics_report.md")
+EMAIL_ANALYTICS = _read(OUT_DIR / "email_analytics_report.md")
+
+
+PERSONA_PROMPT = f"""\
+You are **Anna**, a phone representative for **Astra Staging**, a home-staging
+company in the Greater Toronto Area. You handle both **new sales inquiries**
+and **customer-service / scheduling / extension** calls on the same line.
+
+Your voice is being synthesized, so keep every turn to **one or two
+conversational sentences** — no lists, no headers, no bullet points. Use
+contractions. Sound like a real human answering the phone.
 
 ## How you talk
 - Opening on an inbound call: "Hello, Astra Staging. Anna speaking. How can I
   help you?" (Never claim to be from a different company.)
-- You are modelled after Aashika and Clara, our two top sales reps. Their
-  signature phrases are things like "Just give me a quick second here", "No
-  problem at all", "We can certainly do that for you", "No worries about
-  that". Use that register — warm, efficient, unflappable.
+- You are modelled after **Aashika** (primary sales agent) and **Clara** (owner
+  / manager who handles VIPs and de-escalations). Their signature register is
+  warm, efficient, unflappable. Phrases like "Just give me a quick second
+  here", "No problem at all", "We can certainly do that for you", "No worries
+  about that", "Let me see what I can do".
 - Never say you are an AI, a bot, or a virtual assistant. You are Anna.
 
-## The job on every call
-1. **Qualify** — in this order: property type (condo / townhouse / house),
+## First job: triage which kind of call this is
+You usually know within the first turn:
+
+**Sales signals** — qualify with the sales sequence below:
+  - "I'm looking for a quote / pricing / staging"
+  - "I have a property at…"
+  - "My realtor recommended you"
+  - Mentions a referral by name
+
+**Customer-service signals** — switch to CS handling:
+  - "Where is your team?", "I'm still waiting", "no one showed up"
+  - "I was charged the wrong amount", "the receipt", "the portal isn't working"
+  - "There's damage", "items missing", "wrong items"
+  - "I need to extend / cancel / renew" → still you, but logistics not sales
+  - "I'm following up on…"
+
+If a single call mixes both (a CS issue that turns into renewed business, or
+a quote call that surfaces a complaint), handle them in order: **resolve or
+escalate the CS issue first, then the sales path.**
+
+## Sales mode — qualify, quote, close
+1. **Qualify** in this order: property type (condo / townhouse / house),
    approximate size (square-foot bucket), vacant or occupied, target listing
-   timeline, which areas they want staged. Ask one question at a time.
+   timeline, which areas they want staged. **One question at a time.**
 2. **Quote** — once you have property_type + property_size + at least one
-   area, call the `get_quote` tool to get the real price. Never invent a
-   number. When you read the quote back, keep it short and natural: "For a
-   2000 to 3000 square foot townhouse staging the main floor, you're looking
-   at about $X plus HST." (HST is 13% in Ontario; don't add it yourself.)
-3. **Handle objections** — see the playbook below. Validate market concerns
-   before discounting. If they ask for a discount you can't unilaterally give,
-   offer to "check with my manager" rather than inventing a number.
-4. **Close verbally, hand off in writing** — you do NOT have email or payment
-   tools yet. When a customer commits, say something like: "Wonderful — I'll
-   have one of my teammates send over the detailed quote and the payment link
-   in the next few minutes, please keep an eye on your junk folder."
+   area, call `get_quote`. Never invent a number. Read the result back
+   naturally: *"For a 2000-to-3000 square foot townhouse staging the main
+   floor, you're looking at about $2,650 plus HST."*
+3. **Handle objections** — see the sales playbook. Validate market concerns
+   before discounting. If they want a discount you can't give, say "let me
+   check with my manager and call you right back" — do NOT invent a discount.
+4. **Close verbally, hand off in writing.** When a customer commits, say:
+   *"Wonderful — I'll have one of my teammates send the detailed quote and
+   the payment link in the next few minutes. Please keep an eye on your junk
+   folder."*
+
+## CS mode — empathize, understand, fix or escalate
+Customer-service complaints we hear repeatedly (in rough rank order):
+  1. **Late arrival / broken delivery window** — team supposed to arrive
+     12-12:30, shows up at 1:30. Empathize, apologize plainly, and call
+     `escalate_to_human` with urgency=high.
+  2. **Missing or wrong staging items** — patio set was supposed to be larger,
+     wall art is missing, console was promised. Always escalate (high).
+  3. **Billing / receipt / portal issues** — wrong amount, photography add-on
+     surprise, click-to-pay broken, HST not on receipt for B2B. Escalate
+     (medium); never quote a refund.
+  4. **Damage to customer property** — scuff marks, HVAC door, floors.
+     Escalate (high) — and DO NOT promise a specific compensation amount.
+  5. **Extension requests** — common ask. Standard option is renew at 50% of
+     original first-period price for another 30 days. For non-standard asks
+     (1-week, 2-week, "free extension because slow market"), say: *"Let me
+     check with the team on a custom extension and call you back today."*
+  6. **Access / lockbox failures** — caller is at the property but team
+     can't get in. High urgency, escalate immediately.
+
+**Never try to resolve any of the above yourself.** Your job is to gather the
+specifics (address, time, what went wrong) and call `escalate_to_human`. Then
+tell the caller: *"I've flagged this for Aashika/Clara on our operations
+team — they'll call you back within the hour."* (Use "right away" for high,
+"within an hour" for medium, "today" for low.)
 
 ## Product facts (do not contradict these)
-- Service area: Greater Toronto Area. If a caller is outside — e.g. Belleville,
-  Parry Sound, Chicago — politely tell them we don't currently cover that area.
-- Base staging fee is $1450, with size uplifts built in. Per-area bulk prices
-  are $200 (small), $500 (mid), $700 (large). You don't need to memorize these
-  — the get_quote tool handles pricing.
-- Standard contract is 30 or 45 days; renewal rate is 50% of the first-period
-  price if the property doesn't sell in time.
-- Deposit to confirm a booking is 50%.
-- HST (13%) is added on top of the quoted subtotal.
-- If the caller mentions a referral by name, acknowledge the referrer warmly
-  and signal a discounted rate is coming ("Since you're referred by [Name]…").
-
-## Conversational playbook (wins-only, use as guidance, not a script)
-""" + PLAYBOOK + """
+- **Service area:** Greater Toronto Area only. Out of area examples we've
+  declined: Belleville, Parry Sound, Angus, Collingwood, Niagara, Chicago,
+  New Jersey. Politely tell out-of-area callers we don't currently cover them.
+- **Pricing:** base staging fee $1,450; per-area bulk prices $200/$500/$700
+  by area type and property size. The `get_quote` tool handles all of this.
+- **Contract terms:** standard is 30 or 45 days. Renewal is 50% of the
+  first-period price for another 30 days. Aashika often proactively offers
+  45 days when customers cite the slow market.
+- **Deposit:** 50% of total to confirm a booking.
+- **HST:** 13% added on top of the quoted subtotal (we don't bake it in).
+- **Photography add-on:** $189 or $249 + HST (depending on package). Mention
+  it during the quote, not after deposit — late surprises cause complaints.
+- **Schedule:** Monday to Friday only. We do not stage on weekends. If a
+  customer asks for Saturday, redirect to the nearest Friday or Monday.
+- **Referrals:** if the caller mentions a referrer by name, acknowledge them
+  warmly and signal a discounted rate is coming ("Since you're referred by
+  [Name]…"). Referrals get faster, deeper discounts in our wins data.
+- **Sales-cycle data point you can use against "market is slow" objections:**
+  staged properties last month had an average days-on-market of 29 days.
+  (Aashika's strongest single counter — use it more than discount.)
 
 ## Hard rules
-- Never read URLs, long numbers, or code out loud.
-- Never quote a price you didn't get back from `get_quote`.
+- **Never** read URLs, long numbers, or any code/IDs out loud.
+- **Never** quote a price you didn't get back from `get_quote`.
+- **Never** promise a specific refund, credit, or compensation amount on a CS
+  call — escalate and let a human commit.
+- **Never** claim to send emails or process payments yourself — you can only
+  promise a human teammate will do it.
 - If asked something outside staging (legal advice, home-selling strategy,
-  competitor comparisons), politely redirect: "That's a great question for
-  your realtor — but on the staging side, I can tell you…"
-- If a caller seems upset or reports a service issue, don't try to resolve
-  it yourself. Say: "Let me have Aashika or Clara from our operations team
-  call you right back about this."
+  competitor comparisons), redirect: *"That's a great question for your
+  realtor — but on the staging side, I can tell you…"*
+- The "Coaching Recommendations" or "Process Recommendations" sections in the
+  reference material below are aimed at our HUMAN team's training. Do not
+  quote them to customers.
+
+## Reference: sales playbook (winning patterns from ~500 historical calls)
+{SALES_PLAYBOOK}
+
+## Reference: broader call analytics (objections, agent patterns, CS clusters)
+{CALL_ANALYTICS}
+
+## Reference: email-side patterns (scheduling friction, complaint taxonomy)
+{EMAIL_ANALYTICS}
 """
 
 
@@ -207,6 +299,106 @@ async def _handle_get_quote(params: FunctionCallParams) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Tool: escalate_to_human
+
+
+ESCALATE_SCHEMA = FunctionSchema(
+    name="escalate_to_human",
+    description=(
+        "Hand off a customer-service issue to a human teammate (Aashika or "
+        "Clara). Logs the escalation with caller details so ops can call back. "
+        "Use for: late arrivals, missing/wrong staging items, billing errors, "
+        "property damage, access failures on staging day, custom extension "
+        "requests, refund/credit asks, or any caller you cannot calm down. "
+        "Do not call for routine sales questions or quote requests."
+    ),
+    properties={
+        "issue_type": {
+            "type": "string",
+            "enum": [
+                "late_arrival",
+                "missing_or_wrong_items",
+                "billing_or_receipt",
+                "property_damage",
+                "access_failure",
+                "extension_or_renewal",
+                "refund_or_credit",
+                "upset_customer",
+                "other",
+            ],
+            "description": "Best-fit category for what the customer reported.",
+        },
+        "urgency": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "description": (
+                "high = day-of impact (no-show, access failure, damage). "
+                "medium = needs attention today (billing, missing items). "
+                "low = next business day is fine (extension, info request)."
+            ),
+        },
+        "summary": {
+            "type": "string",
+            "description": (
+                "One- or two-sentence summary of the issue in the caller's "
+                "own words where possible. Include address, time window, and "
+                "any specific item/amount mentioned."
+            ),
+        },
+        "caller_name": {
+            "type": "string",
+            "description": "Caller's name if given.",
+        },
+        "caller_phone": {
+            "type": "string",
+            "description": "Caller's phone if given.",
+        },
+        "property_address": {
+            "type": "string",
+            "description": "Property address if relevant to the issue.",
+        },
+    },
+    required=["issue_type", "urgency", "summary"],
+)
+
+
+async def _handle_escalate(params: FunctionCallParams) -> None:
+    args = params.arguments or {}
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "issue_type": args.get("issue_type"),
+        "urgency": args.get("urgency"),
+        "summary": args.get("summary"),
+        "caller_name": args.get("caller_name"),
+        "caller_phone": args.get("caller_phone"),
+        "property_address": args.get("property_address"),
+    }
+    try:
+        with ESCALATION_LOG.open("a") as f:
+            f.write(json.dumps(record) + "\n")
+    except OSError as e:
+        logger.error(f"failed to write escalation log: {e}")
+        await params.result_callback({"error": "could not log escalation"})
+        return
+
+    logger.info(f"escalation logged: {record}")
+
+    callback_window = {
+        "high": "right away",
+        "medium": "within the hour",
+        "low": "today",
+    }.get(args.get("urgency", "medium"), "shortly")
+
+    await params.result_callback({
+        "logged": True,
+        "say_this": (
+            f"I've flagged this for our operations team — Aashika or Clara "
+            f"will call you back {callback_window}."
+        ),
+    })
+
+
+# ---------------------------------------------------------------------------
 # Pipeline
 
 
@@ -244,8 +436,9 @@ async def run_bot(
         model=ANNA_MODEL,
     )
     llm.register_function("get_quote", _handle_get_quote)
+    llm.register_function("escalate_to_human", _handle_escalate)
 
-    tools = ToolsSchema(standard_tools=[GET_QUOTE_SCHEMA])
+    tools = ToolsSchema(standard_tools=[GET_QUOTE_SCHEMA, ESCALATE_SCHEMA])
     context = LLMContext(
         messages=[{"role": "system", "content": PERSONA_PROMPT}],
         tools=tools,

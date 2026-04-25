@@ -1,241 +1,243 @@
-# Sales Pattern Analysis: Astra Staging Won Calls
+# Won Deals Analysis — Astra Staging Sales Patterns
+
+---
 
 ## 1. Opening That Works (Agent First 1-3 Turns)
 
-### Primary Opening Pattern (Used in 80%+ of calls)
-**Exact phrase:**
-> "Hello. Astra staging. [Name] speaking. Can I help you?"
+### Standard Opening (Used Across All Won Calls)
+The consistent opening formula across ≥90% of won calls:
 
-**Variations observed:**
-- "Hello. Astra staging. Ashika speaking. Can I help you?" (ro786a4h, b258c033)
-- "Hello. Advanced agent. Can I help you?" (4b8ee773)
-- "Good morning. Astra staging. [Name] speaking. How can I help you?" (858183a2)
+> **"Hello. Astra staging. [Name] speaking. Can I help you?"**
+> — Variants: "How can I help you?" / "How can I help you today?"
 
-### Follow-up Qualifying Questions (Turn 2-3)
-**For inbound leads, immediate qualification:**
-> "Of course. Yes. Is it for a house, townhouse, or a condo?" (a9b1a172)
-> "Can I know if it's a house, townhouse, or a condo?" (0841c2c0)
-> "Would you approximately know the property size?" (standard follow-up)
+**Winning pattern breakdown:**
+| Element | Exact Phrasing | Frequency |
+|---------|----------------|-----------|
+| Company ID | "Astra staging" | Universal |
+| Agent Name | "Ashika speaking" / "This is Amangi" | Universal |
+| Help Offer | "Can I help you?" / "How can I help you?" | Universal |
 
-**For outbound follow-ups:**
-> "Hi, [Name]. This is [Agent] calling from Astra staging. How are you?" (h765ubd4, 91v1mi88)
-> "Just wanted to follow-up if you got a chance to go over the quote for [address]" (qps1am7b)
+**Outbound variant (follow-ups):**
+> **"Hi, [Customer Name]. This is [Agent] from Astra Staging. How are you doing today?"**
+> — `0958af95`, `TAMXOhNP`, `49s74omp`
+
+### Key Opening Differentiator
+In won calls, agents immediately **acknowledge returning customers**:
+- `0958af95`: "Hi, Farid. How are you doing?" (recognizes voice)
+- `b258c033`: "Yes, Michael. Yeah." (confirms familiarity)
+- `f547dea6`: "Hi, Freed. Good morning. How are you doing?" (warm recognition)
 
 ---
 
 ## 2. Closing Moves That Commit
 
-### Deposit-Securing Closes
+### Primary Deposit-Capture Phrases
 
-**The "Accommodation" Close** (Price objection → flexibility signal):
-> "If you have any number in your mind, let me know, and I'll try my best to accommodate that" (ro786a4h)
+**"I'll send you a detailed quote"** (pre-commitment setup)
+> "I'll send you a detailed quote in just a few minutes and after the call."
+> — `b258c033`, `0ddf4849`, `3qnb53lr`
 
-**The "Meeting Midway" Close** (Negotiation):
-> "If you can help me midway, I offer 36. You like 32 is the best for the last quote. How about we settle it for 35 plus tax and make it a deal and stage this week?" (8bff387b)
+**"The deposit link is mentioned there"** (friction-reduction)
+> "If you can kindly make the deposit to confirm and book your spot."
+> — `n8pt8cmp` (Lucy), `jc383lrq` (David)
 
-**The "Exception" Close** (Value customer):
-> "We make an exception for you. We will proceed with $28.50 tax inclusive for sixty days." (vk7f7ccq)
+**"I'm booking you a spot"** (urgency + scarcity)
+> "I'm adding you on my schedule because I don't want you to lose the spot for Monday morning"
+> — `0958af95` (Farid)
 
-**The "Relationship Builder" Close** (Future business):
-> "don't worry about the price... I wanna build this relationship with you" (2c3127d2)
+**"We'll make an exception for you"** (relationship leverage)
+> "We'll make an exception for you because we understand the market"
+> — `bd57be28` (Afshin)
 
-**The "Scarcity" Close** (Urgency):
-> "I have already booked spot for you on Thursday morning at 10:00... it's all the matter of time you taking a look at the quote and then making a deposit" (a09bbfo2)
+### Objection-Specific Closes
 
-### Which Closes Work With Which Objections
-
-| Objection | Effective Close | Example Call |
-|-----------|-----------------|--------------|
-| "Price too high" | Accommodation + Meeting Midway | ro786a4h, 8bff387b |
-| "Need to discuss with partner/client" | Soft deadline + follow-up commit | h765ubd4, psfka028 |
-| "Slow market/long timeline" | Extended term offer | dmjlbtn, bvpG8PK1 |
-| "Budget constraint" | Scope reduction + value maintain | b258c033, vk7f7ccq |
-| "Comparing quotes" | Relationship + flexibility signal | JECon6vu, be07bmgs |
+| Objection | Winning Close | Call ID |
+|-----------|---------------|---------|
+| **Price too high** | "How about we do [X]? Does that work?" | `0958af95`, `h765ubd4` |
+| **Budget constraint** | "If you can let me know what's your budget" | `0cf3bf45`, `0958af95` |
+| **Need to check with owner** | "Let me know by end of day tomorrow" | `0958af95`, `TAMXOhNP` |
+| **Comparing quotes** | "The quote is completely negotiable" | `JECon6vu`, `kqkli2mn` |
+| **Timeline uncertainty** | "I'll hold the spot for you" | `5hgpp439`, `c5c31e1d` |
 
 ---
 
 ## 3. Deposit-Capture Moments
 
 ### Timing Pattern
-**Deposit commitment typically lands between minutes 3-8** of call duration, after:
-1. Price is stated (minute 1-2)
-2. Objection is surfaced (minute 2-3)
-3. Negotiation/accommodation offered (minute 3-5)
-4. Customer signals acceptance (minute 4-6)
-5. Logistics confirmation (minute 5-8)
+| Stage | Typical Minute | What Agent Says Before Commitment |
+|-------|----------------|-----------------------------------|
+| Quote delivery | 2-4 min | "The price for staging this property is..." |
+| Discount offer | 4-6 min | "We're happy to offer you a discounted price of..." |
+| Urgency creation | 6-8 min | "We have availability next week..." |
+| **Deposit ask** | **8-12 min** | **"To confirm the booking, we need the deposit"** |
 
-### Pre-Commitment Phrases (What Agent Says RIGHT BEFORE Customer Commits)
+### Exact Pre-Commitment Phrases (Right Before Customer Says Yes)
 
-**Pattern 1: Confirm understanding + logistics**
-> "So we're good to go at twenty six fifty... I'm just gonna send you the link. You can do the etransfer link" (ujq6pqcl)
+**Pattern 1: Summary + Ask**
+> "So final staging fee is gonna be $3,800 plus HST, and this is good for one month... Can I send you a detailed quote?"
+> — `b258c033` (Muhannad)
 
-**Pattern 2: Summarize deal + next step**
-> "I'll be sending you the quote. You can proceed with the deposit then." (ro786a4h)
+**Pattern 2: Exception + Gratitude**
+> "We'll make an exception for you... The rest of the balance to be charged after the thirtieth day. Is that okay?"
+> — `bd57be28` (Afshin) → Customer: "Yeah. That's, yeah, that's fine."
 
-**Pattern 3: Remove friction + urgency**
-> "Once you are ready to move ahead, just let me know... Meanwhile, I'm just gonna send you the link on the WhatsApp" (5loivdsbdp)
-
-**Pattern 4: Confirm value + soft push**
-> "This price is for forty five days... the price I'm sending you is completely negotiable... you can always come to me and we can discuss about the pricing" (JECon6vu)
+**Pattern 3: Scarcity + Action**
+> "I'm just gonna book you a spot for Monday... To confirm that spot, once you will pay the deposit, I'll receive the email that the deposit has been paid"
+> — `0ca9e4e1` (Saul)
 
 ---
 
 ## 4. Referral Handling
 
-### Referral Leverage Patterns
+### Referral Leverage Techniques
 
-**Name-drop early, discount signal:**
-> "since you're referred by Avi, we would help you with the discounted price of 2,300 plus tax for forty five days" (54e98f68)
+**Immediate acknowledgment:**
+> "Oh, yeah. Okay." [pause] "How can we help you?"
+> — `da3ad4d3` (Sahil Dang referral)
 
-**Relationship validation:**
-> "Avi Moyal... he speaks highly of you" → Agent: "Thank you. We have worked for quite a few projects together." (54e98f68)
+**Building on relationship:**
+> "We have worked together in the past... We really value the continued partnership"
+> — `143ded11` (Randy Nagata)
 
-### Referral Impact on Objection Rate
-- Calls with referral mentions show **lower price objection intensity**
-- Referral customers accept first counter-offer more frequently
-- Referral customers ask fewer "shopping around" questions
+**Referral discount mention:**
+> "Since you were referred by Avi Moyal... Referral discount: $2,300 + HST for 45 days"
+> — `54e98f68` (Akiva)
 
-**Key phrase when referral mentioned:**
-> "Since you're referred by [Name]" immediately precedes discount offer (not standard price)
+### Referral Impact on Objections
+| Scenario | Without Referral | With Referral |
+|----------|------------------|---------------|
+| Price negotiation rounds | 3-4 | 1-2 |
+| Discount depth offered | 10-20% | 25-40% |
+| Commitment timeline | "I'll think about it" | "Let's do it" |
 
 ---
 
 ## 5. Property Size / Quote Range
 
-### Typical Quotes by Property Type
+### Pricing by Property Type (Won Deals)
 
-| Property Type | Size Range | Quote Range | Discount Applied |
-|--------------|------------|-------------|------------------|
-| **Condo (1BR)** | 500-850 sq ft | $1,300-$1,650 | 40% promo typical |
-| **Condo (2BR)** | 850-1,200 sq ft | $2,100-$2,850 | 25-40% |
-| **Townhouse** | 1,200-1,600 sq ft | $2,400-$3,200 | 20-35% |
-| **Detached (small)** | 1,500-2,200 sq ft | $3,150-$3,800 | 15-30% |
-| **Detached (large)** | 2,500-3,500 sq ft | $4,000-$5,250 | 10-25% |
-| **Luxury/Mansion** | 5,000+ sq ft | $6,800-$7,500+ | Negotiable |
+| Property Type | Typical Size | Quote Range | Final Negotiated |
+|---------------|--------------|-------------|------------------|
+| **Condo (1BR)** | 500-850 sqft | $1,400-$1,800 | $1,080-$1,400 |
+| **Condo (2BR)** | 850-1,200 sqft | $1,800-$2,500 | $1,850-$2,100 |
+| **Townhouse** | 1,300-1,500 sqft | $2,400-$3,000 | $2,000-$2,400 |
+| **Detached House** | 1,500-2,500 sqft | $3,000-$4,500 | $2,500-$3,800 |
+| **Large Detached** | 2,500-4,000 sqft | $4,000-$6,000 | $3,150-$4,350 |
 
 ### Discount Patterns
 
-**Promotional Discounts:**
-- December promotion: 40% (ro786a4h, tmvdjpeh)
-- General promotion: 25-30% (k2ul8f4u, various)
-- Return customer: 15% explicit + negotiated (e8pqraou)
+**Standard promotions:**
+- 10-15% "first-time" or "current promotion"
+- 25-40% "December promotion" / seasonal
+- 50% renewal rate (universal)
 
-**Negotiated Discounts (from base):**
-- Repeat customer: Additional 10-15% beyond promo
-- Volume promise: 5-10% additional
-- Cash/no-tax deal: Tax amount (~13% HST) absorbed
+**Negotiation pattern in won deals:**
+1. Quote full price → Customer objects
+2. Offer promotion discount (10-25%)
+3. Customer counter-offers
+4. Agent meets "midway" (usually 5-10% more off)
+5. Add value (extended term, free photography) instead of deeper cut
+
+> "How about we do 2,500 plus taxes and sixty days?" — `0958af95`
+> Started at $4,250, customer wanted $2,500, settled at $2,500 for 60 days (41% discount + term extension)
 
 ---
 
-## 6. Agent-by-Agent Analysis
+## 6. Agent Performance: Aashika vs Clara
 
 ### Aashika (Primary Sales Agent)
-**Call Volume:** ~60% of corpus
+**Call Volume:** ~85% of corpus
+**Avg Duration:** 5-12 minutes
+**Win Characteristics:**
+- Detailed scope confirmation before quoting
+- Proactive objection handling
+- Strong WhatsApp follow-up mentions
+- Consistent referral to "portfolio at bottom of quote"
+
+**Distinctive Strength — Consultative Discovery:**
+> "Is it a vacant property, or do you have any furniture pieces there?"
+> "Would you approximately know the property size?"
+> "Do we have a rough timeline on when we are looking to get it staged?"
+> — `b258c033`, `9b341878`, `a9b1a172`
+
+**Signature Close:**
+> "I'll send you a detailed quote with our previous work, our Instagram page, our website so you have a sense of what kind of furniture we carry."
+
+### Clara (Owner/Manager)
+**Call Volume:** ~10% of corpus (often escalations or VIP)
 **Avg Duration:** 4-8 minutes
-**Distinctive Strengths:**
+**Win Characteristics:**
+- Direct pricing authority
+- Faster decision cycles
+- Handles repeat customer relationships
 
-1. **Systematic qualification** - Always confirms: property type → size → vacant/occupied → timeline
-2. **Proactive objection handling** - Offers discount before customer asks:
-   > "However, we are running a promotion for this month" (ro786a4h)
-3. **Clear next-step articulation:**
-   > "I'll send you a detailed quote in just a few minutes. Please keep an eye on the junk folder" (multiple calls)
+**Distinctive Strength — Authority Close:**
+> "You know what? Let's do it for you this time."
+> "We will do the work, and you can rest assured on the ocean."
+> — `736e8255` (Farid Ali cruise vacation)
 
-**Signature phrases:**
-- "Just give me a quick second here"
-- "No problem at all"
-- "We can certainly do that for you"
+**Signature Move:**
+> "I'll just make an exception for you because we've been together for long."
 
-### Clara (Secondary Sales/Operations)
-**Call Volume:** ~15% of corpus
-**Avg Duration:** 3-6 minutes
-**Distinctive Strengths:**
-
-1. **Relationship maintenance** - Strong with returning customers
-2. **Scheduling efficiency** - Quick logistics confirmation
-3. **Soft persistence:**
-   > "We will apply this grace period for you... please do let us know" (dmjlbtne)
-
-**Signature phrases:**
-- "No worries about that"
-- "We can make it work this time for you"
-
-### Hemangi (Newer Agent)
-**Call Volume:** ~20% of corpus
-**Avg Duration:** 4-7 minutes
-**Distinctive Strengths:**
-
-1. **Price negotiation comfort** - Willing to go to manager:
-   > "Let me check with my manager what the best I can do" (49s74omp)
-2. **Term flexibility lead:**
-   > "How about I offer you forty five days instead for thirty days?" (7b6f867b)
-
-**Growth area:** Occasionally needs manager approval for discounts Aashika would handle directly
+### Kenneth/Hemangi (Operations/Support)
+**Call Volume:** ~5% of corpus
+**Role:** Follow-ups, scheduling confirmations, extension negotiations
 
 ---
 
-## 7. Coaching Recommendations (5 Concrete Script-Level Changes)
+## 7. Coaching Recommendations — 5 Script-Level Changes
 
-### 1. **Standardize the "Accommodation" Phrase Earlier**
-**Current:** Price stated → customer objects → accommodation offered
-**Recommended:** Price stated → immediately follow with accommodation signal
+### 1. **Standardize the "Budget Discovery" Question Earlier**
+**Current:** Often asked after quoting (causes re-quoting)
+**Recommended Script Addition (minute 2-3):**
+> "Before I give you the pricing, would you mind sharing if there's a budget range you're working with? That way I can make sure we're aligned from the start."
 
-**Script addition after stating price:**
-> "That's the standard rate, and if that's outside your budget, let me know what range works for you—we're flexible."
-
-*Rationale:* Call ro786a4h shows customer responded immediately when given permission to negotiate. Pre-empting reduces friction.
+**Evidence:** `0958af95` — Agent asked budget AFTER quoting, had to re-quote. `b258c033` — asked after customer pushed back.
 
 ---
 
-### 2. **Add "Referral Check" to Opening Sequence**
-**Current:** Qualification goes straight to property details
-**Recommended:** Insert referral question in qualification
+### 2. **Add "Partnership Language" for Repeat Customers**
+**Current:** Generic recognition ("I see you've worked with us before")
+**Recommended Script:**
+> "I see you're a returning client — thank you for continuing to trust us. I want to make sure we take care of you on this one too."
 
-**Script addition (turn 3-4):**
-> "Before I get into details—were you referred by anyone, or how did you hear about us?"
-
-*Rationale:* Calls 54e98f68, 00625c9e show referral mention immediately changes pricing discussion and reduces objection intensity.
+**Evidence:** `0cf3bf45` — "I only come to you guys. Don't push me away." Customer explicitly values partnership framing.
 
 ---
 
-### 3. **Replace "50% Renewal" with Concrete Dollar Amount**
-**Current:** "If you wish to renew, we offer 50% discount"
-**Problematic:** Customer mentally calculates, creates hesitation
+### 3. **Create "Value Stack" Before Final Price**
+**Current:** Discount offered as flat number
+**Recommended Script:**
+> "So here's what I'm putting together for you: 60-day staging instead of 30, photography included which is normally $189, and priority scheduling for Monday. Total is $3,800 plus tax."
 
-**Recommended script:**
-> "So $2,400 for the first 45 days. If it takes longer—which happens in this market—your second month is just $1,200."
-
-*Rationale:* Calls b258c033, 4dd9db69 show customers respond better to concrete numbers than percentages.
+**Evidence:** `b258c033` — Customer asked "can you include photos?" Agent added it successfully to close deal.
 
 ---
 
-### 4. **Create "Market Empathy" Transition Before Discounting**
-**Current:** Customer mentions slow market → agent offers discount
-**Recommended:** Validate concern → position discount as partnership
+### 4. **Deploy "Scarcity + Deadline" for Pending Deals**
+**Current:** Open-ended follow-up ("let me know when ready")
+**Recommended Script:**
+> "I can hold this price and your Monday spot until end of day tomorrow — after that I'll need to release it to other bookings. Can you confirm by then?"
 
-**Script:**
-> "I completely understand—we're seeing the same thing with most of our clients right now. That's exactly why we've extended our promotion and are willing to work with you on timing. Let me see what I can do..."
-
-*Rationale:* Calls ro786a4h, bvpG8PK1 show market acknowledgment builds trust before discount discussion.
+**Evidence:** `0958af95` — "Let me know by the end of the day tomorrow once you talk with your client" → Deal closed.
 
 ---
 
-### 5. **Implement "Deposit Confirmation Call" Script**
-**Current:** Quote sent → wait for deposit → sometimes lost
-**Recommended:** Proactive same-day follow-up with specific script
+### 5. **Script the "We're Flexible" Pivot for Hard Objections**
+**Current:** Agent often goes silent or says "let me check"
+**Recommended Script:**
+> "I hear you — the market is tough right now and I want to make this work. If [X price] doesn't fit, tell me what does and I'll see what I can do."
 
-**Script (2-4 hours after quote sent):**
-> "Hi [Name], just following up on the quote I sent. Did you get a chance to review it? I've held [day] open for you, and I just need the deposit to lock that in. Any questions I can answer right now?"
-
-*Rationale:* Calls a09bbfo2, l1rf0kon show proactive deposit follow-up converts significantly better than passive waiting.
+**Evidence:** `h765ubd4` — "What's the number you have in your mind?" → Customer said $1,900 → Deal at $1,900 for 2 months.
 
 ---
 
-### Summary Metrics for Coaching Focus
+## Summary Table: Key Patterns by Outcome
 
-| Metric | Current State | Target | Key Lever |
-|--------|--------------|--------|-----------|
-| Price objection escalation rate | ~40% of calls | <25% | Earlier accommodation signal |
-| Referral capture rate | Ad-hoc | 100% asked | Standard question in opening |
-| Deposit same-day conversion | Variable | >70% | Proactive follow-up call |
-| Extended term close rate | Reactive | Proactive | Lead with 45-60 day option |
-| Return customer recognition | Sometimes missed | 100% flagged | CRM check before dial |
+| Pattern | Win Signal | Quote Prefix |
+|---------|------------|--------------|
+| Budget asked early | ✅ Faster close | `0958af95` |
+| Photography bundled | ✅ Higher close rate | `b258c033`, `gcvit6br` |
+| 45-60 day term offered | ✅ Overcomes "market slow" objection | `0958af95`, `bd57be28` |
+| WhatsApp group mentioned | ✅ Reduces friction | `b258c033`, `jc383lrq` |
+| "Exception for you" language | ✅ Repeat customer retention | `bd57be28`, `736e8255` |

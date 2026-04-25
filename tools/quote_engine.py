@@ -196,10 +196,18 @@ class Quote:
     def summary_line(self) -> str:
         """One-sentence version suitable for speaking out loud."""
         area_count = sum(1 for a in self.areas if a.charged_price > 0)
+        size_phrases = {
+            "under-1000": "under 1000",
+            "1000-2000": "1000 to 2000",
+            "2000-3000": "2000 to 3000",
+            "3000-4000": "3000 to 4000",
+            "over-4000": "over 4000",
+        }
+        size_phrase = size_phrases.get(self.property_size, self.property_size)
+        area_word = "area" if area_count == 1 else "areas"
         return (
-            f"For a {self.property_type.replace('-', ' ')} at "
-            f"{self.property_size.replace('-', ' to ')} square feet, "
-            f"staging {area_count} areas, you're looking at "
+            f"For a {self.property_type} at {size_phrase} square feet, "
+            f"staging {area_count} {area_word}, you're looking at "
             f"about ${self.subtotal:,.0f} plus HST."
         )
 

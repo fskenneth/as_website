@@ -1,263 +1,208 @@
-# Astra Staging Sales-Ops Analytics Report
-**Analysis Period:** Recent ~400 calls | **High-Signal Subset:** ~120 diarized transcripts
+# Astra Staging Analytics Report
 
 ---
 
 ## 1. Pipeline Snapshot
 
 ### Volume by Call Type
-| Type | Count | % of Total |
-|------|-------|------------|
-| sales_follow_up | 68 | 56% |
-| sales_new_lead | 35 | 29% |
-| scheduling | 15 | 12% |
-| customer_service_issue | 10 | 8% |
-| other | 8 | 7% |
+| Type | Count | % |
+|------|-------|---|
+| sales_follow_up | ~210 | 53% |
+| sales_new_lead | ~85 | 21% |
+| scheduling | ~55 | 14% |
+| customer_service_issue | ~28 | 7% |
+| other | ~20 | 5% |
 
 ### Direction Split
-- **Inbound:** ~55% (new inquiries, scheduling requests, CS issues)
-- **Outbound:** ~45% (follow-ups, return calls)
+- **Inbound:** ~38% (new leads, CS complaints, scheduling confirmations)
+- **Outbound:** ~62% (follow-ups, scheduling, cold outreach, staging partnership calls)
 
-### Agent Workload
-Primary agents identified: **Aashika/Aashika** (dominant - handles ~85% of transcribed calls), **Clara/Clara** (backup/overflow)
+### Agent Workload (named agents)
+| Agent | Approx. Calls | Primary Role |
+|-------|--------------|--------------|
+| Aashika (aashika@) | ~180 | Primary sales + new lead handling |
+| Kenneth (kenneth@) | ~140 | Sales follow-up, CS, scheduling, ops |
+| Clara (clara@) | ~25 | Sales follow-up, occasional scheduling |
+| Hemangi/Himangi (hemangi@) | ~20 | Sales follow-up (appears legacy/older calls) |
 
-Aashika handles the vast majority of both inbound and outbound calls. Clara appears primarily on scheduling and some new leads.
+*Note: Many Kenneth-metadata calls are answered by agents identifying as "Amandi," "Emangi," "Hemangi," "Amanda," or "Himandi" — this appears to be a forwarding/team-phone situation. The actual humans on those calls are likely a rotating pool of sales staff, not Kenneth directly.*
 
-### Actionable vs. Noise (Inbound)
-- **Actionable:** ~72% (genuine sales inquiries, scheduling, CS requiring resolution)
-- **Noise:** ~28% breakdown:
-  - Wrong number/service mismatch: 5 calls (furniture assembly request `lojhfv13`, stage steps `6eb6cd30`, Crawford Staging lookup `7ce8c4b3`)
-  - Job inquiries: 4 calls (`3f2b0886`, `8255c36c`, `e46cae90`, `3munb7hj`)
-  - Employment verification: 1 call (`50547a65`)
-  - Out-of-service-area: 3 calls (Parry Sound `d67fce7e`, Belleville `4f20b36c`, Chicago trade show `9af532d7`)
+### Inbound Actionable vs. Noise
+Of inbound calls:
+- **Actionable** (genuine quote requests, scheduling, CS with resolution needed): ~68%
+- **Noise** (wrong numbers, job inquiries, voicemails with no follow-up, cold calls to Astra): ~32%
+
+Voicemails and missed-call situations requiring callback are not separated by type in the data but represent a meaningful portion of follow-up volume.
 
 ---
 
 ## 2. Sales Patterns That Close
 
-### Opening Phrases Correlated with Good Flow
+### Opening Phrases That Correlate with Good Flow
+Calls that progressed to committed next steps shared these agent opening patterns:
 
-**Effective openings (from won/strong-pending calls):**
+1. **"I just need to confirm a few things and I can certainly help you with the price"** — used in nearly every successful new lead (e.g., 0ddf4849, 228bd326, 4ee9dc66). Creates structure without intimidating the prospect.
+2. **"Is it a house, townhouse, or a condo?"** — the standardized intake sequence (property type → city → size → vacant/occupied → timeline → rooms) appears in every quote call and gets customers talking. Works because it's systematic, not pushy.
+3. **Calling customers by name immediately** — e.g., "Hi, Anne. How are you?" (call 0055ad3e) before diving in. Creates warmth on return calls.
 
-1. **Immediate value acknowledgment + info-gathering:**
-> "Yes. Absolutely. I just need to confirm a few things, and I can certainly help you with the price." — `0ddf4849` (won), `228bd326` (pending-strong)
+What **doesn't** work as an opener: starting with pricing before context (call ddgq2fm95 — Aashika had to backtrack when the customer jumped to a price range before she'd qualified).
 
-2. **Warm return-call framing:**
-> "Hi there. It's Astra of Staging returning your call. Can I help you?" — `3qnb53lr` (consultation scheduled)
+### Closing Phrases That Commit to Next Steps
+**Won** outcomes consistently used:
+- **"Can we stage this on [specific date]?"** + immediate calendar check (0055ad3e: *"Thursday it is. Right? For the twenty third."*)
+- **"If you can kindly make the deposit to confirm and book your spot"** — direct CTA with urgency framing (11beff01, 500fecdb)
+- **"We'd really love for you to just come back if you get any other quote"** — used by Aashika on 07e3ad2b to stay in a competitive situation
+- **"Let's do [X price] and make it happen for both of us"** — collaborative framing on negotiated deals (b9a14421, 592b93dd)
 
-3. **Recognition of referral/relationship:**
-> "You were referred by Goldie, and we really appreciate her business and referring you to us." — `d1c911b5` (scheduled, $2600 deal)
+**Pending** outcomes almost always end with: *"I'll send you the quote and you can let me know"* — no hard ask for deposit timing.
 
-**Weak openings (correlated with lost/stalled):**
-- Answering as wrong company: `78c6ee08` opened with "Hello. Advanced Locksmith" — customer confused, deal lost
-- Passive/unclear: calls where agent doesn't immediately take control of the conversation
+### Call Length Correlation with Conversion
+- **Won calls:** Typically 4–12 minutes. Long enough to build rapport and confirm logistics, short enough that they stayed on topic.
+- **Pending (strong) calls:** 6–20 minutes — longer negotiation or information gathering, but still actionable.
+- **Lost calls:** Either very short (<2 min, wrong service/price shock) or very long (20+ min of circular negotiation with no resolution).
+- **Best predictor:** Calls that reach elevator/deposit/date specifics within the first 5 minutes are almost always won or strongly pending. Calls that spend >8 minutes on ballpark pricing without moving to specifics rarely convert same-call.
 
-### Closing Phrases That Commit Customers
-
-**High-conversion closers:**
-
-1. **Deposit + date lock:**
-> "I'm gonna send you a detailed quote in just a few minutes... We require 50% deposit to confirm the booking." — Used in `0055ad3e` (won), `55f23d2d` (won)
-
-2. **Scarcity + accommodation:**
-> "We can stage it this week on Wednesday... if you can kindly make the deposit to confirm and book your spot." — `f66fb946`
-
-3. **Explicit next-step ownership:**
-> "Let's go ahead with that... Sounds good. Thank you so much, and we look forward to working with you." — `0055ad3e` (won - $1000 deposit same day)
-
-4. **Negotiation closure with value add:**
-> "If you wish to proceed with us, I can throw in the photography service at no extra charge." — `5da13ea0`
-
-### Call Length Patterns
-
-| Outcome | Avg Duration | Pattern |
-|---------|--------------|---------|
-| Won | 8-15 min | Deep discovery + pricing + scheduling in one call |
-| Pending (strong) | 6-12 min | Quote sent, consultation scheduled, clear next step |
-| Pending (weak) | 3-6 min | Customer "will think about it," no deposit/date |
-| Lost | 2-5 min | Price objection unresolved or service mismatch |
-
-**Key insight:** Won calls typically involve 10+ back-and-forth exchanges on property details before pricing is discussed. Lost calls often jump to price within first 3 exchanges.
-
-### Questions That Elicit Property-Specific Detail
-
-**High-signal questions (from successful calls):**
-
-1. "Would you approximately know the property size?" — Asked in 90%+ of calls
-2. "Is it vacant or occupied?" — Critical for pricing accuracy
-3. "What's on the main floor? How many bedrooms?" — `228bd326`, `4ee9dc66`
-4. "When are we looking to get it staged?" — Creates urgency context
-5. "Is there a price range you had in mind?" — `0ddf4849` used this to negotiate from $2100→$1850
-
-**Underutilized question (appears in won calls):**
-> "Do we have a rough timeline on when we are looking to get it listed?" — Appears in `02a3708e`, creates urgency and qualifies serious buyers
+### Questions That Elicit the Most Property Detail
+1. **"Is it a house, townhouse, or a condo?"** — anchors the customer, prevents ambiguity
+2. **"Would you approximately know the property size?"** — almost always gets a number (even if vague: "around 2,000")
+3. **"Is this property vacant, or do you have any furniture pieces there?"** — critical qualifier that changes the entire quote and scope
+4. **"How many bedrooms? What's on the main floor — living, dining, family?"** — opens a verbal walkthrough (e.g., call 592b93dd, customer walked through every floor)
+5. **"When are we looking to get it staged?"** — the timeline question frequently reveals urgency that unlocks flexibility on both sides
 
 ---
 
 ## 3. Objection Taxonomy
 
-| Objection | Frequency | Representative Quote | Best Response |
-|-----------|-----------|---------------------|---------------|
-| **Price too high** | 18 occurrences | "That is way too much for my client's budget" — `dtnnirmq` | Offer reduced scope: "Would you be open to just take the main level then?" — `4dca6b46` |
-| **Comparing quotes** | 12 occurrences | "I'm calling around to see if there's other companies" — `46a4405e` | "If you get any other quote, please give us a callback... we really wanna make it happen" — `07e3ad2b` |
-| **Monthly renewal concern** | 8 occurrences | "Monthly renewal fee too expensive... wants flat rate until sold" — `0hnvb36t` | Extend initial term: "We can offer forty-five days to begin with" — `d1c911b5` |
-| **Need to consult spouse/partner** | 7 occurrences | "I have to talk to my wife" — `249222f9` | Schedule consultation anyway: "We are available next week... This is a complimentary service" |
-| **Timeline mismatch** | 6 occurrences | "Cannot wait until April 9 - needs staging by Wednesday" — `cd62afc9` | Lost — no effective counter when fully booked |
-| **Need to see design first** | 5 occurrences | "Cannot commit without seeing design/floor plan first" — `f8a5d468` | "I could share some recent MLS listings with you" — `592b93dd` |
-| **Found someone else** | 4 occurrences | "We found someone else" — `0qst76am` | No recovery possible |
-
-**Objection with lowest win rate:** Timeline mismatch — 0% recovery when customer needs staging within 48-72 hours and Astra is booked.
-
-**Objection with highest recovery rate:** Price negotiation — ~60% recovery rate when agent offers reduced scope or extended term.
+| # | Objection | Frequency | Representative Quote | Best Response Observed |
+|---|-----------|-----------|---------------------|------------------------|
+| 1 | **Price too high** | ~85 calls | *"It seems high. I'm a returning customer. You guys did a house for me similar... it was in the 2,000 or under 2,000"* (592b93dd) | Counter with extended term (45→60 days at same price), throw in photography, or drop to "best and final." Works ~40% of time. |
+| 2 | **Need to think about it / discuss with partner/client** | ~60 calls | *"Let me discuss with my wife before proceeding"* (249222f9) | Send quote immediately, follow up within 48h, ask "is there a number in mind we could work with?" |
+| 3 | **Market is slow / not worth staging** | ~35 calls | *"Market very slow. I see houses sitting on market five months, six months"* (386mjvgb) | Aashika's strongest counter: "Our March average days on market for staged properties was 29 days." Real data. Use it more. |
+| 4 | **Already found another company** | ~20 calls | *"We did. We did."* (0qst76am) | Generally unrecoverable same-call. Best play: *"Can we match their quote if you share it?"* Worked in 3 cases. |
+| 5 | **Property not ready yet** | ~18 calls | *"The property is under renovation, which should finish maybe in about fifteen days"* (228bd326) | Schedule consultation anyway, tentatively hold staging slot. Works well. |
+| 6 | **Want flat rate / no monthly renewal** | ~15 calls | *"I want the package for until it's sold"* (0hnvb36t) | Offer 60-day initial term. Reframe renewal as "only 50% of original, so half the cost." Partially effective. |
+| 7 | **Competitors offering longer terms** | ~12 calls | *"Others are usually offering 60 days minimum"* (5da13ea0) | Match the term (Aashika typically offers 45 days proactively now). Don't wait for push. |
+| 8 | **Furniture quality concern** | ~8 calls | *"I don't want to replace old furniture with old furniture"* (b01d7o43) | Send Instagram/portfolio link + explain 24-48h design preview. Offer to walk through recent MLS listings on HouseSigma. |
+| 9 | **No virtual staging** | ~6 calls | *"I I was actually looking for decluttering"* (6h8nlk2p) | No good counter — service mismatch. Refer out politely. |
 
 ---
 
 ## 4. Agent Scorecard
 
-### Aashika (Primary Agent)
+### Aashika (aashika@astrastaging.com)
+- **Call volume:** ~180 calls
+- **Avg duration:** 5–8 minutes (estimated from transcripts)
+- **% with committed next step:** ~52%
+- **Strengths:**
+  - Strongest intake cadence — executes the property-type → city → size → vacant → timeline → rooms sequence consistently
+  - Best at delivering market data as objection counter ("our average DOM last month was 29 days")
+  - Good at mid-call pivots when scope changes (e.g., 02a3708e — adjusts quote live when customer adds basement)
+  - Strong empathy on difficult calls (repeat clients, slow-market frustration)
+  - Example quote: *"We are happy to offer forty five days to begin with. Three thousand for forty five days."* (b9a14421) — proactively extended term without being asked
+- **Weaknesses:**
+  - Occasionally misnames customers mid-call (called Tyson "Riley," Ritesh "Rakesh") — minor but notable
+  - Sometimes sends to WhatsApp when customer explicitly requested email only (call 249222f9: customer asked for email confirmation, agent said "junk mail" warning but quote went to WhatsApp too)
+  - On cold brokerage outreach calls, pitches are thin and quickly dismissed
 
-| Metric | Value |
-|--------|-------|
-| Call volume | ~85% of transcribed calls |
-| Avg duration | 7.2 minutes |
-| % leading to committed next step | 62% |
+### Kenneth / "Pool" Agents (kenneth@astrastaging.com)
+*This line handles a mix of agents — Amanda, Himangi/Hem, Amandhi, Amandi, Emangi — creating brand inconsistency.*
+- **Call volume:** ~140 calls
+- **Avg duration:** 4–10 minutes
+- **% with committed next step:** ~38%
+- **Strengths:**
+  - Better at operational coordination (elevator codes, lockbox issues, destaging logistics)
+  - Kenneth personally is direct on pricing negotiation (b258c033, dca6121c)
+  - Hem/Himangi is good at closing on December/Black Friday promotions quickly
+- **Weaknesses:**
+  - **Identity confusion is serious.** In call 00625c9e, agent answered "Hello. Astral speaking" then shifted to "I'm very good, Brandon. How are you?" — and called the customer "Brandon" when his name was "Brian." Multiple calls have agents identify as "Emongi," "Amagi," "Amandhi" — none of which are real names. Customers notice: *"Can you confirm? I'm not sure it was you."* (3m506k74)
+  - More likely to quote from memory without pulling up the system, leading to errors (call Y8zgxSyCHWFP — wrong quote sent, wall art included when prohibited, price wrong)
+  - Less consistent on the intake sequence — sometimes skips property size or vacant/occupied question
+  - Example of a missed close: Customer Grace (jp8o0r1p) said competitor offers $3,000 for 90 days. Kenneth didn't come back same-call with a counter. Aashika would have.
 
-**Strengths:**
-- Excellent at structured discovery: consistently asks property size, vacancy status, room count, timeline
-- Strong negotiation flexibility: "We can try our best to squeeze in and meet you midway" — `0ddf4849`
-- Proactive WhatsApp/email follow-up offering
+### Clara (clara@astrastaging.com)
+- **Call volume:** ~25 calls (appears to be manager role, less frontline)
+- **% with committed next step:** ~55% (small sample)
+- **Strengths:**
+  - Warmest tone of any agent — customers specifically request her (Fareed: *"It's always a pleasure to work with you instead of the last person I dealt with"*, 736e8255)
+  - Handles returning/VIP clients well
+  - Strong de-escalation on CS calls (c0a24108 — HVAC damage)
+- **Weaknesses:**
+  - Lower call volume suggests she's not primarily frontline; some calls suggest she's pulled in for escalations only
+  - Missed follow-up caused Beverly Swerling (52889e31) to nearly leave: *"I was told 'Mona will contact you soon' but no follow-up occurred."*
 
-**Weaknesses:**
-- Occasionally answers phone incorrectly: "Hello. Advanced Locksmith" — `78c6ee08`
-- Sometimes doesn't push for deposit commitment on strong calls
-- Quote from `f8a5d468`: customer wanted design preview, Aashika defaulted to "design links are sent 24-48 hours before staging" without offering alternatives sooner
-
-**Distinctive pattern:** Aashika uses "Mhmm" extensively (20+ times per call average) — creates conversational flow but occasionally sounds disengaged on playback.
-
-### Clara (Secondary Agent)
-
-| Metric | Value |
-|--------|-------|
-| Call volume | ~15% of transcribed calls |
-| Avg duration | 5.8 minutes |
-| % leading to committed next step | 48% |
-
-**Strengths:**
-- Good at handling scheduling logistics
-- Clear communication on process: "We send out a proposal with continuing to do list... staging item list" — `46a4405e`
-
-**Weaknesses:**
-- Less price negotiation flexibility demonstrated
-- Fewer examples of overcoming objections in transcripts
-
----
-
-## 5. Customer Service Theme Clustering
-
-### Top 3 Recurring Issues
-
-**1. Delivery/Timing Conflicts (4 incidents)**
-- `31b37369`: Randy urgent — delivery window changed from 10-12 to 1-3, customer must leave by 1pm
-- `c6b1271a`: Staging team delay — photographer scheduled 10:30am, team not arrived
-- `858e6581`: Jackie — staging team not present at scheduled time
-
-**Quote:** "Trying doesn't work. I will not be there if they come at 01:00." — Randy, `31b37369`
-
-**2. Property Damage During Staging (2 incidents)**
-- `c0a24108`: HVAC door damaged at 5 Everson Drive Unit 830 — door not sliding properly after furniture delivery
-- (Referenced in multiple calls as concern customers raise)
-
-**Quote:** "They had to take off our HVAC door to get some of the furniture inside, and, unfortunately, it's been damaged and it's not sliding properly." — `c0a24108`
-
-**3. Billing/Invoice Discrepancies (2 incidents)**
-- `5cbpgks9`: Josephine Carroll confused about $2,192.83 missing from invoices (resolved — was third property charge)
-- `b2fe0011`: Same customer, voicemail about name correction and total discrepancy
-
-**Severity Pattern:**
-- **Urgent (same-day resolution required):** Delivery timing conflicts, property damage
-- **Normal (24-48 hour resolution):** Invoice corrections, name changes
-- **Low:** General inquiries routed to wrong department
+### Distinctive Pattern — Aashika vs. the Pool
+**Aashika consistently quotes a specific number + discount sequence in one breath:** *"The price is $3,005.50. However, we are happy to offer a discounted price of $2,400 plus tax."* The pool agents more often say a range or get the number wrong. This single pattern difference likely accounts for the conversion gap.
 
 ---
 
-## 6. Cold-Call Vendor Spam Registry
+## 5. Customer-Service Theme Clustering
 
-**Companies/individuals cold-calling Astra to sell services:**
+### Top 3 Recurring Complaints
 
-| Caller | Contact | Pitch | Call ID |
-|--------|---------|-------|---------|
-| Sterling Backcheck | +16048812011 | Employment verification (RBC) | `50547a65` |
+**1. Scheduling/ETA Communication Failures (~11 incidents)**
+- Delivery windows confirmed but team arrives outside them without warning
+- Examples: Randy DeAngeles (31b37369) — window changed from 10am-12pm to 1pm-3pm via email with no phone call. Jackie (858e6581) — staging team scheduled for 12-12:30, no one showed up. Customer at 241 Bridgestown (355d2a37) waited from 11am-4:22pm.
+- **Pattern:** When a window changes, email-only notification is insufficient. Customers need a phone call.
 
-**Note:** Very low vendor spam volume in this dataset. Most "other" calls were job applicants or service mismatches rather than B2B cold calls.
+**2. Access/Lockbox Problems on Staging Day (~9 incidents)**
+- Teams arrive and cannot enter: wrong lockbox code, code not set up, building access protocols misunderstood
+- Examples: call ac22e44f (photographer can't find lockbox), call a9225395 (wrong lockbox among multiple), call 858183a2 (team sent to wrong address per system error)
+- **Pattern:** Access info is not being confirmed the day before staging in a standardized way.
 
-**Recommended block/do-not-engage:** No urgent additions from this corpus.
+**3. Invoice Discrepancies and Billing Errors (~8 incidents)**
+- Wrong amounts sent, extension pricing shown incorrectly in portal, charges processed before customer approval
+- Examples: 5cbpgks9 (Josephine Carroll, $2,192 missing from consolidated invoices), b2fe0011 (customer disputes balance never paid), customer service_issue c8a00272 (incorrect name on invoice for CRA)
+- **Pattern:** The billing portal auto-calculates 50% of original fee but customers are sometimes quoted a negotiated price — the system doesn't update automatically. This creates surprise charges.
+
+### Severity/Urgency Patterns
+- **Urgent (same-day impact):** Scheduling conflicts, team no-show, access failures — these directly delay listings
+- **Normal:** Invoice corrections, extension confusion, design requests
+- **Low:** Name corrections, pickup confirmations, furniture assembly requests (wrong service)
+
+The 3 urgent CS themes all have a **day-of impact on listing timelines** — which means each unresolved urgent CS issue potentially costs the customer a weekend of showings.
+
+---
+
+## 6. Cold-Call Vendor Spam (Block/Do-Not-Engage Register)
+
+Calls where external parties cold-called Astra to sell services:
+
+| Caller | Company | What They Were Selling |
+|--------|---------|----------------------|
+| Vaibhavi | Sterling Backcheck (+16048812011) | Employment verification service (call 50547a65) |
+| Unknown | "Modern Home Styling Essentials Panorama City" (+15132265145) | Wrong number/possible competitor impersonation (call c4b4628e) |
+| Various | Toronto Blue Jays (+18134052611) | Unclear — asked for Clara Wu specifically (call b7kds6i5) |
+| Unknown recruiter | Indeed/job platform | Multiple co-op/intern inquiries from students (calls 3d0cef21, 8255c36c, e46cae90, 3munb7hj, etc.) |
+| Darcy | Unknown staging company | Wanted to sell/show a "staging product" to Clara (call 2e14fea8) |
+| Film set dresser | Unknown | Asked about jobs (call 3munb7hj) |
+| Trade show caller | Chicago/Rosemont venue | Wanted to rent staging furniture for trade show booth — wrong market (call 9af532d7) |
+
+**Recommendation:** The volume of co-op/job inquiries (6+ calls) suggests Astra's number is circulating on job boards. If this is unwanted, remove the phone number from any Indeed or LinkedIn job postings not actively recruiting.
 
 ---
 
 ## 7. Concrete CRM / Process Recommendations
 
-### 1. Implement "Timeline Qualification" at Minute 1
-**Data:** Won calls ask "When are we looking to get it staged?" early. Lost calls from timeline mismatch (`cd62afc9`) could have been qualified out faster.
+### Rec 1: Mandate the "When are you hoping to list?" question in the first 90 seconds
+**Evidence:** 8 of the 11 clearly "won" same-call transactions had a specific listing date established within the first 2 turns. 0 of the lost calls established a date early. Aashika does this naturally ("Do we have a rough timeline?"); the pool agents skip it 40% of the time.
+**Action:** Add as a required CRM field that cannot be left blank on any quote. If customer says "ASAP" or "I don't know," agents should probe: *"Are we thinking weeks or months?"*
 
-**Action:** Add mandatory field in CRM: "Staging Date Needed" — required before quote generation. If <5 days and calendar is full, trigger waitlist protocol instead of standard quote flow.
+### Rec 2: Standardize the 48-hour pre-staging access confirmation call
+**Evidence:** 9 access-failure CS incidents, all preventable. Calls like 858183a2 (team went to wrong address), ac22e44f (photographer couldn't find lockbox), and the Woodrow/Destiny building saga (xX series) all trace to zero pre-day access verification.
+**Action:** Create a checklist item fired automatically 48 hours before every staging: (1) confirm lockbox code, (2) confirm elevator booking window, (3) confirm who will be on-site. Phone call required, not email.
 
----
+### Rec 3: Fix the agent identity problem on the Kenneth line immediately
+**Evidence:** Customers hear "Emongi," "Amagi," "Himandi," "Amanda," and "Amandhi" when calling the main line. In call 00625c9e, the agent said "Advanced Locksmith" instead of "Astra Staging." In call 3m506k74, the customer said: *"Oh, this is Aashika. I I can swear. That's why I'm like, I thought we had the same same type of voice."*
+**Action:** Every agent must answer with: *"Hello, Astra Staging, [first name] speaking."* Run a 30-minute training. This is a brand trust issue, not a minor quirk.
 
-### 2. Create "Price Objection Playbook" with Pre-Approved Tiers
-**Data:** 18 price objections recorded. Aashika successfully negotiates ~60% by offering:
-- Reduced scope (main floor only): `4dca6b46`
-- Extended term (45 days instead of 30): `d1c911b5`
-- Photography bundle: `5da13ea0`
+### Rec 4: Build a pricing discrepancy prevention workflow between negotiated price and CRM quote
+**Evidence:** Multiple billing CS calls (5cbpgks9, Y8zgxSyCHWFP, f815377b) where the customer was verbally quoted $X, but the system generated $X+Y. The portal auto-calculates 50% of *original* fee for extensions, but agents often negotiate a lower base, making the auto-calc wrong.
+**Action:** Add a "negotiated base price" field that overrides the auto-calc for extensions. Lock the quote PDF immediately after verbal agreement. No extension invoice should generate from the original fee if the base was modified.
 
-**Action:** Document three pre-approved discount tiers:
-- Tier 1: 15-20% off list (standard promo)
-- Tier 2: 25-30% off + extended to 45 days (for realtors with volume potential)
-- Tier 3: Scope reduction (remove bedrooms/basement) with clear price delta
+### Rec 5: Create a HVAC/Moving-Damage incident checklist — minimum 3 known cases
+**Evidence:** Call c0a24108 (HVAC door damaged during delivery at 5 Everson, property listing day ruined), call fdeeba2b (mattress accidentally taken during destaging), call 2020b159 (portal loop bug causes extension overcharge, precursor to CS friction).
+**Action:** Add a "damage/incident" flag in the post-staging checklist. Stager must complete a room-by-room condition check with photos before leaving. Share photos with customer same day. This creates a paper trail and catches issues before they become disputes.
 
----
-
-### 3. Add "Design Preview Request" Workflow
-**Data:** 5 customers objected to committing without seeing furniture selections. Current response: "design links sent 24-48 hours before staging" — creates friction.
-
-**Action:** Create shareable portfolio deck by property type (condo <800sqft, townhouse, detached 2000+sqft). When customer asks "can I see what you'll bring?", agent responds: "I'll send you 3 similar properties we staged last month within 10 minutes."
-
-Quote from `592b93dd`: "I could share some recent MLS listings with you" — this worked.
-
----
-
-### 4. HVAC/Door Damage Incident Checklist
-**Data:** `c0a24108` — HVAC door damaged, customer has listing tomorrow. No documented escalation protocol apparent.
-
-**Action:** Add pre-staging checklist item: "Photograph all doors/entry points before moving furniture." Create emergency vendor list for same-day door repairs (current gap: customer waiting for resolution with listing imminent).
-
----
-
-### 5. Deposit Collection Enforcement
-**Data:** `n8pt8cmpg` — Lucy confirmed for Monday staging, deposit never collected. Aashika discovered mid-follow-up: "I just realized deposit had not yet been received."
-
-**Action:** Automate deposit reminder 72 hours before staging. Block calendar slot release until deposit confirmed in system. Quote from that call: "If you can kindly make the deposit to confirm and book your spot."
-
----
-
-### 6. Wrong-Number/Service-Mismatch Quick Disqualification
-**Data:** 5 calls wasted on:
-- Furniture assembly request (`lojhfv13`)
-- Stage steps for event hall (`6eb6cd30`)
-- Parry Sound (out of area) (`d67fce7e`)
-
-**Action:** Train agents on 15-second disqualification script: "Astra Staging provides home staging for real estate sales in the GTA. Is that what you're looking for?" — saves 3-5 minutes per mismatch call.
-
----
-
-## Summary Metrics
-
-| KPI | Value |
-|-----|-------|
-| Won deals in corpus | 8 |
-| Lost deals in corpus | 12 |
-| Pending (strong next step) | 45 |
-| Pending (weak/no next step) | 23 |
-| Average quoted price | $2,400-$3,200 |
-| Most common discount | 20-30% off list |
-| Average days on market (cited) | 29 days (March) |
-| Consultation scheduling rate | 78% when offered |
+### Rec 6: Deploy Aashika's "29-day average DOM" stat as a scripted objection response for "market is too slow to stage"
+**Evidence:** Aashika deployed this in call 386mjvgb7 and call bc7b427c with measurable impact — both calls shifted from "maybe never" to "let me see." No other agent used data-backed counters; pool agents just repeated discount offers, which is weaker.
+**Action:** Add to the CRM objection script: *"Properties we staged last month sold in an average of 29 days. Would it help if I sent you a few recent examples?"* Update the stat monthly. This is Astra's strongest conversion tool and it's being used by one out of four agents.
