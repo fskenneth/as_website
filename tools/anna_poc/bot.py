@@ -36,6 +36,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from tools import quote_engine  # noqa: E402
+from tools.gmail_sender import GmailSender, GmailSendError  # noqa: E402
 
 from pipecat.adapters.schemas.function_schema import FunctionSchema  # noqa: E402
 from pipecat.adapters.schemas.tools_schema import ToolsSchema  # noqa: E402
@@ -68,6 +69,13 @@ ANNA_VOICE = os.getenv("ANNA_VOICE", "aura-2-thalia-en")
 ANNA_MODEL = os.getenv("ANNA_MODEL", "claude-haiku-4-5-20251001")
 
 ESCALATION_LOG = Path(__file__).parent / "escalations.log"
+
+# Comma-separated list of recipients for escalation emails. Falls back to the
+# Toky-pipeline default (kenneth + clara). Setting ANNA_ESCALATION_EMAIL=""
+# disables email notifications (logs only).
+ANNA_ESCALATION_EMAIL = os.getenv(
+    "ANNA_ESCALATION_EMAIL", "kenneth@astrastaging.com,clara@astrastaging.com"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -362,6 +370,61 @@ ESCALATE_SCHEMA = FunctionSchema(
 )
 
 
+def _format_escalation_email(record: dict) -> tuple[str, str, str]:
+    """Build (subject, html, text) for an escalation alert email."""
+    urgency = (record.get("urgency") or "medium").upper()
+    issue = (record.get("issue_type") or "other").replace("_", " ")
+    name = record.get("caller_name") or "Unknown caller"
+    subject = f"[Anna · {urgency}] {issue} — {name}"
+
+    rows = [
+        ("Time (UTC)", record.get("ts")),
+        ("Urgency", record.get("urgency")),
+        ("Issue type", record.get("issue_type")),
+        ("Caller", record.get("caller_name")),
+        ("Phone", record.get("caller_phone")),
+        ("Property", record.get("property_address")),
+    ]
+    html_rows = "".join(
+        f"<tr><td style='padding:4px 12px 4px 0;color:#666'>{k}</td>"
+        f"<td style='padding:4px 0'>{v or '—'}</td></tr>"
+        for k, v in rows
+    )
+    summary = record.get("summary") or "(no summary)"
+    html = (
+        f"<p>Anna escalated a call.</p>"
+        f"<table style='font-family:-apple-system,sans-serif;font-size:14px'>"
+        f"{html_rows}</table>"
+        f"<p style='margin-top:18px'><strong>What the caller said:</strong></p>"
+        f"<p style='border-left:3px solid #ccc;padding-left:12px;color:#333'>"
+        f"{summary}</p>"
+    )
+    text_lines = [f"{k}: {v or '—'}" for k, v in rows]
+    text_lines += ["", "Summary:", summary]
+    return subject, html, "\n".join(text_lines)
+
+
+def _send_escalation_email(record: dict) -> None:
+    """Best-effort email notification. Logs and swallows errors."""
+    if not ANNA_ESCALATION_EMAIL.strip():
+        return
+    recipients = [r.strip() for r in ANNA_ESCALATION_EMAIL.split(",") if r.strip()]
+    if not recipients:
+        return
+    subject, html, text = _format_escalation_email(record)
+    try:
+        sender = GmailSender(sender_name="Anna (Astra Staging)")
+        sender.send_email(
+            to_email=recipients,
+            subject=subject,
+            html_content=html,
+            text_content=text,
+        )
+        logger.info(f"escalation email sent to {recipients}")
+    except (GmailSendError, Exception) as e:  # noqa: BLE001 — fail-soft
+        logger.warning(f"escalation email failed: {e}")
+
+
 async def _handle_escalate(params: FunctionCallParams) -> None:
     args = params.arguments or {}
     record = {
@@ -382,6 +445,7 @@ async def _handle_escalate(params: FunctionCallParams) -> None:
         return
 
     logger.info(f"escalation logged: {record}")
+    _send_escalation_email(record)
 
     callback_window = {
         "high": "right away",

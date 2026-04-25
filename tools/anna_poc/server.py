@@ -6,8 +6,10 @@
 """
 
 import asyncio
+import os
 from pathlib import Path
 
+from aiortc import RTCIceServer
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -27,8 +29,15 @@ STATIC = HERE / "static"
 app = FastAPI(title="Anna Voice POC")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
+# STUN lets aiortc gather a server-reflexive ICE candidate so the browser can
+# reach the droplet's public IP. Harmless on localhost (just an extra UDP
+# round-trip that no peer ends up using).
+_STUN_URLS = os.getenv(
+    "ANNA_STUN_URLS",
+    "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302",
+).split(",")
 webrtc_handler = SmallWebRTCRequestHandler(
-    ice_servers=[],  # localhost only — no STUN needed
+    ice_servers=[RTCIceServer(urls=u.strip()) for u in _STUN_URLS if u.strip()],
 )
 
 

@@ -1,0 +1,18 @@
+[Unit]
+Description=Anna voice agent (Pipecat WebRTC)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/as_website/tools/anna_poc
+EnvironmentFile=/var/www/as_website/.env
+EnvironmentFile=/var/www/as_website/tools/anna_poc/.env
+ExecStart=/var/www/as_website/tools/anna_poc/.venv/bin/python server.py
+Restart=always
+RestartSec=3
+StandardOutput=append:/var/log/anna.log
+StandardError=append:/var/log/anna.log
+
+[Install]
+WantedBy=multi-user.target
