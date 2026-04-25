@@ -2,31 +2,71 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Anna voice test</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#111111" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>Anna — Astra Staging</title>
 <style>
-  body { font-family: -apple-system, system-ui, sans-serif; max-width: 520px;
-         margin: 80px auto; padding: 0 24px; color: #222; }
-  h1 { font-weight: 600; letter-spacing: -0.02em; }
-  button { font: inherit; padding: 14px 28px; border-radius: 999px; border: 0;
-           background: #111; color: #fff; cursor: pointer; }
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+         max-width: 520px; margin: 64px auto; padding: 0 24px; color: #222;
+         padding-bottom: env(safe-area-inset-bottom); -webkit-text-size-adjust: 100%; }
+  h1 { font-weight: 600; letter-spacing: -0.02em; margin: 0 0 12px; }
+  p { line-height: 1.5; }
+  /* Buttons sized for thumb taps (≥48px tall, Apple HIG ≥44px). */
+  button { font: inherit; padding: 16px 32px; border-radius: 999px; border: 0;
+           background: #111; color: #fff; cursor: pointer; min-height: 48px;
+           font-size: 17px; font-weight: 500; -webkit-tap-highlight-color: transparent; }
   button[disabled] { opacity: 0.4; cursor: default; }
   button.stop { background: #c33; }
+  /* font-size:16px on select prevents iOS Safari from zooming on focus. */
   label { display: block; margin-top: 18px; font-size: 14px; color: #444; }
-  select { font: inherit; padding: 10px 12px; border-radius: 8px;
-           border: 1px solid #ccc; background: #fff; min-width: 280px;
-           margin-top: 6px; }
+  select { font: inherit; font-size: 16px; padding: 12px 14px; border-radius: 10px;
+           border: 1px solid #ccc; background: #fff; width: 100%; max-width: 360px;
+           margin-top: 6px; appearance: none; -webkit-appearance: none;
+           background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none' stroke='%23666' stroke-width='1.5'><path d='M1 1l5 5 5-5'/></svg>");
+           background-repeat: no-repeat; background-position: right 14px center;
+           background-size: 12px; padding-right: 38px; }
   select[disabled] { opacity: 0.5; }
   #status { margin-top: 24px; color: #666; font-size: 14px; }
-  #latency { margin-top: 8px; color: #666; font-size: 13px; font-variant-numeric: tabular-nums; }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  #latency { margin-top: 8px; color: #666; font-size: 13px; font-variant-numeric: tabular-nums;
+             min-height: 1.2em; }
+  #error { margin-top: 16px; color: #c33; font-size: 14px; display: none;
+           padding: 12px; background: #fee; border-radius: 8px;
+           border: 1px solid #fcc; line-height: 1.45; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
          background: #ccc; margin-right: 8px; vertical-align: middle; }
   .dot.live { background: #2c2; box-shadow: 0 0 0 4px rgba(34, 204, 34, 0.18); }
+
+  /* Phone screens — tighten margins, full-width controls. */
+  @media (max-width: 520px) {
+    body { margin: 24px auto; padding: 0 18px; }
+    h1 { font-size: 26px; }
+    button { width: 100%; padding: 18px; font-size: 18px; }
+    select, select option { max-width: 100%; }
+    .button-wrap { margin-top: 28px; }
+  }
+
+  /* Dark mode support — follows system preference. */
+  @media (prefers-color-scheme: dark) {
+    :root { color-scheme: dark; }
+    body { background: #111; color: #eee; }
+    h1, p { color: inherit; }
+    label { color: #aaa; }
+    select { background-color: #1c1c1c; color: #eee; border-color: #444; }
+    #status, #latency { color: #999; }
+    #error { background: #4a1717; border-color: #7a2222; color: #f99; }
+    button.stop { background: #c33; }
+  }
 </style>
 </head>
 <body>
-<h1>Anna — voice test</h1>
-<p>Click <strong>Start</strong>, allow the mic, and start talking. Anna will greet you, then chat about anything.</p>
-<label for="voice">Voice (Deepgram Aura-2)</label>
+<h1>Anna — Astra Staging</h1>
+<p>Tap <strong>Start</strong>, allow mic access, and start talking. Anna handles
+   sales questions, quotes, and any service issue you'd normally call us about.</p>
+
+<label for="voice">Voice</label>
 <select id="voice">
   <option value="aura-2-thalia-en">Thalia — clear, conversational (default)</option>
   <option value="aura-2-luna-en">Luna — friendly, younger female</option>
@@ -38,10 +78,14 @@
   <option value="aura-2-arcas-en">Arcas — conversational male</option>
   <option value="aura-2-zeus-en">Zeus — deep, authoritative male</option>
 </select>
-<p style="margin-top: 24px;"><button id="btn">Start</button></p>
+
+<p class="button-wrap" style="margin-top: 24px;"><button id="btn">Start</button></p>
+
 <p id="status"><span class="dot" id="dot"></span><span id="statusText">idle</span></p>
 <p id="latency"></p>
-<audio id="audio" autoplay></audio>
+<div id="error"></div>
+
+<audio id="audio" autoplay playsinline></audio>
 
 <script>
 const btn = document.getElementById('btn');
@@ -49,9 +93,10 @@ const audio = document.getElementById('audio');
 const statusText = document.getElementById('statusText');
 const dot = document.getElementById('dot');
 const latencyEl = document.getElementById('latency');
+const errorEl = document.getElementById('error');
 const voiceSel = document.getElementById('voice');
 
-// Remember last choice across reloads
+// Remember voice across reloads.
 const savedVoice = localStorage.getItem('annaVoice');
 if (savedVoice) voiceSel.value = savedVoice;
 voiceSel.addEventListener('change', () => localStorage.setItem('annaVoice', voiceSel.value));
@@ -60,25 +105,68 @@ let pc = null;
 let micStream = null;
 let lastUserSpeechEnd = 0;
 let firstAudioAt = 0;
+let vadInterval = null;
+let audioContext = null;
 
-function setStatus(text, live=false) {
+function setStatus(text, live = false) {
   statusText.textContent = text;
   dot.classList.toggle('live', live);
 }
 
+function showError(message) {
+  errorEl.textContent = message;
+  errorEl.style.display = 'block';
+}
+
+function clearError() {
+  errorEl.textContent = '';
+  errorEl.style.display = 'none';
+}
+
+// Pre-flight: refuse to start if the browser can't do WebRTC + mic.
+function checkSupport() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showError('This browser can\'t access the microphone. Try Safari or Chrome on iOS, or any modern desktop browser.');
+    btn.disabled = true;
+    return false;
+  }
+  if (!window.RTCPeerConnection) {
+    showError('This browser doesn\'t support WebRTC. Try Safari or Chrome.');
+    btn.disabled = true;
+    return false;
+  }
+  return true;
+}
+
 async function start() {
+  if (!checkSupport()) return;
+  clearError();
   btn.disabled = true;
   setStatus('requesting mic…');
-  micStream = await navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-  });
+
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+  } catch (err) {
+    btn.disabled = false;
+    setStatus('idle');
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      showError('Mic access was denied. On iOS, tap the AA button in the address bar → Website Settings → allow Microphone.');
+    } else if (err.name === 'NotFoundError') {
+      showError('No microphone was found on this device.');
+    } else {
+      showError('Could not access the microphone: ' + err.message);
+    }
+    return;
+  }
 
   pc = new RTCPeerConnection();
 
-  // play remote audio (Anna)
   pc.ontrack = (ev) => {
     audio.srcObject = ev.streams[0];
-    // crude latency probe: time from when remote audio starts flowing
+    // iOS Safari sometimes needs an explicit play() after srcObject is set.
+    audio.play().catch(() => { /* will play once user interacts again */ });
     const track = ev.track;
     track.addEventListener('unmute', () => {
       const now = performance.now();
@@ -90,18 +178,18 @@ async function start() {
     });
   };
 
-  // local mic monitor — detect when user stops speaking, for latency timing
-  const ac = new (window.AudioContext || window.webkitAudioContext)();
-  const src = ac.createMediaStreamSource(micStream);
-  const analyzer = ac.createAnalyser();
+  // Local mic-RMS monitor for the latency timer.
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const src = audioContext.createMediaStreamSource(micStream);
+  const analyzer = audioContext.createAnalyser();
   analyzer.fftSize = 1024;
   src.connect(analyzer);
   const buf = new Uint8Array(analyzer.frequencyBinCount);
   let speaking = false;
-  setInterval(() => {
+  vadInterval = setInterval(() => {
     analyzer.getByteTimeDomainData(buf);
     let sum = 0;
-    for (let i = 0; i < buf.length; i++) { const v = (buf[i]-128)/128; sum += v*v; }
+    for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; sum += v * v; }
     const rms = Math.sqrt(sum / buf.length);
     const isSpeaking = rms > 0.04;
     if (speaking && !isSpeaking) {
@@ -120,20 +208,27 @@ async function start() {
   };
 
   setStatus('negotiating…');
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
+  try {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
 
-  const resp = await fetch('/offer', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sdp: pc.localDescription.sdp,
-      type: pc.localDescription.type,
-      requestData: { voice: voiceSel.value },
-    }),
-  });
-  const answer = await resp.json();
-  await pc.setRemoteDescription(answer);
+    const resp = await fetch('/offer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sdp: pc.localDescription.sdp,
+        type: pc.localDescription.type,
+        requestData: { voice: voiceSel.value },
+      }),
+    });
+    if (!resp.ok) throw new Error(`server returned ${resp.status}`);
+    const answer = await resp.json();
+    await pc.setRemoteDescription(answer);
+  } catch (err) {
+    showError('Could not connect to Anna: ' + err.message);
+    stop();
+    return;
+  }
 
   voiceSel.disabled = true;
   btn.textContent = 'Stop';
@@ -145,14 +240,21 @@ async function start() {
 function stop() {
   if (pc) { pc.close(); pc = null; }
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  if (vadInterval) { clearInterval(vadInterval); vadInterval = null; }
+  if (audioContext) { audioContext.close().catch(() => {}); audioContext = null; }
   voiceSel.disabled = false;
   btn.textContent = 'Start';
   btn.classList.remove('stop');
+  btn.disabled = false;
   btn.onclick = start;
   setStatus('idle');
   latencyEl.textContent = '';
 }
 
+// Tear down cleanly when the user navigates away or backgrounds the tab.
+window.addEventListener('pagehide', stop);
+
+checkSupport();
 btn.onclick = start;
 </script>
 </body>
