@@ -1,11 +1,16 @@
 """
-Workstream A: run Claude Opus over the full 500-call corpus to extract
+Workstream A: run Claude Opus over the full Toky corpus to extract
 sales patterns, objection taxonomy, agent performance, and CS themes.
 
 Strategy: feed Opus
-  - all 411 structured extracts (cheap, structured, dense)
-  - full Deepgram transcripts of the ~165 sales + 15 CS calls (high-signal)
+  - all structured extracts (cheap, structured, dense)
+  - full Deepgram transcripts of high-signal subset (sales + scheduling + CS),
+    budgeted by char count so the prompt fits the 1M context window
   - NO voicemails or cold calls (low signal, would dilute)
+
+Source of truth: data/zoho_sync.db tables toky_calls/toky_extracts/toky_transcripts.
+Falls back to per-callid files in out/ if the DB lookup yields no transcript
+(legacy mac-local extracts have files but no DB rows).
 
 Output: tools/toky_poc/out/analytics_report.md
 """
@@ -13,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import sys
 import time
 from pathlib import Path
@@ -20,20 +26,57 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path("/var/www/as_website") if Path("/var/www/as_website/data/zoho_sync.db").exists() else Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
 
 OUT = Path(__file__).resolve().parent / "out"
+DB = ROOT / "data" / "zoho_sync.db"
 ANTHROPIC_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 if not ANTHROPIC_KEY:
     print("ERROR: ANTHROPIC_API_KEY missing", file=sys.stderr); sys.exit(2)
 
-# Load all extracts
+# Load every call that has an extract. Joins to transcripts so we can attach
+# the diarized text to high-signal subsets later.
 extracts: list[dict] = []
+if DB.exists():
+    conn = sqlite3.connect(str(DB))
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT c.callid, c.direction, c.duration_s, c.agent_id, c.init_dt,
+               e.call_type, e.confidence, e.summary, e.extract_json,
+               t.transcript_text
+        FROM toky_calls c
+        JOIN toky_extracts e ON e.callid = c.callid
+        LEFT JOIN toky_transcripts t ON t.callid = c.callid
+    """).fetchall()
+    conn.close()
+    for r in rows:
+        try:
+            d = json.loads(r["extract_json"] or "{}")
+        except Exception:
+            d = {}
+        # Denormalized columns win over extract_json if both present.
+        d["_callid"] = r["callid"]
+        d["_agent_id"] = r["agent_id"]
+        d["_transcript"] = r["transcript_text"]
+        d.setdefault("call_type", r["call_type"])
+        d.setdefault("confidence", r["confidence"])
+        d.setdefault("summary", r["summary"])
+        extracts.append(d)
+
+# Also pick up any legacy file-based extracts not yet in the DB (older mac
+# run wrote .extract.json but no DB row). Skip duplicates by callid.
+seen_ids = {e["_callid"] for e in extracts}
 for p in sorted(OUT.glob("*.extract.json")):
+    cid = p.stem.replace(".extract", "")
+    if cid in seen_ids:
+        continue
     try:
         d = json.loads(p.read_text())
-        d["_callid"] = p.stem.replace(".extract", "")
+        d["_callid"] = cid
+        d["_agent_id"] = None
+        dg = OUT / f"{cid}.dg.txt"
+        d["_transcript"] = dg.read_text() if dg.exists() else None
         extracts.append(d)
     except Exception:
         pass
@@ -46,13 +89,15 @@ HIGH_SIGNAL = {"sales_new_lead", "sales_follow_up", "scheduling", "customer_serv
 # calls there.
 INCLUDE = HIGH_SIGNAL | {"other"}
 
-bundle_rows: list[str] = []
+bundle_rows: list[tuple[str, str, str, str | None]] = []
 for e in extracts:
-    ct = e.get("call_type", "other")
+    ct = e.get("call_type", "other") or "other"
     if ct not in INCLUDE:
         continue
     callid = e["_callid"]
     line = f"## call {callid}  type={ct}  conf={e.get('confidence')}"
+    if e.get("_agent_id"):
+        line += f"  agent={e['_agent_id']}"
     line += f"\n  summary: {e.get('summary','')}"
     customer = e.get("customer") if isinstance(e.get("customer"), dict) else {}
     if customer.get("name") or customer.get("phone"):
@@ -76,36 +121,29 @@ for e in extracts:
     if cs:
         line += f"\n  cs_task: {cs.get('severity','?')} - {cs.get('title','')}"
 
-    bundle_rows.append((ct, callid, line))
+    bundle_rows.append((ct, callid, line, e.get("_transcript")))
 
 # Attach transcripts only to high-signal calls, prioritizing CS + new_lead + follow_up.
-# Budget ~120k tokens of transcript so total stays under 200k.
+# Budget chars so total prompt comfortably fits 1M context.
 TRANSCRIPT_PRIORITY = [
     "customer_service_issue",
     "sales_new_lead",
     "sales_follow_up",
 ]
-TRANSCRIPT_BUDGET_CHARS = 280_000  # aim for total prompt < 195k tokens
+TRANSCRIPT_BUDGET_CHARS = 1_400_000  # ~350k tokens of transcripts; full prompt stays under 1M
 used_chars = 0
 for pri in TRANSCRIPT_PRIORITY:
-    for i, (ct, callid, line) in enumerate(bundle_rows):
-        if ct != pri:
+    for i, (ct, callid, line, txt) in enumerate(bundle_rows):
+        if ct != pri or not txt:
             continue
-        dg = OUT / f"{callid}.dg.txt"
-        if not dg.exists():
-            continue
-        txt = dg.read_text()
         if used_chars + len(txt) > TRANSCRIPT_BUDGET_CHARS:
             continue
         used_chars += len(txt)
-        bundle_rows[i] = (ct, callid, line + "\n  transcript: " + "\n    " + txt.replace("\n", "\n    "))
+        bundle_rows[i] = (ct, callid, line + "\n  transcript: " + "\n    " + txt.replace("\n", "\n    "), None)
 
-bundle_rows_final = [row[2] for row in bundle_rows]
-bundle_rows = bundle_rows_final  # alias back to the rest of the script
-
-corpus = "\n\n".join(bundle_rows)
-print(f"Loaded {len(extracts)} extracts")
-print(f"Corpus size: {len(corpus)} chars (~{len(corpus)//4} tokens)")
+corpus = "\n\n".join(row[2] for row in bundle_rows)
+print(f"Loaded {len(extracts)} extracts ({len(bundle_rows)} after INCLUDE filter)")
+print(f"Corpus size: {len(corpus)} chars (~{len(corpus)//4} tokens), transcript chars used: {used_chars}")
 
 SYSTEM = """You are a sales-ops analyst for Astra Staging (Toronto home staging).
 You're given the structured analysis of ~400 recent phone calls plus full

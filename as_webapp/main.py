@@ -345,7 +345,7 @@ def _send_draft_email_sync(callid: str) -> None:
     recipients = [
         r.strip() for r in os.getenv(
             "TOKY_DRAFT_EMAIL_TO",
-            "kenneth@astrastaging.com,clara@astrastaging.com",
+            "kenneth@astrastaging.com",
         ).split(",") if r.strip()
     ]
     try:
