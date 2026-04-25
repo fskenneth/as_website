@@ -430,4 +430,8 @@ toky_call_intake.register(rt)         # /calls (+ detail, cs/draft actions), /an
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("as_webapp.main:app", host="0.0.0.0", port=5002, reload=True)
+    _port = int(os.getenv("AS_WEBAPP_PORT", "5002"))
+    # On DO we disable reload — systemd manages restarts and watchfiles
+    # churn on a busy shared box is wasteful. Locally keep the reload for dev.
+    _reload = os.getenv("AS_WEBAPP_RELOAD", "true").lower() in ("1", "true", "yes")
+    uvicorn.run("as_webapp.main:app", host="0.0.0.0", port=_port, reload=_reload)
