@@ -53,15 +53,8 @@ app.mount("/item_management", item_management_app_export)
 app.mount("/zoho_sync", zoho_sync_app_export)
 
 
-@rt("/")
-def root():
-    """Temporary landing. /signin, /portal, /api/* are the real entry points."""
-    return JSONResponse({
-        "service": "as_webapp",
-        "status": "ok",
-        "phase": 3,
-        "hints": ["/signin", "/portal", "/api/v1/hello"],
-    })
+# Root `/` is registered in portal_web/staging_task_board.py — the
+# Task Board is the staff ops home. Unauth users get redirected to /signin.
 
 
 # ---------------- background sync tasks (Phase 3) ----------------
@@ -281,7 +274,7 @@ def _send_draft_email_sync(callid: str) -> None:
         conn.close()
 
     portal_base = os.getenv("PORTAL_PUBLIC_URL", "http://100.114.47.80:5002")
-    portal_link = f"{portal_base}/toky_call_intake/{callid}"
+    portal_link = f"{portal_base}/calls/{callid}"
 
     ct = extract.get("call_type") or "unknown"
     badge = {"sales_new_lead": "#10b981", "sales_follow_up": "#3b82f6",
@@ -432,7 +425,7 @@ async def shutdown():
 portal_api.register(rt)               # /api/v1/* (Bearer token — iOS + Android)
 portal_web.register(app, rt)          # /signin, /portal, /api/auth/*, admin, 3D, stagings
 staging_task_board.register(rt)       # /staging_task_board (+ /stub, /set_date)
-toky_call_intake.register(rt)         # /toky_call_intake (+ detail, cs/draft actions)
+toky_call_intake.register(rt)         # /calls (+ detail, cs/draft actions), /analytics
 
 
 if __name__ == "__main__":

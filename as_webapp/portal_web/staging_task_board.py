@@ -413,14 +413,19 @@ def _style_block():
     tr.data-row.state-inquired td { background: var(--row-inquired); }
 
     tr.date-banner td {
-        background: var(--date-bg); color: var(--date-text);
-        font-weight: 700; font-size: 12px;
-        text-transform: uppercase; letter-spacing: 0.06em;
-        text-align: left; padding: 5px 14px;
-        border-top: 1px solid var(--date-border);
-        border-bottom: 1px solid var(--date-border);
-        position: sticky; top: 41px; z-index: 4;
+        position: sticky; top: 0; z-index: 4;
+        background: var(--accent-soft); color: var(--accent);
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        padding: 6px 14px; font-size: 11px; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.05em;
+        white-space: nowrap;
     }
+    tr.date-banner td.banner-date {
+        font-size: 13px; font-weight: 700; letter-spacing: 0.03em;
+        text-transform: none;
+    }
+    tr.date-banner td.banner-label { opacity: 0.7; }
 
     tr.empty-state td {
         text-align: center; padding: 40px 20px;
@@ -445,7 +450,7 @@ def _style_block():
     }
     .staging-address-row .st-addr {
         font-weight: 600; color: var(--text);
-        flex: 1 1 auto; min-width: 0;
+        flex: 0 1 auto; min-width: 0;
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .staging-address-row .map-link,
@@ -459,10 +464,11 @@ def _style_block():
     .map-link {
         display: inline-flex; align-items: center; justify-content: center;
         width: 22px; height: 22px; border-radius: var(--radius-sm);
-        text-decoration: none; color: var(--text-muted);
-        transition: all 140ms ease; font-size: 14px; line-height: 1;
+        text-decoration: none; color: #ea4335;
+        transition: all 140ms ease;
     }
-    .map-link:hover { background: var(--accent-soft); color: var(--accent); }
+    .map-link:hover { background: #fce8e6; color: #d93025; }
+    .map-link svg { display: block; }
     .staging-address { font-weight: 600; color: var(--text); margin-top: 2px; }
     .sublinks { display: flex; flex-wrap: nowrap; gap: 6px; margin-top: 8px; min-width: 0; }
     .sublinks .sublink { flex-shrink: 0; }
@@ -983,15 +989,16 @@ def _col_staging(row, serial):
         title_bits.append(prop)
     title_line = " ".join(title_bits)
 
-    # Line 2: "— Remaining / 9 in Design".
+    # Line 2: "0 Remaining / 9 in Design".
     # TODO: "Remaining" = items at warehouse that belong to this staging.
-    # Needs a staging→items linkage we don't yet have on this page (Item_Report
-    # only knows Current_Location). Will wire up when the Design view ships.
+    # Needs a staging→items linkage we don't yet have on this page. Defaulting
+    # to 0 (assume items are all on-site) until the Design view ships.
     try:
         in_design = int(str(row["Total_Item_Number"] or 0).split(".")[0])
     except Exception:
         in_design = 0
-    items_line = f"— Remaining / {in_design} in Design"
+    remaining = 0
+    items_line = f"{remaining} Remaining / {in_design} in Design"
 
     # Line 3: "12PM  917-25 Cole St, Toronto  🗺  40mins"
     eta = _fmt_time_short(row["Staging_ETA"] or "")
@@ -1007,8 +1014,14 @@ def _col_staging(row, serial):
         addr_children.append(Span(eta, cls="st-time"))
     addr_children.append(Span(address, cls="st-addr"))
     if maps_url:
+        pin_svg = (
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" '
+            'aria-hidden="true"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s'
+            '7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-'
+            '2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>'
+        )
         addr_children.append(
-            A(NotStr("🗺"), href=maps_url, target="_blank",
+            A(NotStr(pin_svg), href=maps_url, target="_blank",
               cls="map-link", title="Open directions in Google Maps")
         )
     if drive:
@@ -1208,14 +1221,8 @@ def _build_row(row, serial):
 
 
 def _build_table(grouped):
-    headers = Thead(Tr(
-        Th("Staging"), Th("Persons"), Th("Tasks"),
-        Th("Moving Instructions", cls="col-moving"),
-        Th("General Notes", cls="col-notes"),
-        Th("Accounting"),
-        Th("Listing", cls="col-listing"),
-    ))
-
+    # Date banners double as per-group column headers — first cell shows the
+    # date instead of "Staging", the rest carry the column labels.
     body = []
     for date_str, group in grouped:
         d = _parse_mdy(date_str)
@@ -1224,7 +1231,13 @@ def _build_table(grouped):
         if d == date.today():
             banner_text += "  (today)"
         body.append(Tr(
-            Td(banner_text, colspan="7"),
+            Td(banner_text, cls="banner-date"),
+            Td("Persons", cls="banner-label"),
+            Td("Tasks", cls="banner-label"),
+            Td("Moving Instructions", cls="banner-label col-moving"),
+            Td("General Notes", cls="banner-label col-notes"),
+            Td("Accounting", cls="banner-label"),
+            Td("Listing", cls="banner-label col-listing"),
             cls="date-banner", **{"data-date": d_iso},
         ))
         for i, r in enumerate(group, start=1):
@@ -1244,7 +1257,7 @@ def _build_table(grouped):
         style="display:none",
     ))
 
-    return Table(headers, Tbody(*body), cls="board")
+    return Table(Tbody(*body), cls="board")
 
 
 # -------------------- shared record data --------------------
@@ -1966,8 +1979,15 @@ def _full_page(title, body_children, extra_scripts=()):
 
 def register(rt):
 
-    @rt("/staging_task_board")
+    @rt("/")
+    @rt("/staging_task_board")  # legacy — kept so existing bookmarks / links work
     def task_board(request: Request):
+        # Staff-only ops home. Unauth users bounce to /signin.
+        from as_webapp.as_portal_api.employees_db import get_user_by_session
+        token = request.cookies.get("astra_session")
+        user = get_user_by_session(token) if token else None
+        if not user:
+            return RedirectResponse("/signin", status_code=302)
         rows = _fetch_all_stagings()
         employees = _fetch_employees()
         corpus = _build_autocomplete_corpus(rows, employees)

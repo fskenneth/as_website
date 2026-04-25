@@ -2,14 +2,19 @@
 Call Intake — portal page showing structured extracts from Toky calls.
 
 Two views:
-  /toky_call_intake             : list of calls (filter: all / cs / drafts / noise)
-  /toky_call_intake/{callid}    : full detail (transcript + extract + actions)
+  /calls             : list of calls (filter: all / cs / drafts / noise)
+  /calls/{callid}    : full detail (transcript + extract + actions)
 
 POST handlers to flip CS task / draft status:
-  /toky_call_intake/cs/{id}/resolve
-  /toky_call_intake/cs/{id}/reopen
-  /toky_call_intake/draft/{id}/approve
-  /toky_call_intake/draft/{id}/reject
+  /calls/cs/{id}/resolve
+  /calls/cs/{id}/reopen
+  /calls/draft/{id}/approve
+  /calls/draft/{id}/reject
+
+Analytics:
+  /analytics         : Opus Workstream A report + per-type stats
+
+Legacy 301 redirects kept for /toky_call_intake, /toky_analytics, /staff.
 
 Auth: session cookie (same SESSION_COOKIE_NAME used by the rest of the portal).
 Signed-out users bounce to /signin.
@@ -131,7 +136,7 @@ def _page(title: str, *body_children) -> HTMLResponse:
             Div(
                 H1("Call Intake"),
                 Span("Toky → Deepgram → Sonnet → drafts", cls="meta"),
-                A("← Portal", href="/portal", style="margin-left:auto;"),
+                A("← Task Board", href="/", style="margin-left:auto;"),
                 cls="app",
             ),
             Main(*body_children),
@@ -254,7 +259,7 @@ def _render_card(row: dict):
             cls="call-head",
         ),
         Span("›", cls="arrow", style="font-size:24px;"),
-        href=f"/toky_call_intake/{row['callid']}",
+        href=f"/calls/{row['callid']}",
         cls="card",
         style="color:inherit;",
     )
@@ -369,45 +374,19 @@ def _render_analytics_report() -> str:
 
 
 def register(rt):
+    # /staff removed — the ops home is now at / (staging_task_board).
+    # Keep a legacy redirect so old bookmarks don't 404.
     @rt("/staff")
-    def staff_home(request: Request):
-        """Quick-link dashboard for staff tools (bypasses the customer-style
-        /portal view which isn't useful to owners/admins)."""
-        user = _current_user(request)
-        if not user:
-            return RedirectResponse("/signin", status_code=302)
-        name = user.get("first_name") or "there" if isinstance(user, dict) else "there"
-        role = user.get("user_role", "staff") if isinstance(user, dict) else "staff"
+    def staff_redirect(request: Request):
+        return RedirectResponse("/", status_code=301)
 
-        tiles = [
-            ("Call Intake", "/toky_call_intake", "All Toky calls. Review drafts, resolve CS tickets."),
-            ("Toky Analytics", "/toky_analytics", "Opus Workstream A report — sales patterns, objections, scorecards."),
-            ("Staging Task Board", "/staging_task_board", "Daily schedule + milestones per staging."),
-        ]
-
-        tile_html = Div(
-            *[A(
-                H2(name, style="margin:0 0 4px;font-size:16px;"),
-                P(desc, style="margin:0;color:var(--muted);font-size:13px;"),
-                href=url,
-                style=("display:block;padding:16px;background:var(--surface);"
-                       "border:1px solid var(--border);border-radius:10px;"
-                       "color:inherit;text-decoration:none;"),
-            ) for (name, url, desc) in tiles],
-            style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;",
-        )
-
-        return _page(
-            "Staff Home",
-            Div(
-                H1(f"Hi {name}", style="margin:0 0 4px;font-size:20px;"),
-                P(f"Signed in as {role}. Your tools:", cls="meta", style="margin:0 0 14px;"),
-                tile_html,
-                cls="section",
-            ),
-        )
-
+    # /calls renamed to /calls — short, intuitive, fits the
+    # future /emails / /inbox companions.
     @rt("/toky_call_intake")
+    def intake_legacy_redirect(request: Request):
+        return RedirectResponse("/calls", status_code=301)
+
+    @rt("/calls")
     def intake_list(request: Request):
         user = _current_user(request)
         if not user:
@@ -424,7 +403,7 @@ def register(rt):
             *[A(
                 f"{label} ",
                 Span(f"({counts.get(vid, 0)})", cls="meta"),
-                href=f"/toky_call_intake?view={vid}",
+                href=f"/calls?view={vid}",
                 cls=("active" if vid == view else ""),
             ) for vid, label in _VIEWS],
             cls="nav",
@@ -442,7 +421,7 @@ def register(rt):
 
         return _page("Call Intake", nav, body)
 
-    @rt("/toky_call_intake/{callid}")
+    @rt("/calls/{callid}")
     def intake_detail(request: Request, callid: str):
         user = _current_user(request)
         if not user:
@@ -473,7 +452,7 @@ def register(rt):
                 ex = {}
 
         header = Div(
-            A("← Back", href="/toky_call_intake", cls="meta"),
+            A("← Back", href="/calls", cls="meta"),
             H2(ex.get("summary") or "(no summary)", style="margin-top:8px;"),
             Div(
                 Span((ex.get("call_type") or "?").replace("_", " "),
@@ -542,12 +521,12 @@ def register(rt):
                 action = Form(
                     Button("Resolve", cls="btn btn-primary", type="submit"),
                     method="post",
-                    action=f"/toky_call_intake/cs/{t['id']}/resolve",
+                    action=f"/calls/cs/{t['id']}/resolve",
                     style="display:inline;margin-left:8px;",
                 ) if t["status"] == "open" else Form(
                     Button("Reopen", cls="btn", type="submit"),
                     method="post",
-                    action=f"/toky_call_intake/cs/{t['id']}/reopen",
+                    action=f"/calls/cs/{t['id']}/reopen",
                     style="display:inline;margin-left:8px;",
                 )
                 parts.append(Div(
@@ -575,13 +554,13 @@ def register(rt):
                     Form(
                         Button("Approve", cls="btn btn-primary", type="submit"),
                         method="post",
-                        action=f"/toky_call_intake/draft/{d['id']}/approve",
+                        action=f"/calls/draft/{d['id']}/approve",
                         style="display:inline;",
                     ),
                     Form(
                         Button("Reject", cls="btn btn-danger", type="submit"),
                         method="post",
-                        action=f"/toky_call_intake/draft/{d['id']}/reject",
+                        action=f"/calls/draft/{d['id']}/reject",
                         style="display:inline;margin-left:6px;",
                     ),
                 ) if d["status"] == "draft" else (Span(f"status: {d['status']}", cls="meta"),)
@@ -628,6 +607,10 @@ def register(rt):
         return _page(f"Call {callid[:8]}", *sections)
 
     @rt("/toky_analytics")
+    def analytics_legacy_redirect(request: Request):
+        return RedirectResponse("/analytics", status_code=301)
+
+    @rt("/analytics")
     def analytics(request: Request):
         """Render the Opus analytics report (500-call Workstream A signal)."""
         user = _current_user(request)
@@ -662,7 +645,7 @@ def register(rt):
 
         report_html = _render_analytics_report()
         body = Div(
-            A("← Back to Call Intake", href="/toky_call_intake", cls="meta"),
+            A("← Back to Call Intake", href="/calls", cls="meta"),
             cls="section",
             style="padding:8px 16px;",
         )
@@ -691,7 +674,7 @@ def register(rt):
             Div(NotStr(report_html), cls="section report"),
         )
 
-    @rt("/toky_call_intake/cs/{task_id}/resolve", methods=["POST"])
+    @rt("/calls/cs/{task_id}/resolve", methods=["POST"])
     async def cs_resolve(request: Request, task_id: str):
         user = _current_user(request)
         if not user:
@@ -704,10 +687,10 @@ def register(rt):
             )
             callid = c.execute("SELECT callid FROM toky_cs_tasks WHERE id = ?", (task_id,)).fetchone()
             c.commit()
-        dest = f"/toky_call_intake/{callid[0]}" if callid else "/toky_call_intake"
+        dest = f"/calls/{callid[0]}" if callid else "/calls"
         return RedirectResponse(dest, status_code=303)
 
-    @rt("/toky_call_intake/cs/{task_id}/reopen", methods=["POST"])
+    @rt("/calls/cs/{task_id}/reopen", methods=["POST"])
     async def cs_reopen(request: Request, task_id: str):
         user = _current_user(request)
         if not user:
@@ -716,10 +699,10 @@ def register(rt):
             c.execute("UPDATE toky_cs_tasks SET status = 'open', resolved_at = NULL WHERE id = ?", (task_id,))
             callid = c.execute("SELECT callid FROM toky_cs_tasks WHERE id = ?", (task_id,)).fetchone()
             c.commit()
-        dest = f"/toky_call_intake/{callid[0]}" if callid else "/toky_call_intake"
+        dest = f"/calls/{callid[0]}" if callid else "/calls"
         return RedirectResponse(dest, status_code=303)
 
-    @rt("/toky_call_intake/draft/{draft_id}/approve", methods=["POST"])
+    @rt("/calls/draft/{draft_id}/approve", methods=["POST"])
     async def draft_approve(request: Request, draft_id: str):
         user = _current_user(request)
         if not user:
@@ -731,10 +714,10 @@ def register(rt):
             )
             callid = c.execute("SELECT callid FROM toky_staging_drafts WHERE id = ?", (draft_id,)).fetchone()
             c.commit()
-        dest = f"/toky_call_intake/{callid[0]}" if callid else "/toky_call_intake"
+        dest = f"/calls/{callid[0]}" if callid else "/calls"
         return RedirectResponse(dest, status_code=303)
 
-    @rt("/toky_call_intake/draft/{draft_id}/reject", methods=["POST"])
+    @rt("/calls/draft/{draft_id}/reject", methods=["POST"])
     async def draft_reject(request: Request, draft_id: str):
         user = _current_user(request)
         if not user:
@@ -743,5 +726,5 @@ def register(rt):
             c.execute("UPDATE toky_staging_drafts SET status = 'rejected' WHERE id = ?", (draft_id,))
             callid = c.execute("SELECT callid FROM toky_staging_drafts WHERE id = ?", (draft_id,)).fetchone()
             c.commit()
-        dest = f"/toky_call_intake/{callid[0]}" if callid else "/toky_call_intake"
+        dest = f"/calls/{callid[0]}" if callid else "/calls"
         return RedirectResponse(dest, status_code=303)
