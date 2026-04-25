@@ -1,8 +1,8 @@
 """
-Workstream A: run Claude Opus over the full Toky corpus to extract
+Workstream A: run Claude Sonnet 4.6 1M over the full Toky corpus to extract
 sales patterns, objection taxonomy, agent performance, and CS themes.
 
-Strategy: feed Opus
+Strategy: feed the model
   - all structured extracts (cheap, structured, dense)
   - full Deepgram transcripts of high-signal subset (sales + scheduling + CS),
     budgeted by char count so the prompt fits the 1M context window
@@ -207,7 +207,7 @@ headers = {
     "content-type": "application/json",
 }
 
-print("calling Opus...")
+print("calling Sonnet 4.6...")
 t0 = time.time()
 with httpx.Client(timeout=600.0) as c:
     r = c.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
@@ -222,7 +222,7 @@ usage = body.get("usage", {})
 report_parts = [blk["text"] for blk in body.get("content", []) if blk.get("type") == "text"]
 report = "\n\n".join(report_parts)
 
-# Opus pricing: check actual billing — recent public rate is ~$15/$75 per M.
+# Sonnet 4.6 1M pricing: $3/M input + $15/M output up to 200k; $6/$22.50 above.
 in_toks = usage.get("input_tokens", 0) + usage.get("cache_read_input_tokens", 0) + usage.get("cache_creation_input_tokens", 0)
 out_toks = usage.get("output_tokens", 0)
 in_rate = 6.0 if in_toks > 200_000 else 3.0

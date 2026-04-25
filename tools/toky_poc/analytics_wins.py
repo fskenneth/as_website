@@ -1,5 +1,5 @@
 """Run Sonnet 4.6 over just the win-cohort calls (n=~185 after backfill
-completed). Reuses the corpus-builder from analytics_opus.py but
+completed). Reuses the corpus-builder from analytics.py but
 filters to callids in wins_mapping.json."""
 import json, os, sqlite3, sys, time
 from pathlib import Path

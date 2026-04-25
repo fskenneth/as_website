@@ -269,14 +269,14 @@ def _render_card(row: dict):
 
 
 _ANALYTICS_VIEWS = {
-    "all":    ("analytics_report.md",          "tools/toky_poc/analytics_opus.py"),
+    "all":    ("analytics_report.md",          "tools/toky_poc/analytics.py"),
     "wins":   ("wins_only_analytics.md",       "tools/toky_poc/analytics_wins.py"),
-    "emails": ("email_analytics_report.md",    "tools/toky_poc/analytics_opus_emails.py"),
+    "emails": ("email_analytics_report.md",    "tools/toky_poc/analytics_emails.py"),
 }
 
 
 def _render_analytics_report(view: str = "all") -> str:
-    """Minimal markdown → HTML converter for the Opus analytics report.
+    """Minimal markdown → HTML converter for the analytics report.
     Supports: # / ## / ### headings, **bold**, tables, ordered/unordered lists,
     blockquotes, inline code. Anything fancier and we'd add a real lib."""
     import html as _html

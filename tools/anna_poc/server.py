@@ -56,9 +56,6 @@ PREVIEW_VOICES: set[str] = {
     "aura-2-stella-en",
     "aura-2-athena-en",
     "aura-2-hera-en",
-    "aura-2-orion-en",
-    "aura-2-arcas-en",
-    "aura-2-zeus-en",
 }
 _preview_cache: dict[str, bytes] = {}
 _preview_lock = asyncio.Lock()

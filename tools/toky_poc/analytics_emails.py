@@ -1,10 +1,10 @@
 """
-Run Claude Opus over the email_extracts corpus to surface sales patterns,
-quote→close behavior, objection themes, response-time signals, and
-recurring customer-service issues across email.
+Run Claude Sonnet 4.6 1M over the email_extracts corpus to surface sales
+patterns, quote→close behavior, objection themes, response-time signals,
+and recurring customer-service issues across email.
 
-Mirrors analytics_opus.py (call side). Reads from data/email.db on the
-host where email_extract.py wrote — designed to run on DO.
+Mirrors analytics.py (call side). Reads from data/email.db on the host
+where email_extract.py wrote — designed to run on DO.
 
 Output: tools/toky_poc/out/email_analytics_report.md
 """
@@ -207,7 +207,7 @@ Write in dense, scannable markdown. Expect a savvy business reader who hates flu
         "content-type": "application/json",
     }
 
-    print("calling Opus...")
+    print("calling Sonnet 4.6...")
     t0 = time.time()
     with httpx.Client(timeout=900.0) as c:
         r = c.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
