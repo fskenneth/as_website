@@ -380,11 +380,16 @@ def register(rt):
     def staff_redirect(request: Request):
         return RedirectResponse("/", status_code=301)
 
-    # /calls renamed to /calls — short, intuitive, fits the
-    # future /emails / /inbox companions.
+    # /toky_call_intake renamed to /calls — short, intuitive, fits the
+    # future /emails / /inbox companions. Legacy redirects cover both
+    # the list URL and the detail URL shape.
     @rt("/toky_call_intake")
     def intake_legacy_redirect(request: Request):
         return RedirectResponse("/calls", status_code=301)
+
+    @rt("/toky_call_intake/{callid}")
+    def intake_detail_legacy_redirect(request: Request, callid: str):
+        return RedirectResponse(f"/calls/{callid}", status_code=301)
 
     @rt("/calls")
     def intake_list(request: Request):
