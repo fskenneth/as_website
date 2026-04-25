@@ -327,9 +327,11 @@ def _style_block():
     /* ---------- layout ---------- */
     .app-shell { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
     .toolbar {
-        flex: 0 0 var(--toolbar-h);
+        flex: 0 0 auto;
         display: flex; align-items: center; gap: 12px;
-        padding: 0 16px;
+        flex-wrap: wrap; row-gap: 8px;
+        padding: 8px 16px;
+        min-height: var(--toolbar-h);
         background: var(--surface); border-bottom: 1px solid var(--border);
         box-shadow: var(--shadow-sm); z-index: 20;
     }
@@ -346,6 +348,7 @@ def _style_block():
         border: 1px solid var(--border); border-radius: var(--radius-md);
         cursor: pointer; transition: all 140ms ease;
         font-family: inherit; white-space: nowrap;
+        flex-shrink: 0; max-width: 100%; overflow: hidden;
     }
     .tbtn:hover { background: var(--surface-2); border-color: var(--border-strong); }
     .tbtn.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
@@ -630,7 +633,7 @@ def _style_block():
     .scroll-area::-webkit-scrollbar-thumb, .modal-card::-webkit-scrollbar-thumb, .notes::-webkit-scrollbar-thumb, .search-suggest::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; border: 2px solid var(--bg); }
 
     /* ---------- view switcher ---------- */
-    .view-seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 3px; gap: 2px; }
+    .view-seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 3px; gap: 2px; flex-shrink: 0; }
     .view-seg button {
         all: unset; box-sizing: border-box; cursor: pointer; font-family: inherit;
         padding: 6px 12px; font-size: 12px; font-weight: 500; color: var(--text-muted);
@@ -1983,7 +1986,11 @@ def register(rt):
     @rt("/staging_task_board")  # legacy — kept so existing bookmarks / links work
     def task_board(request: Request):
         # Staff-only ops home. Unauth users bounce to /signin.
-        from as_webapp.as_portal_api.employees_db import get_user_by_session
+        # Use tools.user_db (data/customers.db) — same DB the Google OAuth
+        # + email signin handlers write sessions to. Reading from
+        # employees_db.py here would miss those sessions and cause a
+        # /signin <-> / redirect loop.
+        from tools.user_db import get_user_by_session
         token = request.cookies.get("astra_session")
         user = get_user_by_session(token) if token else None
         if not user:

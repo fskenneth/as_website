@@ -34,7 +34,10 @@ from fasthtml.common import (
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, RedirectResponse
 
-from as_webapp.as_portal_api.employees_db import get_user_by_session
+# Use tools.user_db (data/customers.db) — same DB the web sign-in path
+# writes sessions to. Mobile API in as_portal_api uses employees.db
+# (a separate auth namespace).
+from tools.user_db import get_user_by_session
 
 SESSION_COOKIE_NAME = "astra_session"
 
