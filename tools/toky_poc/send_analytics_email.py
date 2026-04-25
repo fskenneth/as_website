@@ -24,6 +24,9 @@ from pathlib import Path
 ROOT = Path("/var/www/as_website") if Path("/var/www/as_website/tools").exists() else Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from dotenv import load_dotenv
+load_dotenv(ROOT / ".env")
+
 from tools.gmail_sender import GmailSender
 
 OUT = ROOT / "tools" / "toky_poc" / "out"
