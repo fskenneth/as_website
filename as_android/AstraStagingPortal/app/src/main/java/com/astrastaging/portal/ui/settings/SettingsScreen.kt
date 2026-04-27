@@ -61,6 +61,7 @@ fun SettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val settings = remember { AppSettings(appContext) }
     val captures = remember { CaptureRepository(appContext) }
     val wifiOnly by settings.wifiOnlyMediaUpload.collectAsStateWithLifecycle(initialValue = true)
+    val enterToSend by settings.enterToSend.collectAsStateWithLifecycle(initialValue = true)
     val pendingCount by captures.pendingCount().collectAsStateWithLifecycle(initialValue = 0)
     val pendingCaptures by captures.observePending()
         .collectAsStateWithLifecycle(initialValue = emptyList<com.astrastaging.portal.data.media.CaptureEntity>())
@@ -124,6 +125,41 @@ fun SettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                             settings.setWifiOnlyMediaUpload(newValue)
                             captures.scheduleUpload(wifiOnly = newValue)
                         }
+                    }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+        Text(
+            "CHAT",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Enter to Send",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        "Off: pressing return inserts a newline; tap the send button to send.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = enterToSend,
+                    onCheckedChange = { newValue ->
+                        scope.launch { settings.setEnterToSend(newValue) }
                     }
                 )
             }

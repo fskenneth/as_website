@@ -35,6 +35,20 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Chat") {
+                Toggle(isOn: Binding(
+                    get: { settings.enterToSend },
+                    set: { settings.enterToSend = $0 }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Enter to Send")
+                        Text("Off: pressing return inserts a newline; tap the send button to send.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
             Section("Appearance") {
                 Picker("Mode", selection: Binding(
                     get: { settings.themeMode },

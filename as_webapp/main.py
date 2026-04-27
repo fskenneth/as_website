@@ -36,12 +36,81 @@ from tools.zoho_sync.write_service import write_service
 from tools.zoho_sync.page_sync_service import PageSyncService
 
 from as_webapp.as_portal_api import routes as portal_api
+from as_webapp.as_portal_api import chat_routes
 from as_webapp.portal_web import routes as portal_web
 from as_webapp.portal_web import staging_task_board
 from as_webapp.portal_web import toky_call_intake
+from as_webapp.portal_web import chat_web
 
 
 app, rt = fast_app(live=False)
+
+
+# ---------------- chat widget injector ----------------
+
+_CHAT_WIDGET_TAG = b'<script src="/static/chat_widget.js" defer></script>'
+
+
+class ChatWidgetInjector:
+    """ASGI middleware that appends the chat FAB script to every HTML
+    response so the floating chat button appears on every page (signin,
+    portal, task board, calls, etc.). The /chat page itself is skipped to
+    avoid recursion when the panel iframes /chat back into itself."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        path = scope.get("path", "")
+        if path == "/chat" or path.startswith("/chat/"):
+            await self.app(scope, receive, send)
+            return
+
+        is_html = False
+        body_buf = bytearray()
+        start_msg = None
+
+        async def _send(msg):
+            nonlocal is_html, start_msg
+            if msg["type"] == "http.response.start":
+                start_msg = msg
+                for k, v in msg.get("headers", []):
+                    if k.lower() == b"content-type" and b"text/html" in v.lower():
+                        is_html = True
+                        break
+                if not is_html:
+                    await send(msg)
+                return
+            if msg["type"] == "http.response.body":
+                if not is_html:
+                    await send(msg)
+                    return
+                body_buf.extend(msg.get("body", b""))
+                if msg.get("more_body"):
+                    return
+                # Final chunk — mutate and flush.
+                idx = body_buf.rfind(b"</body>")
+                if idx == -1:
+                    new_body = bytes(body_buf) + _CHAT_WIDGET_TAG
+                else:
+                    new_body = bytes(body_buf[:idx]) + _CHAT_WIDGET_TAG + bytes(body_buf[idx:])
+                # Strip stale Content-Length.
+                hdrs = [
+                    (k, v) for k, v in start_msg.get("headers", [])
+                    if k.lower() != b"content-length"
+                ]
+                hdrs.append((b"content-length", str(len(new_body)).encode()))
+                start_msg["headers"] = hdrs
+                await send(start_msg)
+                await send({"type": "http.response.body", "body": new_body})
+
+        await self.app(scope, receive, _send)
+
+
+app.add_middleware(ChatWidgetInjector)
 
 
 # Static mount — images, CSS, 3D models live in static/. Both servers serve
@@ -423,9 +492,11 @@ async def shutdown():
 
 # Register routes
 portal_api.register(rt)               # /api/v1/* (Bearer token — iOS + Android)
+chat_routes.register(rt)              # /api/v1/chat/* (+ SSE)
 portal_web.register(app, rt)          # /signin, /portal, /api/auth/*, admin, 3D, stagings
 staging_task_board.register(rt)       # /staging_task_board (+ /stub, /set_date)
 toky_call_intake.register(rt)         # /calls (+ detail, cs/draft actions), /analytics
+chat_web.register(rt)                 # /chat (web UI)
 
 
 if __name__ == "__main__":

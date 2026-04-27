@@ -85,6 +85,8 @@ enum AccentTheme: String, CaseIterable, Identifiable {
     }
 }
 
+enum ChatFabSide: String { case left, right }
+
 @Observable
 @MainActor
 final class AppSettings {
@@ -94,6 +96,9 @@ final class AppSettings {
     private let wifiOnlyKey = "settings.wifiOnlyMediaUpload"
     private let themeModeKey = "settings.themeMode"
     private let accentKey = "settings.accentTheme"
+    private let enterToSendKey = "settings.enterToSend"
+    private let fabSideKey = "settings.chatFabSide"
+    private let fabYFractionKey = "settings.chatFabYFraction"
 
     var wifiOnlyMediaUpload: Bool {
         didSet { defaults.set(wifiOnlyMediaUpload, forKey: wifiOnlyKey) }
@@ -107,13 +112,36 @@ final class AppSettings {
         didSet { defaults.set(accent.rawValue, forKey: accentKey) }
     }
 
+    var enterToSend: Bool {
+        didSet { defaults.set(enterToSend, forKey: enterToSendKey) }
+    }
+
+    var chatFabSide: ChatFabSide {
+        didSet { defaults.set(chatFabSide.rawValue, forKey: fabSideKey) }
+    }
+
+    /// 0 = top of available area, 1 = bottom. The FAB view clamps and
+    /// applies its own padding so this stays portable across screen sizes.
+    var chatFabYFraction: Double {
+        didSet { defaults.set(chatFabYFraction, forKey: fabYFractionKey) }
+    }
+
     init() {
         if defaults.object(forKey: wifiOnlyKey) == nil {
             defaults.set(true, forKey: wifiOnlyKey)
         }
+        if defaults.object(forKey: enterToSendKey) == nil {
+            defaults.set(true, forKey: enterToSendKey)
+        }
+        if defaults.object(forKey: fabYFractionKey) == nil {
+            defaults.set(0.85, forKey: fabYFractionKey)  // default sits low, near old position
+        }
         self.wifiOnlyMediaUpload = defaults.bool(forKey: wifiOnlyKey)
         self.themeMode = ThemeMode(rawValue: defaults.string(forKey: themeModeKey) ?? "") ?? .auto
         self.accent = AccentTheme(rawValue: defaults.string(forKey: accentKey) ?? "") ?? .slate
+        self.enterToSend = defaults.bool(forKey: enterToSendKey)
+        self.chatFabSide = ChatFabSide(rawValue: defaults.string(forKey: fabSideKey) ?? "") ?? .right
+        self.chatFabYFraction = defaults.double(forKey: fabYFractionKey)
     }
 }
 

@@ -17,6 +17,7 @@ import UIKit
 
 struct MainTabView: View {
     @Environment(AuthStore.self) private var auth
+    @Environment(ChatStore.self) private var chat
     @State private var prefs = MenuPreferences()
     @State private var selected: MenuItem = .tasks
     @State private var moreOpen = false
@@ -28,6 +29,16 @@ struct MainTabView: View {
     private var overflowItems: [MenuItem] { prefs.overflowItems(for: roleLevel) }
     private var activeItem: MenuItem {
         visibleItems.contains(selected) ? selected : (visibleItems.first ?? .tasks)
+    }
+    /// Total unread count across all conversations — drives the FAB badge
+    /// and the dock chat-button badge (when chat is on the dock).
+    private var unreadCount: Int {
+        chat.conversations.reduce(0) { $0 + ($1.unread_count ?? 0) }
+    }
+    /// FAB is redundant when chat is reachable from the dock or when the
+    /// user is already in the chat tab — hide it in those cases.
+    private var showChatFAB: Bool {
+        !dockItems.contains(.chat) && activeItem != .chat
     }
 
     var body: some View {
@@ -49,11 +60,28 @@ struct MainTabView: View {
                     selected: activeItem,
                     showMore: !overflowItems.isEmpty,
                     moreActive: moreOpen,
+                    chatBadge: unreadCount,
                     onSelect: { selected = $0 },
                     onMore: { moreOpen = true },
-                    onLongPress: enterEditMode
+                    onLongPress: enterEditMode,
+                    onDragStart: enterEditMode
                 )
             }
+
+            // Floating chat button — hidden when chat is reachable from the
+            // dock or already on screen. Drag-and-snap when shown.
+            if showChatFAB {
+                DraggableChatFAB(onTap: { selected = .chat })
+                    .zIndex(5)
+            }
+
+            // Top-of-screen toast banner for incoming chat messages. Tap
+            // jumps to the chat tab; auto-dismisses after a few seconds.
+            ChatToastBanner { selected = .chat }
+                .padding(.top, 8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .allowsHitTesting(true)
+                .zIndex(6)
 
             if editMode {
                 EditMenuOverlay(
@@ -102,6 +130,7 @@ struct MainTabView: View {
         case .items:        ItemsView()
         case .me:           MeView()
         case .consultation: ConsultationView()
+        case .chat:         ChatListView()
         case .sales:        SalesManagementView()
         case .hr:           HRAccountingView()
         }
@@ -115,9 +144,14 @@ private struct DockBar: View {
     let selected: MenuItem
     let showMore: Bool
     let moreActive: Bool
+    let chatBadge: Int
     let onSelect: (MenuItem) -> Void
     let onMore: () -> Void
     let onLongPress: () -> Void
+    /// Fires the moment a `.draggable` preview appears for one of the dock
+    /// items. We use this to flip into edit mode in the same gesture, so
+    /// the user can keep dragging without releasing and re-pressing.
+    let onDragStart: () -> Void
 
     var body: some View {
         HStack(spacing: 0) {
@@ -126,8 +160,11 @@ private struct DockBar: View {
                     label: item.label,
                     symbol: item.sfSymbol,
                     active: item == selected,
+                    badge: item == .chat ? chatBadge : 0,
                     action: { onSelect(item) },
-                    onLongPress: onLongPress
+                    onLongPress: onLongPress,
+                    draggablePayload: item.rawValue,
+                    onDragStart: onDragStart
                 )
             }
             if showMore {
@@ -135,8 +172,11 @@ private struct DockBar: View {
                     label: "More",
                     symbol: "ellipsis",
                     active: moreActive,
+                    badge: 0,
                     action: onMore,
-                    onLongPress: onLongPress
+                    onLongPress: onLongPress,
+                    draggablePayload: nil,
+                    onDragStart: onDragStart
                 )
             }
         }
@@ -152,13 +192,30 @@ private struct DockButton: View {
     let label: String
     let symbol: String
     let active: Bool
+    let badge: Int
     let action: () -> Void
     let onLongPress: () -> Void
+    /// If non-nil, long-pressing this button starts a SwiftUI drag carrying
+    /// this payload (the MenuItem.rawValue). The "More" button passes nil
+    /// so it stays a plain tap target.
+    let draggablePayload: String?
+    let onDragStart: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        let inner = Button(action: action) {
             VStack(spacing: 3) {
-                Image(systemName: symbol).font(.system(size: 22))
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: symbol).font(.system(size: 22))
+                    if badge > 0 {
+                        Text(badge > 99 ? "99+" : "\(badge)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(Capsule().fill(Color.red))
+                            .overlay(Capsule().stroke(Color(.systemBackground), lineWidth: 1.5))
+                            .offset(x: 12, y: -8)
+                    }
+                }
                 Text(label).font(.system(size: 10))
             }
             .frame(maxWidth: .infinity)
@@ -167,9 +224,24 @@ private struct DockButton: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // Fall-back long-press still toggles edit mode for the More tile
+        // and any item that doesn't carry a draggable payload.
         .simultaneousGesture(
             LongPressGesture(minimumDuration: 0.5).onEnded { _ in onLongPress() }
         )
+
+        if let payload = draggablePayload {
+            inner.draggable(payload) {
+                // The drag preview is attached to the user's finger; the
+                // moment it appears we flip on edit mode so the EditMenu
+                // overlay's drop destinations are already armed when the
+                // finger reaches them.
+                DragPreview(item: MenuItem(rawValue: payload) ?? .tasks)
+                    .onAppear { onDragStart() }
+            }
+        } else {
+            inner
+        }
     }
 }
 

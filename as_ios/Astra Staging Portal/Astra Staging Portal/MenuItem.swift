@@ -13,6 +13,7 @@ enum MenuItem: String, CaseIterable, Identifiable, Codable {
     case items
     case me
     case consultation
+    case chat
     case sales
     case hr
 
@@ -24,6 +25,7 @@ enum MenuItem: String, CaseIterable, Identifiable, Codable {
         case .items:        return "Items"
         case .me:           return "Me"
         case .consultation: return "Consultation"
+        case .chat:         return "Chat"
         case .sales:        return "Sales"
         case .hr:           return "HR"
         }
@@ -35,6 +37,7 @@ enum MenuItem: String, CaseIterable, Identifiable, Codable {
         case .items:        return "shippingbox"
         case .me:           return "person.circle"
         case .consultation: return "person.2.wave.2"
+        case .chat:         return "bubble.left.and.bubble.right"
         case .sales:        return "briefcase"
         case .hr:           return "building.2"
         }
@@ -43,11 +46,11 @@ enum MenuItem: String, CaseIterable, Identifiable, Codable {
     /// Min user.roleLevel required to see this item (1=execution, 2=manager, 3=owner).
     var minRoleLevel: Int {
         switch self {
-        case .tasks, .items, .me, .consultation: return 1
+        case .tasks, .items, .me, .consultation, .chat: return 1
         case .sales: return 2
         case .hr:    return 3
         }
     }
 
-    static let defaultOrder: [MenuItem] = [.tasks, .items, .consultation, .me, .sales, .hr]
+    static let defaultOrder: [MenuItem] = [.tasks, .chat, .items, .consultation, .me, .sales, .hr]
 }

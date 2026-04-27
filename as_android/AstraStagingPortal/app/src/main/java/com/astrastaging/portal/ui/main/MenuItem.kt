@@ -1,6 +1,7 @@
 package com.astrastaging.portal.ui.main
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.outlined.Apartment
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -24,6 +25,7 @@ enum class MenuItem(
     val minRoleLevel: Int,
 ) {
     TASKS("tasks", "Tasks", Icons.Outlined.CheckCircle, 1),
+    CHAT("chat", "Chat", Icons.AutoMirrored.Outlined.Chat, 1),
     ITEMS("items", "Items", Icons.Outlined.Inventory2, 1),
     ME("me", "Me", Icons.Outlined.Person, 1),
     CONSULTATION("consultation", "Consultation", Icons.Outlined.SupportAgent, 1),
@@ -31,7 +33,7 @@ enum class MenuItem(
     HR("hr", "HR", Icons.Outlined.Apartment, 3);
 
     companion object {
-        val defaultOrder: List<MenuItem> = listOf(TASKS, ITEMS, CONSULTATION, ME, SALES, HR)
+        val defaultOrder: List<MenuItem> = listOf(TASKS, CHAT, ITEMS, CONSULTATION, ME, SALES, HR)
         fun fromKey(key: String): MenuItem? = entries.firstOrNull { it.key == key }
         val MoreIcon: ImageVector get() = Icons.Outlined.MoreHoriz
     }
