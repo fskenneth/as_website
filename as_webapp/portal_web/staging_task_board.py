@@ -197,6 +197,46 @@ _STAFF_ROSTER = [
 ]
 
 
+# Display name → Zoho first_name. Mona is the colloquial name; Zoho stores
+# her record under "Mrunal", so reads need to alias forward and writes
+# need to alias back.
+_NAME_TO_ZOHO = {"Mona": "Mrunal"}
+_ZOHO_TO_NAME = {v: k for k, v in _NAME_TO_ZOHO.items()}
+
+# Display name → Zoho ID, used when persisting an assignment back to the
+# Stager / Movers JSON columns so the row matches what Zoho would write.
+_NAME_TO_ZOHO_ID = {
+    "Mona":       "3692314000005986003",
+    "Nency":      "3692314000021764045",
+    "Gurleen":    "3692314000011765003",
+    "Abhijeet":   "3692314000021796003",
+    "Navdeep":    "3692314000019138003",
+    "Philpas":    "3692314000017106003",
+    "Jashandeep": "3692314000005685243",
+    "Jatin":      "3692314000011814003",
+    "Ravi":       "3692314000019015149",
+    "Ravinder":   "3692314000014190019",
+    "Saddam":     "3692314000008763003",
+}
+
+
+def _display_name(zoho_name):
+    """Convert a Zoho display_value back to the schedule view's display
+    name (Mrunal → Mona). Pass-through when no alias is configured."""
+    return _ZOHO_TO_NAME.get(zoho_name, zoho_name)
+
+
+def _person_json_obj(display_name):
+    """{display_value, ID} object for a roster member. Falls back to
+    display_value-only when the name isn't in the ID map (so a typo or a
+    new hire still saves cleanly to the local DB)."""
+    zoho_name = _NAME_TO_ZOHO.get(display_name, display_name)
+    zid = _NAME_TO_ZOHO_ID.get(display_name)
+    if zid:
+        return {"display_value": zoho_name, "ID": zid}
+    return {"display_value": zoho_name}
+
+
 def _fetch_employee_roster():
     return _STAFF_ROSTER
 
@@ -424,15 +464,31 @@ def _style_block():
     .toolbar {
         flex: 0 0 auto;
         display: flex; align-items: center; gap: 12px;
-        flex-wrap: wrap; row-gap: 8px;
+        flex-wrap: nowrap;
         padding: 8px 16px;
         min-height: var(--toolbar-h);
         background: var(--surface); border-bottom: 1px solid var(--border);
         box-shadow: var(--shadow-sm); z-index: 20;
+        overflow-x: auto;
     }
     .toolbar-title { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; white-space: nowrap; }
     .toolbar-title .accent { color: var(--accent); }
     .toolbar-spacer { flex: 1; }
+    /* In Schedule view, hide the global toolbar's range / search /
+       mytasks blocks since the schedule controls live in the chips
+       bar below the toolbar. */
+    [data-view="schedule"] #range-btn,
+    [data-view="schedule"] .search-wrap,
+    [data-view="schedule"] #mytasks-btn { display: none; }
+    /* Settings sticks to the right of the toolbar regardless of view. */
+    .toolbar > button:last-child { margin-left: auto; }
+    /* sched-controls (Today, ‹/›, week range, Guide) — left side of
+       the page-level chips bar; chips fill the remaining space. */
+    .sched-controls {
+        display: flex; align-items: center; gap: 6px;
+        flex-wrap: nowrap; white-space: nowrap;
+        flex-shrink: 0;
+    }
 
     /* unified toolbar button */
     .tbtn {
@@ -570,7 +626,7 @@ def _style_block():
     .staging-address { font-weight: 600; color: var(--text); margin-top: 2px; }
     .sublinks { display: flex; flex-wrap: nowrap; gap: 6px; margin-top: 8px; min-width: 0; }
     .sublinks .sublink { flex-shrink: 0; }
-    .sublink { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--accent); text-decoration: none; transition: background 140ms ease; }
+    .sublink { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--accent); text-decoration: none; transition: background 140ms ease; border: 0; cursor: pointer; font-family: inherit; line-height: inherit; }
     .sublink:hover { background: var(--accent); color: var(--accent-fg); }
 
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -1062,62 +1118,98 @@ def _style_block():
         padding: 16px 16px 24px; display: flex; flex-direction: column;
         gap: 18px;
     }
+    /* Mobile: drop the day card's left/right inset so cards use the
+       full viewport width. Smaller gap between days too. */
+    @media (max-width: 700px) {
+        .sched-grid { padding: 8px 0 16px; gap: 10px; }
+        .sched-day { border-left: 0; border-right: 0; border-radius: 0; }
+        .sched-chips-bar { padding: 6px 8px; gap: 8px; }
+    }
     .sched-day {
         background: var(--surface); border: 1px solid var(--border);
-        border-radius: var(--radius-md); overflow: hidden;
-        /* Day grows to fit the widest hour-column total while always
-           filling at least the viewport — keeps short days flush to the
-           edges and lets long days trigger horizontal scroll. */
-        width: max-content; min-width: 100%;
+        border-radius: var(--radius-md);
+        /* Always fills the viewport. Axis row + axis-corner stay
+           sticky at the top while scrolling through this day. */
+        width: 100%;
     }
-    .sched-day-head {
-        display: flex; align-items: center; gap: 12px;
-        padding: 10px 14px; border-bottom: 1px solid var(--border);
-        background: var(--surface-2);
-    }
-    .sched-day-head .date { font-size: 14px; font-weight: 700; }
-    .sched-day-head .dow {
-        font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
-        color: var(--text-muted); font-weight: 600;
-    }
-    .sched-day-head .day-tag {
-        display: inline-flex; align-items: center;
-        padding: 2px 8px; border-radius: 999px;
-        font-size: 10px; font-weight: 700;
-        text-transform: uppercase; letter-spacing: 0.05em;
-    }
-    .sched-day-head .day-tag.today    { background: var(--accent); color: var(--accent-fg); }
-    .sched-day-head .day-tag.past     { background: var(--surface-3); color: var(--text-muted); }
-    .sched-day-head .day-tag.future   { background: var(--accent-soft); color: var(--accent); }
-    .sched-day-head .day-tag.weekend  { background: var(--warning-soft); color: var(--warning); }
-    .sched-day.today .sched-day-head { background: var(--accent-soft); }
-    .sched-day.today .date { color: var(--accent); }
-    .sched-day.weekend .sched-day-head { background: var(--surface-3); opacity: 0.85; }
-    .sched-day-head .spacer { flex: 1; }
 
     .sched-table {
         display: grid;
-        /* width is set inline to 96px + (sum of hour widths) so the hour
-           columns can be variable. */
+        grid-template-columns: 100px minmax(0, 1fr);
+    }
+    /* Hour row: short date in the corner + hour ticks. Sticky so it
+       stays at the top of the scroll viewport while the body below
+       scrolls. */
+    .sched-axis-row {
+        display: grid;
+        grid-template-columns: 100px minmax(0, 1fr);
+        position: sticky; top: 0; z-index: 12;
+        background: var(--surface);
+    }
+    /* Page-level chips bar: schedule controls on the first row, the
+       chip list always on the next row below — chip list is too wide
+       to comfortably share a row with the controls, and putting it
+       below gives it the entire bar width to wrap into. */
+    .sched-chips-bar {
+        flex: 0 0 auto;
+        display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center;
+        padding: 8px 16px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+    }
+    /* Chip list always wraps to its own row (flex-basis: 100%) so it
+       sits under the schedule controls. Inside, the cascading wrap
+       order is:
+         decrease 1 → chip list wraps below controls (this).
+         decrease 2 → movers group wraps below stagers.
+         decrease 3 → last-4-mover sub-group wraps below first-4. */
+    .sched-chips {
+        display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center;
+        flex-basis: 100%; min-width: 0;
+    }
+    .sched-chip-group {
+        display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    }
+    .sched-chip-group-stagers { flex-wrap: nowrap; }
+    .sched-chip-subgroup {
+        display: flex; flex-wrap: nowrap; gap: 6px; align-items: center;
+    }
+    .sched-chip {
+        display: inline-flex; align-items: center;
+        padding: 3px 10px; border-radius: 999px;
+        font-size: 11px; font-weight: 600;
+        background: var(--surface-2); color: var(--text);
+        border: 1px solid var(--border);
+        cursor: grab; user-select: none;
+        white-space: nowrap;
+    }
+    .sched-chip:active { cursor: grabbing; }
+    .sched-chip.role-stager { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-soft); }
+    .sched-chip.role-mover  { background: var(--warning-soft); color: var(--warning); border-color: var(--warning-soft); }
+
+    /* Hour row cells: short date in the corner, hour ticks in axis. */
+    .sched-axis-corner, .sched-axis {
+        height: 32px;
+        background: var(--surface-2);
+        border-bottom: 1px solid var(--border);
     }
     .sched-axis-corner {
         grid-column: 1 / 2;
-        background: var(--surface-2);
+        display: flex; align-items: center; justify-content: center;
+        padding: 0 8px;
+        font-size: 12px; font-weight: 700; color: var(--text);
     }
-    .sched-axis {
-        grid-column: 2 / 3;
-        position: relative; height: 22px;
-        background: var(--surface);
-    }
+    .sched-axis { grid-column: 2 / 3; position: relative; }
+    .sched-day.today .sched-axis-corner { background: var(--accent-soft); color: var(--accent); }
+    .sched-day.weekend .sched-axis-corner { background: var(--surface-3); }
     .sched-tick {
         position: absolute; top: 0; bottom: 0;
-        font-size: 10px; color: var(--text-muted);
+        display: flex; align-items: center;
+        font-size: 11px; color: var(--text-muted);
         font-variant-numeric: tabular-nums;
         font-weight: 600;
         padding-left: 4px;
-        border-left: 1px solid var(--border);
     }
-    .sched-tick:first-child { border-left: 0; }
 
     /* Body. The track-col reserves padding-top = --header-h so each card's
        header element can sit absolutely above row 0 without overlapping
@@ -1145,6 +1237,10 @@ def _style_block():
     .sched-job-header,
     .sched-job-slots {
         position: absolute;
+        /* Floor on width — proportional time-span widths below this
+           clamp here, so a short job doesn't render too narrow to read.
+           Card can extend past its end-time when this kicks in. */
+        min-width: 120px;
         background: var(--surface);
         border: 1px solid var(--border);
         border-left: 3px solid var(--accent);
@@ -1162,6 +1258,19 @@ def _style_block():
     }
     .sched-job-header:active { cursor: grabbing; }
     .sched-job-header.dragging { opacity: 0.4; }
+    .sched-job-header .line.first { display: flex; align-items: center; gap: 6px; }
+    .sched-job-header .line.first .time { flex: 1; }
+    .sched-edit-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 22px; height: 22px;
+        background: var(--surface-2); color: var(--text-muted);
+        border: 1px solid var(--border); border-radius: 4px;
+        cursor: pointer; transition: background 140ms ease, color 140ms ease;
+        padding: 0; font-family: inherit;
+        flex-shrink: 0;
+    }
+    .sched-edit-btn svg { width: 13px; height: 13px; display: block; }
+    .sched-edit-btn:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-soft); }
     .sched-job-slots {
         border-top: 0;
         border-radius: 0 0 var(--radius-sm) var(--radius-sm);
@@ -1171,7 +1280,7 @@ def _style_block():
     .sched-job-header.kind-staging,      .sched-job-slots.kind-staging      { border-left-color: var(--accent); }
     .sched-job-header.kind-destage,      .sched-job-slots.kind-destage      { border-left-color: var(--warning); }
     .sched-job-header.kind-consultation, .sched-job-slots.kind-consultation { border-left-color: var(--success); }
-    .sched-job-header.kind-design,       .sched-job-slots.kind-design       { border-left-color: var(--text-muted); border-style: dashed; }
+    .sched-job-header.kind-design,       .sched-job-slots.kind-design       { border-left-color: var(--text-muted); }
     .sched-job-header:hover, .sched-job-slots:hover { box-shadow: var(--shadow-md); }
     /* Card on top of another card at an overlap: dim it so the covered
        card's edges + content show through. Click any card to bring it
@@ -1182,34 +1291,55 @@ def _style_block():
        to the front so its content is fully visible. The card that's
        already covering doesn't need any visual badge. */
 
-    /* Header-zone content — exactly 3 lines. Hours expand to fit so we
-       never need to wrap; nowrap + ellipsis keeps any rare overflow from
-       breaking the 3-line shape. */
+    /* Header-zone content. Single-line per row by default; long
+       addresses clip with ellipsis at the card's right edge. */
     .sched-job-header .line {
-        font-size: 11px; line-height: 1.2;
+        font-size: 11px; font-weight: 500; line-height: 1.25;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .sched-job-header .line.first {
-        font-weight: 700;
-        display: flex; gap: 6px; align-items: baseline;
+    .sched-job-header .nowrap { white-space: nowrap; }
+    /* Time + items + drive — single meta line that wraps as items
+       (atoms stay together via .nowrap). When the card is wide enough
+       all three sit on one line; when narrow, items+drive can drop
+       below the time. */
+    .sched-job-header .line.meta {
+        font-size: 10px;
+        display: flex; flex-wrap: wrap; column-gap: 8px; row-gap: 1px;
+        white-space: normal; text-overflow: clip;
     }
+    .sched-job-header .line.meta .time { color: var(--text); }
+    .sched-job-header .line.meta .item,
+    .sched-job-header .line.meta .drive { color: var(--text-muted); }
+    /* items + drive stay together as one inline group so the wrap
+       break happens between time and items, not between items and
+       drive. */
+    .sched-job-header .line.meta .item-drive {
+        display: inline-flex; gap: 4px; white-space: nowrap;
+    }
+    .sched-job-header .line.first {
+        display: flex; gap: 6px; align-items: center;
+    }
+    .sched-job-header .line.first .spacer { flex: 1; }
     .sched-job-header .line.first .kind {
-        font-size: 10px; font-weight: 800;
+        font-weight: 700;
         text-transform: uppercase; letter-spacing: 0.05em;
         color: var(--text-muted);
     }
     .sched-job-header.kind-staging      .line.first .kind { color: var(--accent); }
     .sched-job-header.kind-destage      .line.first .kind { color: var(--warning); }
     .sched-job-header.kind-consultation .line.first .kind { color: var(--success); }
-    .sched-job-header .line.first .time {
-        font-variant-numeric: tabular-nums; color: var(--text);
-        font-size: 12px;
+    /* Mobile shorthand swap: hide the long "CONSULTATION" label on
+       narrow viewports and show the short "CONSULT" label instead. */
+    .sched-job-header .kind.kind-short { display: none; }
+    @media (max-width: 700px) {
+        .sched-job-header.kind-consultation .kind.kind-long  { display: none; }
+        .sched-job-header.kind-consultation .kind.kind-short { display: inline; }
+    }
+    .sched-job-header .line.meta .time {
+        font-variant-numeric: tabular-nums;
     }
     .sched-job-header .line.addr {
-        font-weight: 600; color: var(--text);
-    }
-    .sched-job-header .line.meta {
-        font-size: 10px; color: var(--text-muted); font-weight: 500;
+        font-size: 11px; font-weight: 600; color: var(--text);
     }
 
     /* Live time indicator while a job is being dragged. The badge sits on
@@ -1264,10 +1394,12 @@ def _style_block():
         letter-spacing: 0.04em;
     }
     .sched-job-slot .who {
-        flex: 1 1 auto; font-weight: 600; color: var(--text);
+        flex: 0 1 auto; min-width: 0;
+        font-weight: 600; color: var(--text);
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         cursor: grab; user-select: none;
     }
+    .sched-job-slot.empty .who { flex: 1 1 auto; }
     .sched-job-slot.empty .who {
         color: var(--text-faint); font-style: italic; font-weight: 500;
         cursor: default;
@@ -1275,34 +1407,60 @@ def _style_block():
     .sched-job-slot.empty.drop-over {
         background: var(--accent-soft);
     }
+    /* × sits inline right after the assignee name. */
+    .sched-job-slot .slot-remove {
+        all: unset; cursor: pointer; font-family: inherit;
+        flex: 0 0 auto;
+        padding: 0 4px; border-radius: 3px;
+        font-size: 14px; line-height: 1; color: var(--text-faint);
+        font-weight: 600;
+    }
+    .sched-job-slot .slot-remove:hover { color: var(--danger); background: var(--danger-soft); }
     .sched-job-slot.removing { opacity: 0.35; }
 
     /* Employee rows */
+    /* Employee row: name (col 1) + shift bar (col 2) form ONE
+       continuous coloured strip per role. The name cell uses a
+       ::before block at the same vertical span as the bar
+       (top:4 bottom:4), so left and right pieces line up flush at
+       the column boundary. Stagers use accent-soft + accent text;
+       movers use warning-soft + warning text — same colors as the
+       chip bar above. */
     .sched-name {
+        position: relative; isolation: isolate;
         padding: 0 10px; font-size: 12px; font-weight: 600;
-        color: var(--text); display: flex; align-items: center;
-        background: var(--surface);
-        height: var(--row-h, 28px);
-        cursor: grab; user-select: none;
-        border-bottom: 1px solid transparent;
+        display: flex; align-items: center;
+        height: var(--row-h, 32px);
+        user-select: none;
+        color: var(--text);
     }
-    .sched-name:hover { background: var(--surface-2); }
-    .sched-name:active { cursor: grabbing; }
-    .sched-name.role-stager { border-left: 3px solid var(--accent); }
-    .sched-name.role-mover  { border-left: 3px solid var(--warning); }
-    .sched-name.team        { background: var(--accent-soft); }
-    .sched-name.team.role-mover { background: var(--warning-soft); }
-    .sched-name.phantom     { background: transparent; cursor: default; border-left: 0; }
+    /* The role-coloured strip sits behind the name text (z-index: -1
+       inside the .sched-name's own stacking context, established by
+       `isolation: isolate`). Span at top:4 bottom:4 to match the bar
+       height in the next column. */
+    .sched-name::before {
+        content: ''; position: absolute;
+        left: 0; right: 0; top: 4px; bottom: 4px;
+        background: transparent;
+        z-index: -1;
+    }
+    .sched-name.role-stager { color: var(--accent); }
+    .sched-name.role-mover  { color: var(--warning); }
+    .sched-name.role-stager::before { background: var(--accent-soft); }
+    .sched-name.role-mover::before  { background: var(--warning-soft); }
+    .sched-name.phantom { cursor: default; color: var(--text); }
+    .sched-name.phantom::before { background: transparent; }
 
     .sched-track {
         position: relative;
-        height: var(--row-h, 28px);
+        height: var(--row-h, 32px);
         background: transparent;
     }
     .sched-track.phantom { background: transparent; }
     .sched-shift-bar {
-        position: absolute; top: 6px; bottom: 6px;
-        background: var(--surface-2); border-radius: 3px;
+        position: absolute; top: 4px; bottom: 4px;
+        left: 0; right: 0;
+        background: var(--surface-2);
         pointer-events: none;
     }
     .sched-track.role-stager .sched-shift-bar { background: var(--accent-soft); }
@@ -1355,11 +1513,11 @@ def _style_block():
         }
     }
     @media (max-width: 720px) {
-        .toolbar { flex-wrap: wrap; height: auto; padding: 10px; gap: 8px; }
-        :root { --toolbar-h: auto; }
-        .toolbar-title { flex: 1 0 100%; }
-        .search-wrap { order: 3; flex: 1 1 100%; min-width: 0; }
-        .range-btn { min-width: 0; flex: 1; }
+        /* Toolbar stays on one row even on narrow viewports — items
+           overflow horizontally (overflow-x: auto on .toolbar). */
+        .toolbar { padding: 8px 10px; gap: 8px; }
+        .search-wrap { min-width: 0; }
+        .range-btn { min-width: 0; }
 
         /* Collapse table to stacked cards. Each row becomes a block. */
         table.board, table.board thead, table.board tbody, table.board tr, table.board td { display: block; }
@@ -1656,7 +1814,9 @@ def _settings_modal(employees):
 
 def _toolbar():
     """Toolbar is rendered by the server; live counts + range text are
-    updated by JS from the client state."""
+    updated by JS from the client state. The .sched-controls block is
+    only visible when data-view=schedule (CSS), and the range / search /
+    mytasks buttons are hidden in that view."""
     return Div(
         Div(NotStr("Staging "), Span("Task Board", cls="accent"), cls="toolbar-title"),
 
@@ -1791,7 +1951,8 @@ def _col_staging(row, serial):
         Div(items_line, cls="staging-items"),
         Div(*addr_children, cls="staging-address-row"),
         Div(
-            _sub_page_link("Staging", "Staging_Edit", staging_id=sid),
+            Button("Staging", type="button", cls="sublink",
+                   onclick=f"StagingEditModal.open('{sid}')"),
             _sub_page_link("Design", "Staging_Design", staging_id=sid),
             _sub_page_link("Pictures", "Staging_Videos_and_Pictures", staging_id=sid),
             _sub_page_link("Packing", "Packing_Guide_Page", staging_id=sid, staging_type="Staging"),
@@ -2089,9 +2250,21 @@ def _build_calendar_card(row):
 
     rec = _record_data(row)
 
-    stager_default = "|".join(_parse_people(row["Stager"]))
+    # Stager / mover fields can be either Zoho-synced or local (after a
+    # schedule-view save). Apply the alias so "Mrunal" surfaces as "Mona"
+    # in the UI without losing identity.
+    if kind == "Consultation":
+        stager_default = "|".join(
+            _display_name(p) for p in _parse_people(row["Consultation_Stager1"])
+        )
+    else:
+        stager_default = "|".join(
+            _display_name(p) for p in _parse_people(row["Stager"])
+        )
     movers_field = "Destaging_Movers" if kind == "Destage" else "Staging_Movers"
-    mover_default = "|".join(_parse_people(row[movers_field]))
+    mover_default = "|".join(
+        _display_name(p) for p in _parse_people(row[movers_field])
+    )
 
     return Div(
         Div(
@@ -2122,26 +2295,32 @@ def _build_calendar_card(row):
 
 
 def _build_schedule_view():
-    """Schedule pane — toolbar + scroll body. JS renderSchedule() fills the
-    body with one section per day."""
-    toolbar = Div(
-        Button("Today", type="button", cls="tbtn",
-               onclick="TB.schedToday()"),
-        Button(NotStr("‹"), type="button", cls="tbtn",
-               onclick="TB.schedShift(-1)", **{"aria-label": "Previous day"}),
-        Button(NotStr("›"), type="button", cls="tbtn",
-               onclick="TB.schedShift(1)", **{"aria-label": "Next day"}),
-        Div(id="sched-title", cls="cal-view-title", style="margin-left:6px"),
-        Div(cls="spacer"),
-        Button("Procedure", type="button", cls="tbtn",
-               onclick="TB.openModal('procedure-modal')"),
-        cls="cal-view-toolbar",
+    """Schedule pane — top bar with schedule controls (Today, ‹/›,
+    week range, Guide) on the left and one shared set of draggable
+    stager/mover chips on the right + scroll body. JS renderSchedule()
+    fills the body with one section per day; the chip strip is
+    populated once on first render."""
+    chips_bar = Div(
+        Div(
+            Button("Today", type="button", cls="tbtn",
+                   onclick="TB.schedToday()"),
+            Button(NotStr("‹"), type="button", cls="tbtn",
+                   onclick="TB.schedShift(-1)", **{"aria-label": "Previous day"}),
+            Button(NotStr("›"), type="button", cls="tbtn",
+                   onclick="TB.schedShift(1)", **{"aria-label": "Next day"}),
+            Div(id="sched-title", cls="cal-view-title"),
+            Button("Guide", type="button", cls="tbtn",
+                   onclick="TB.openModal('procedure-modal')"),
+            cls="sched-controls",
+        ),
+        Div(id="sched-chips", cls="sched-chips"),
+        id="sched-chips-bar", cls="sched-chips-bar",
     )
     scroll = Div(
         Div(id="sched-grid", cls="sched-grid"),
         cls="cal-view-scroll", id="sched-scroll",
     )
-    return toolbar, scroll
+    return chips_bar, scroll
 
 
 def _build_pre_staging_card(row):
@@ -2191,10 +2370,19 @@ def _build_pre_staging_card(row):
             "data-kind": "Design",
             "data-items": str(items),
             "data-driving": "0",
-            "data-eta": "09:00",
+            # Design+Packing is the day's last task — guide stagers to
+            # do it after their morning staging / consultation. The
+            # actual deadline is midnight of the staging day; this is
+            # only a default placement on the timeline.
+            "data-eta": "15:00",
             "data-cust": cust,
             "data-addr": addr,
-            "data-stager-default": "",
+            # Inherit the parent staging's Stager(s) so today's warehouse
+            # prep is done by the same people doing tomorrow's onsite
+            # work. User can drag-replace from the schedule view.
+            "data-stager-default": "|".join(
+                _display_name(p) for p in _parse_people(row["Stager"])
+            ),
             "data-mover-default": "",
         },
     )
@@ -2695,6 +2883,7 @@ def _client_script(employees, corpus, roster, date_min, date_max):
                 updateTitleFromScroll();
             });
         } else if (v === 'schedule') {
+            ensureChipsBar();
             renderSchedule({ scrollToToday: true });
         }
         applyFilters();
@@ -2958,6 +3147,18 @@ def _client_script(employees, corpus, roster, date_min, date_max):
     // stay through detail work (decor + art).
     const STAGE_ONSITE_MOVER = 60;
     const STAGE_ONSITE_STAGER = 90;
+    // Visual onsite duration that drives the card's rendered width.
+    // Kept in sync with the `dur` switch in appendJobToTrack so the
+    // busy-marker post-render pass can find each card's right edge.
+    function cardDurMin(card) {
+        const kind = card.dataset.kind;
+        const items = parseInt(card.dataset.items || '0', 10);
+        if (kind === 'Staging')      return STAGE_ONSITE_STAGER;
+        if (kind === 'Destage')      return Math.max(60, items * 2);
+        if (kind === 'Consultation') return CONSULT_ONSITE;
+        if (kind === 'Design')       return DESIGN_ONSITE;
+        return 90;
+    }
     const CONSULT_ONSITE = 120;
     const DESIGN_ONSITE = 120;
 
@@ -3009,27 +3210,48 @@ def _client_script(employees, corpus, roster, date_min, date_max):
     function crewSize(items) { return (items > 50) ? 3 : 2; }
 
     // slotsForCard / unfilledSlots are the unified slot iterator used by
-    // both the day-detail dialog and the Schedule view. Movers are stored
-    // as an array (so a destage can have 2-3); stager stays a singleton.
+    // both the day-detail dialog and the Schedule view. Both stagers and
+    // movers are stored as arrays so the user can drop an extra of either
+    // role onto a card and that extra slot stays until removed. Default
+    // crew (1 stager + 2/3 movers for Staging; 1 stager for Consultation/
+    // Design; 2/3 movers for Destage) is the minimum slot count.
+    function readStagers(a) {
+        if (Array.isArray(a.stagers)) return a.stagers.slice();
+        if (a.stager) return [a.stager];
+        return [];
+    }
+    function readMovers(a) {
+        if (Array.isArray(a.movers)) return a.movers.slice();
+        if (a.mover) return [a.mover];
+        return [];
+    }
     function slotsForCard(card) {
         const kind = card.dataset.kind;
         const items = parseInt(card.dataset.items || '0', 10);
         const m = getDayAssign(card.dataset.date);
         const a = m[card.dataset.sid] || {};
         const out = [];
-        const movArr = Array.isArray(a.movers) ? a.movers
-                     : (a.mover ? [a.mover] : []);
+        const stagerArr = readStagers(a);
+        const movArr = readMovers(a);
+        const moverCount = Math.max(crewSize(items), movArr.length);
+        // Staging/Consultation/Design default to 1 stager; extras grow
+        // the array (and shrink back when removed past the default).
+        const stagerCount = Math.max(1, stagerArr.length);
         if (kind === 'Staging') {
-            out.push({ role:'stager', index: 0, filled: a.stager || null });
-            for (let i = 0; i < crewSize(items); i++) {
+            for (let i = 0; i < stagerCount; i++) {
+                out.push({ role:'stager', index: i, filled: stagerArr[i] || null });
+            }
+            for (let i = 0; i < moverCount; i++) {
                 out.push({ role:'mover', index: i, filled: movArr[i] || null });
             }
         } else if (kind === 'Destage') {
-            for (let i = 0; i < crewSize(items); i++) {
+            for (let i = 0; i < moverCount; i++) {
                 out.push({ role:'mover', index: i, filled: movArr[i] || null });
             }
         } else if (kind === 'Consultation' || kind === 'Design') {
-            out.push({ role:'stager', index: 0, filled: a.stager || null });
+            for (let i = 0; i < stagerCount; i++) {
+                out.push({ role:'stager', index: i, filled: stagerArr[i] || null });
+            }
         }
         return out;
     }
@@ -3055,13 +3277,9 @@ def _client_script(employees, corpus, roster, date_min, date_max):
     function setSlotAssign(dIso, sid, role, index, name) {
         const m = getDayAssign(dIso);
         if (!m[sid]) m[sid] = {};
-        if (role === 'stager') {
-            if (name == null) delete m[sid].stager;
-            else m[sid].stager = name;
-        } else {
-            // Migrate legacy single-mover key into the array.
-            let arr = Array.isArray(m[sid].movers) ? m[sid].movers.slice()
-                    : (m[sid].mover ? [m[sid].mover] : []);
+        const writeRoleArray = (arrKey, legacyKey) => {
+            let arr = Array.isArray(m[sid][arrKey]) ? m[sid][arrKey].slice()
+                    : (m[sid][legacyKey] ? [m[sid][legacyKey]] : []);
             if (name == null) {
                 arr.splice(index, 1);
             } else {
@@ -3069,12 +3287,64 @@ def _client_script(employees, corpus, roster, date_min, date_max):
                 arr[index] = name;
             }
             arr = arr.filter(x => x);
-            if (arr.length) m[sid].movers = arr;
-            else delete m[sid].movers;
-            delete m[sid].mover;
-        }
-        if (!m[sid].stager && !(m[sid].movers || []).length) delete m[sid];
+            if (arr.length) m[sid][arrKey] = arr;
+            else delete m[sid][arrKey];
+            delete m[sid][legacyKey];
+        };
+        if (role === 'stager') writeRoleArray('stagers', 'stager');
+        else                   writeRoleArray('movers',  'mover');
+        // Snapshot the new state BEFORE we possibly delete the entry, so
+        // we can persist `[]` to clear the column when the user empties
+        // a slot.
+        const snapshot = {
+            stagers: (m[sid].stagers || []).slice(),
+            movers:  (m[sid].movers  || []).slice(),
+        };
+        if (!snapshot.stagers.length && !snapshot.movers.length) delete m[sid];
         setDayAssign(dIso, m);
+        persistAssignment(dIso, sid, snapshot);
+    }
+
+    // Fire a save POST so the assignment lands in Staging_Report. Skips
+    // synthetic Design+Packing cards (no DB row to write) and silently
+    // tolerates network errors — localStorage still has the change.
+    function persistAssignment(dIso, sid, snapshot) {
+        if (!sid || sid.endsWith('_dp')) return;
+        const card = document.querySelector('.cal-card[data-sid="' + sid + '"]');
+        if (!card) return;
+        const kind = card.dataset.kind;
+        if (kind === 'Design') return;
+        const fd = new FormData();
+        fd.append('sid', sid);
+        fd.append('kind', kind);
+        fd.append('stagers', (snapshot.stagers || []).join('|'));
+        fd.append('movers',  (snapshot.movers  || []).join('|'));
+        fetch('/staging_task_board/save_assignment', {
+            method: 'POST', body: fd,
+        }).catch(() => {});
+    }
+
+    // On page load, seed tb_assign from each card's data-*-default
+    // attributes (DB state) so the schedule view shows the current
+    // Staging_Report assignments. Local edits afterwards overwrite
+    // localStorage and POST back to the DB.
+    function seedAssignmentsFromDefaults() {
+        const all = {};
+        document.querySelectorAll('.cal-card[data-record="cal"]').forEach(card => {
+            const date = card.dataset.date;
+            const sid = card.dataset.sid;
+            if (!date || !sid) return;
+            if (!all[date]) all[date] = {};
+            const stagersStr = (card.dataset.stagerDefault || '').trim();
+            const moversStr  = (card.dataset.moverDefault  || '').trim();
+            const stagers = stagersStr ? stagersStr.split('|').filter(Boolean) : [];
+            const movers  = moversStr  ? moversStr.split('|').filter(Boolean)  : [];
+            const obj = {};
+            if (stagers.length) obj.stagers = stagers;
+            if (movers.length)  obj.movers  = movers;
+            if (Object.keys(obj).length) all[date][sid] = obj;
+        });
+        saveAssign(all);
     }
 
     function staffCanRole(staff, role) {
@@ -3386,11 +3656,14 @@ def _client_script(employees, corpus, roster, date_min, date_max):
 
     // Timeline 8 AM – 5 PM (full hour ticks). Mover shift = 8:30–4:30
     // (offsets 30..510). Stager shift = 9–5 (60..540).
-    const SCHED_START_MIN = 8 * 60;          // 8:00 AM
+    // Timeline starts at 8:30 AM (the start of every shift) so the
+    // axis has no dead 8:00–8:30 gap before the first activity.
+    const SCHED_START_MIN = 8 * 60 + 30;     // 8:30 AM
     const SCHED_END_MIN   = 17 * 60;         // 5:00 PM
-    const SCHED_DUR       = SCHED_END_MIN - SCHED_START_MIN; // 540
-    const SHIFT_MOVER  = { start: 30,  end: 510 };
-    const SHIFT_STAGER = { start: 60,  end: 540 };
+    const SCHED_DUR       = SCHED_END_MIN - SCHED_START_MIN; // 510
+    // Both stagers and movers cover the full timeline.
+    const SHIFT_MOVER  = { start: 0, end: SCHED_DUR };
+    const SHIFT_STAGER = { start: 0, end: SCHED_DUR };
 
     let schedAnchor = new Date(today);
     // Last card the user clicked on — gets z-index 50 so it pops to the
@@ -3453,12 +3726,16 @@ def _client_script(employees, corpus, roster, date_min, date_max):
                 { kind:'drive', start: etaMin + STAGE_ONSITE_STAGER,        dur: drv, label: 'Drive', sub: 'back' },
             ];
         }
-        // Staging mover — leaves earlier than stager.
+        // Staging mover — leaves earlier than the stager. The card is
+        // sized to STAGE_ONSITE_STAGER, so we render the mover's
+        // drive-back just past the card's right edge (rather than at
+        // the mover's true earlier finish time, which would sit hidden
+        // inside the card slot).
         return [
             { kind:'load',  start: etaMin - drv - load, dur: load, label: 'Load',  sub: items + ' items' },
             { kind:'drive', start: etaMin - drv,        dur: drv,  label: 'Drive', sub: card.dataset.addr },
             { kind:'stage', start: etaMin,              dur: STAGE_ONSITE_MOVER, label: 'Unload', sub: '' },
-            { kind:'drive', start: etaMin + STAGE_ONSITE_MOVER, dur: drv, label: 'Drive', sub: 'back' },
+            { kind:'drive', start: etaMin + STAGE_ONSITE_STAGER, dur: drv, label: 'Drive', sub: 'back' },
         ];
     }
 
@@ -3483,30 +3760,33 @@ def _client_script(employees, corpus, roster, date_min, date_max):
     }
 
     // Row height (px) — every employee track and every internal job slot
-    // shares this so they line up.
-    const ROW_H = 28;
-    // Header zone height above row 0. Sized to fit exactly 3 lines of
-    // text with snug padding — so a card with no slots doesn't show
-    // 30 px of empty space below its header.
-    const HEADER_PX = 54;
+    // shares this so they line up. Larger than typical body line-height
+    // so name + shift bar feel like one chunky horizontal stripe.
+    const ROW_H = 32;
+    // Header zone height above row 0. HEADER_PX = HEADER_ROWS * ROW_H so
+    // unified cards (which reserve phantom rows above their slots) keep
+    // header + slots vertically flush. On narrow viewports we reserve
+    // extra rows so the header has room for wrapped text.
+    function computeHeaderRows() {
+        const w = window.innerWidth || 1200;
+        // Reserve just enough rows above the slot area for the
+        // header text (kind+edit, time+items+drive, address). Short
+        // values keep cards compact — at narrow widths the address
+        // line may wrap to two lines, which the third row covers.
+        if (w < 700)  return 3;
+        return 2;
+    }
+    let HEADER_ROWS = computeHeaderRows();
+    let HEADER_PX = HEADER_ROWS * ROW_H;
     // Time axis: 8 AM through 5 PM = 9 one-hour bins. Equal width per
     // hour so a 1-hour job is the same size everywhere.
     const HOURS = 9;
-    const HOUR_PX = 110;
-    const _hourPx = new Array(HOURS).fill(HOUR_PX);
-    const _cumulativeX = [0];
-    for (let h = 0; h < HOURS; h++) _cumulativeX.push(_cumulativeX[h] + _hourPx[h]);
-    const _totalPx = _cumulativeX[HOURS];
-
-    function minToPx(min) {
+    // Card / tick positions are % of SCHED_DUR — the time axis is the
+    // 1fr column of the .sched-table grid, so it scales with viewport.
+    function minToPct(min) {
         if (min <= 0) return 0;
-        if (min >= SCHED_DUR) return _totalPx;
-        return (min / 60) * HOUR_PX;
-    }
-    function pxToMin(px) {
-        if (px <= 0) return 0;
-        if (px >= _totalPx) return SCHED_DUR;
-        return (px / HOUR_PX) * 60;
+        if (min >= SCHED_DUR) return 100;
+        return (min / SCHED_DUR) * 100;
     }
 
     // Render a time range like "10-12PM" or "11AM-12:30PM". Always shows
@@ -3525,6 +3805,58 @@ def _client_script(employees, corpus, roster, date_min, date_max):
         const sStr = sMm === 0 ? String(sH12) : sH12 + ':' + String(sMm).padStart(2, '0');
         const eStr = eMm === 0 ? String(eH12) : eH12 + ':' + String(eMm).padStart(2, '0');
         return sStr + '-' + eStr + eAmpm;
+    }
+
+    // Populate the page-level chip bar with one draggable chip per
+    // staff member. Chips are nested in groups so wrapping cascades
+    // gracefully on narrow viewports:
+    //   Outer  (sched-chips)  → flex-wrap: wrap
+    //     Stagers   group     → nowrap (3 chips)
+    //     Movers    group     → flex-wrap: wrap
+    //       First 4 movers    → nowrap
+    //       Last  4 movers    → nowrap
+    // So as the viewport tightens, the movers row wraps first, then
+    // the last-4-movers wraps to its own row.
+    function ensureChipsBar() {
+        const bar = document.getElementById('sched-chips');
+        if (!bar || bar.dataset.populated === '1') return;
+
+        const makeChip = staff => {
+            const isStager = staff.roles.includes('stager') &&
+                             !staff.roles.includes('mover');
+            const role = isStager ? 'stager' : 'mover';
+            const chip = document.createElement('span');
+            chip.className = 'sched-chip role-' + role;
+            chip.dataset.name = staff.name;
+            chip.dataset.role = role;
+            chip.draggable = true;
+            chip.textContent = staff.name;
+            wireEmployeeNameDrag(chip, staff);
+            return chip;
+        };
+
+        const stagers = ROSTER.filter(s =>
+            s.roles.includes('stager') && !s.roles.includes('mover'));
+        const movers = ROSTER.filter(s => s.roles.includes('mover'));
+
+        const stagersGrp = document.createElement('div');
+        stagersGrp.className = 'sched-chip-group sched-chip-group-stagers';
+        stagers.forEach(s => stagersGrp.appendChild(makeChip(s)));
+
+        const moversGrp = document.createElement('div');
+        moversGrp.className = 'sched-chip-group sched-chip-group-movers';
+        const moversFirst = document.createElement('div');
+        moversFirst.className = 'sched-chip-subgroup';
+        const moversLast = document.createElement('div');
+        moversLast.className = 'sched-chip-subgroup';
+        movers.slice(0, 4).forEach(m => moversFirst.appendChild(makeChip(m)));
+        movers.slice(4).forEach(m => moversLast.appendChild(makeChip(m)));
+        moversGrp.appendChild(moversFirst);
+        moversGrp.appendChild(moversLast);
+
+        bar.appendChild(stagersGrp);
+        bar.appendChild(moversGrp);
+        bar.dataset.populated = '1';
     }
 
     function renderSchedule(opts) {
@@ -3562,32 +3894,30 @@ def _client_script(employees, corpus, roster, date_min, date_max):
                 ((dow === 0 || dow === 6) ? ' weekend' : '');
             sec.dataset.date = dIso;
 
-            // Header — "April 24, Friday" with a Yesterday / Today /
-            // Tomorrow chip when applicable. Schedule is the day detail,
-            // so no separate "Day detail ⤢" button.
-            const head = document.createElement('div');
-            head.className = 'sched-day-head';
-            const monthLong = d.toLocaleDateString('en-US', { month: 'long' });
-            const weekday   = d.toLocaleDateString('en-US', { weekday: 'long' });
-            const todayD = new Date(today); todayD.setHours(0, 0, 0, 0);
-            const dDelta = Math.round((d - todayD) / 86400000);
-            let chip = '';
-            if (dDelta === 0)       chip = '<span class="day-tag today">Today</span>';
-            else if (dDelta === -1) chip = '<span class="day-tag past">Yesterday</span>';
-            else if (dDelta === 1)  chip = '<span class="day-tag future">Tomorrow</span>';
-            const weekendChip = (dow === 0 || dow === 6)
-                ? '<span class="day-tag weekend">Weekend</span>' : '';
-            head.innerHTML =
-                '<span class="date">' + monthLong + ' ' + d.getDate() +
-                    ', ' + weekday + '</span>' + chip + weekendChip;
-            sec.appendChild(head);
+            // Short date label "Apr 24 Fri" — rendered into the
+            // axis-corner cell next to the hour ticks.
+            const monthShort = d.toLocaleDateString('en-US', { month: 'short' });
+            const weekdayShort = d.toLocaleDateString('en-US', { weekday: 'short' });
+            const dateLabel = monthShort + ' ' + d.getDate() + ' ' + weekdayShort;
 
             const cards = cardsForDay(dIso);
 
-            // Lane assignment — cards with the same start time stack
-            // vertically (one card per lane). Different start times stay
-            // in lane 0 and may overlap horizontally; the overlap is
-            // resolved later via z-index + transparency.
+            // Per-card meta — every card is "unified" (header + slots in
+            // a single self-contained box). Slot count drives lane height.
+            const cardMeta = new Map();
+            cards.forEach(card => {
+                const cardSlots = slotsForCard(card);
+                cardMeta.set(card.dataset.sid, {
+                    isUnified: true,
+                    slotCount: cardSlots.length,
+                });
+            });
+
+            // Lane assignment — same-start cards stack into separate
+            // lanes; different-start cards may share a lane and overlap
+            // horizontally where their time ranges intersect (z-stacking
+            // keeps them readable, and click-to-focus pulls a covered
+            // card to the front).
             const cardLane = new Map();
             const sameStart = new Map();
             cards.forEach(card => {
@@ -3598,40 +3928,13 @@ def _client_script(employees, corpus, roster, date_min, date_max):
             sameStart.forEach(grp => {
                 grp.forEach((card, i) => cardLane.set(card.dataset.sid, i));
             });
-            const maxLane = cards.reduce(
-                (m, c) => Math.max(m, cardLane.get(c.dataset.sid) || 0), 0);
-
-            // Per-card meta: cards with NO filled slots render as a single
-            // unified box (header + slots stacked, no row gap). Cards with
-            // any filled slot keep the split layout that aligns slot rows
-            // with the employee tracks below.
-            const cardMeta = new Map();
-            cards.forEach(card => {
-                const cardSlots = slotsForCard(card);
-                const hasFilled = cardSlots.some(s => s.filled);
-                cardMeta.set(card.dataset.sid, {
-                    isUnified: !hasFilled,
-                    slotCount: cardSlots.length,
-                });
-            });
-            // Lane height = HEADER_PX for split-only lanes, or
-            // HEADER_PX + max(slotCount) × ROW_H for lanes with any unified
-            // card. Lane top offsets accumulate so total header zone
-            // exactly fits the largest content per lane.
-            const laneHeight = new Array(maxLane + 1).fill(HEADER_PX);
-            cards.forEach(card => {
-                const lane = cardLane.get(card.dataset.sid) || 0;
-                const meta = cardMeta.get(card.dataset.sid);
-                const fullH = meta.isUnified
-                    ? HEADER_PX + meta.slotCount * ROW_H
-                    : HEADER_PX;
-                laneHeight[lane] = Math.max(laneHeight[lane], fullH);
-            });
-            const laneTop = new Array(maxLane + 1).fill(0);
-            for (let i = 1; i <= maxLane; i++) {
-                laneTop[i] = laneTop[i - 1] + laneHeight[i - 1];
-            }
-            const totalHeaderPx = laneHeight.reduce((s, h) => s + h, 0);
+            // No lane top zone any more — each card's HEADER lives at its
+            // own HEADER_ROWS phantoms in the row-aligned area, so columns
+            // need no padding-top to reserve space.
+            const maxLane = -1;
+            const laneHeight = [];
+            const laneTop = [];
+            const totalHeaderPx = 0;
 
             // Z-index base — earlier-starting cards default to lower z so
             // a later card sits on top in the overlap region. Click puts
@@ -3642,66 +3945,165 @@ def _client_script(employees, corpus, roster, date_min, date_max):
                 timeToOffset(b.dataset.eta || '00:00')
             ).forEach((c, i) => cardZBase.set(c.dataset.sid, 3 + i));
 
-            // Build row order. Each filled slot resolves to an employee
-            // row (created on first use, reused thereafter — so the same
-            // mover assigned to 3 jobs occupies one row that all 3 cards
-            // share). Empty slots become phantom rows whose column-space
-            // the user can drop staff onto. There are no longer any
-            // "header phantom" rows: each job's header element floats in
-            // the padding-top zone above the rows.
+            // Row-aligned layout. For each card (in time order):
+            //   1. Resolve its slots — filled → existing employee row or
+            //      a fresh employee row; empty → fresh phantom row keyed
+            //      to THIS card (sid), so same-start cards each get their
+            //      own phantom rows and stack vertically.
+            //   2. If any slot needed a fresh row, prepend HEADER_ROWS
+            //      phantom info rows BEFORE the new rows so the header
+            //      sits directly above the card's first slot.
+            //   3. If every slot reuses existing employee rows (e.g. a
+            //      Consultation reusing the morning Staging's stager) the
+            //      card piggybacks on those rows — they share Y.
+            // Non-team roster fills in at the bottom afterwards.
             const rowDefs = [];
             const empIdx = new Map();
             const phantomKey = (sid, role, index) => sid + '|' + role + '|' + index;
             const phantomIdx = new Map();
             const cardLayout = new Map();
-            cards.forEach(card => {
-                const sid = card.dataset.sid;
-                const meta = cardMeta.get(sid);
-                const slotRows = [];
-                slotsForCard(card).forEach(slot => {
-                    if (meta.isUnified) {
-                        // Unified card — slots live INSIDE the card box,
-                        // not in any row of the table. idx is unused.
-                        slotRows.push({ idx: -1, slot });
-                        return;
-                    }
-                    if (slot.filled) {
-                        let idx;
-                        if (empIdx.has(slot.filled)) {
-                            idx = empIdx.get(slot.filled);
-                        } else {
-                            const staff = ROSTER.find(r => r.name === slot.filled);
-                            if (!staff) return;
-                            idx = rowDefs.length;
-                            empIdx.set(slot.filled, idx);
-                            rowDefs.push({ kind: 'employee', staff });
-                        }
-                        slotRows.push({ idx, slot });
-                    } else {
-                        const k = phantomKey(sid, slot.role, slot.index);
-                        let idx;
-                        if (phantomIdx.has(k)) {
-                            idx = phantomIdx.get(k);
-                        } else {
-                            idx = rowDefs.length;
-                            phantomIdx.set(k, idx);
-                            rowDefs.push({
-                                kind: 'phantom-slot', sid,
-                                role: slot.role, index: slot.index,
-                            });
-                        }
-                        slotRows.push({ idx, slot });
+            function shiftIndicesFrom(pivot, delta) {
+                empIdx.forEach((v, k) => { if (v >= pivot) empIdx.set(k, v + delta); });
+                phantomIdx.forEach((v, k) => { if (v >= pivot) phantomIdx.set(k, v + delta); });
+                cardLayout.forEach(layout => {
+                    layout.slotRows.forEach(s => {
+                        if (s.idx >= pivot) s.idx += delta;
+                    });
+                });
+            }
+
+            // Group cards: unassigned (no slots filled) first, assigned
+            // (any slot filled) last. Within unassigned, time-sorted
+            // cards share a "lane" (one phantom-row block) when their
+            // start times are ≥60 min apart, so they overlap horizontally
+            // and visually share Y. Same-start cards never share a lane,
+            // so they stack vertically.
+            const isUnassigned = c => slotsForCard(c).every(s => !s.filled);
+            const byStart = (a, b) =>
+                timeToOffset(a.dataset.eta || '00:00') -
+                timeToOffset(b.dataset.eta || '00:00');
+            const unassignedCards = cards.filter(isUnassigned).sort(byStart);
+            const assignedCards   = cards.filter(c => !isUnassigned(c)).sort(byStart);
+
+            // Bucket unassigned cards into lanes.
+            const unassignedLanes = [];
+            unassignedCards.forEach(card => {
+                const eta = timeToOffset(card.dataset.eta || '00:00');
+                const lane = unassignedLanes.find(L =>
+                    L.cards.every(c => Math.abs(
+                        timeToOffset(c.dataset.eta || '00:00') - eta) >= 60));
+                if (lane) lane.cards.push(card);
+                else unassignedLanes.push({ cards: [card] });
+            });
+
+            // Allocate one row block per lane: HEADER_ROWS info rows +
+            // one phantom-slot row per (role, index) found across the
+            // lane's cards.  Cards in the lane reuse those rows, so a
+            // 10-12 destage and an 11-1 destage share Y.
+            unassignedLanes.forEach(lane => {
+                const leadSid = lane.cards[0].dataset.sid;
+                const maxByRole = { stager: 0, mover: 0 };
+                lane.cards.forEach(c => {
+                    slotsForCard(c).forEach(slot => {
+                        maxByRole[slot.role] = Math.max(
+                            maxByRole[slot.role] || 0, slot.index + 1);
+                    });
+                });
+                for (let h = 0; h < HEADER_ROWS; h++) {
+                    rowDefs.push({ kind: 'info', sid: leadSid });
+                }
+                const protoIdx = {};
+                ['stager', 'mover'].forEach(role => {
+                    for (let i = 0; i < (maxByRole[role] || 0); i++) {
+                        protoIdx[role + ':' + i] = rowDefs.length;
+                        rowDefs.push({ kind: 'phantom-slot', sid: leadSid,
+                            role, index: i });
                     }
                 });
+                lane.cards.forEach(card => {
+                    const slots = slotsForCard(card);
+                    const slotRows = slots.map(slot => ({
+                        idx: protoIdx[slot.role + ':' + slot.index],
+                        slot,
+                    }));
+                    cardLayout.set(card.dataset.sid, { slotRows });
+                });
+            });
+
+            // Now place the assigned cards beneath. Each card's filled
+            // slots claim or reuse an employee row; remaining empty
+            // slots get fresh phantom rows next to the existing rows.
+            assignedCards.forEach(card => {
+                const sid = card.dataset.sid;
+                const slots = slotsForCard(card);
+
+                const existingPositions = slots
+                    .map(slot => slot.filled && empIdx.has(slot.filled)
+                        ? empIdx.get(slot.filled) : null)
+                    .filter(x => x != null);
+                const newSlots = slots.filter(slot =>
+                    !(slot.filled && empIdx.has(slot.filled)));
+
+                const slotRows = [];
+
+                if (existingPositions.length === 0) {
+                    for (let h = 0; h < HEADER_ROWS; h++) {
+                        rowDefs.push({ kind: 'info', sid });
+                    }
+                    slots.forEach(slot => {
+                        if (slot.filled) {
+                            const staff = ROSTER.find(r => r.name === slot.filled);
+                            if (!staff) return;
+                            const idx = rowDefs.length;
+                            empIdx.set(slot.filled, idx);
+                            rowDefs.push({ kind: 'employee', staff });
+                            slotRows.push({ idx, slot });
+                        } else {
+                            const idx = rowDefs.length;
+                            phantomIdx.set(
+                                phantomKey(sid, slot.role, slot.index), idx);
+                            rowDefs.push({ kind: 'phantom-slot', sid,
+                                role: slot.role, index: slot.index });
+                            slotRows.push({ idx, slot });
+                        }
+                    });
+                } else if (newSlots.length === 0) {
+                    slots.forEach(slot => {
+                        slotRows.push({ idx: empIdx.get(slot.filled), slot });
+                    });
+                } else {
+                    const lastExisting = Math.max(...existingPositions);
+                    const insertPos = lastExisting + 1;
+                    const insertions = newSlots.map(slot => slot.filled
+                        ? { kind: 'employee',
+                            staff: ROSTER.find(r => r.name === slot.filled) }
+                        : { kind: 'phantom-slot', sid,
+                            role: slot.role, index: slot.index });
+                    rowDefs.splice(insertPos, 0, ...insertions);
+                    shiftIndicesFrom(insertPos, insertions.length);
+                    let cursor = insertPos;
+                    newSlots.forEach(slot => {
+                        if (slot.filled) {
+                            empIdx.set(slot.filled, cursor);
+                        } else {
+                            phantomIdx.set(
+                                phantomKey(sid, slot.role, slot.index), cursor);
+                        }
+                        cursor++;
+                    });
+                    slots.forEach(slot => {
+                        if (slot.filled) {
+                            slotRows.push({ idx: empIdx.get(slot.filled), slot });
+                        } else {
+                            slotRows.push({ idx: phantomIdx.get(
+                                phantomKey(sid, slot.role, slot.index)), slot });
+                        }
+                    });
+                }
                 cardLayout.set(sid, { slotRows });
             });
-            stagers.forEach(s => {
-                if (!empIdx.has(s.name)) {
-                    empIdx.set(s.name, rowDefs.length);
-                    rowDefs.push({ kind: 'employee', staff: s });
-                }
-            });
-            movers.forEach(s => {
+            // Append non-team roster (anyone not already on a card).
+            ROSTER.forEach(s => {
                 if (!empIdx.has(s.name)) {
                     empIdx.set(s.name, rowDefs.length);
                     rowDefs.push({ kind: 'employee', staff: s });
@@ -3716,25 +4118,31 @@ def _client_script(employees, corpus, roster, date_min, date_max):
             tbl.className = 'sched-table';
             tbl.style.setProperty('--row-h', ROW_H + 'px');
             tbl.style.setProperty('--header-h', totalHeaderPx + 'px');
-            tbl.style.gridTemplateColumns = '96px ' + _totalPx + 'px';
 
-            // Axis row: empty corner + hour ticks anchored at variable px.
+            // Sticky hour row: short date in corner + hour ticks in
+            // the axis cell. Stays at the top of the scroll viewport.
+            const axisRow = document.createElement('div');
+            axisRow.className = 'sched-axis-row';
             const axisCorner = document.createElement('div');
             axisCorner.className = 'sched-axis-corner';
-            tbl.appendChild(axisCorner);
+            axisCorner.textContent = dateLabel;
+            axisRow.appendChild(axisCorner);
             const axis = document.createElement('div');
             axis.className = 'sched-axis';
-            for (let h = 8; h <= 17; h++) {
-                const t = (h - 8) * 60;
+            // Visible ticks: 9 AM through 4 PM (skip 8:30 start and
+            // 5 PM end edges).
+            for (let h = 9; h <= 16; h++) {
+                const t = h * 60 - SCHED_START_MIN;
                 const tick = document.createElement('div');
                 tick.className = 'sched-tick';
-                tick.style.left = minToPx(t) + 'px';
+                tick.style.left = minToPct(t) + '%';
                 const h12 = h % 12 === 0 ? 12 : h % 12;
                 const ampm = h < 12 ? 'AM' : 'PM';
                 tick.textContent = h12 + ampm;
                 axis.appendChild(tick);
             }
-            tbl.appendChild(axis);
+            axisRow.appendChild(axis);
+            sec.appendChild(axisRow);
 
             // Body columns.
             const nameCol = document.createElement('div');
@@ -3759,13 +4167,13 @@ def _client_script(employees, corpus, roster, date_min, date_max):
                     const role = isStager ? 'stager' : 'mover';
                     const onTeam = cards.some(c =>
                         slotsForCard(c).some(s => s.filled === row.staff.name));
+                    // First column is read-only label; drag source is
+                    // the chip row at the top of the day.
                     nameEl.className = 'sched-name role-' + role +
                         (onTeam ? ' team' : '');
                     nameEl.dataset.name = row.staff.name;
                     nameEl.dataset.role = role;
-                    nameEl.draggable = true;
                     nameEl.textContent = row.staff.name;
-                    wireEmployeeNameDrag(nameEl, row.staff);
 
                     trackEl.className = 'sched-track role-' + role;
                     trackEl.dataset.name = row.staff.name;
@@ -3774,35 +4182,55 @@ def _client_script(employees, corpus, roster, date_min, date_max):
                     const shift = document.createElement('div');
                     shift.className = 'sched-shift-bar';
                     const sh = isStager ? SHIFT_STAGER : SHIFT_MOVER;
-                    shift.style.left  = minToPx(sh.start) + 'px';
-                    shift.style.width = (minToPx(sh.end) - minToPx(sh.start)) + 'px';
+                    shift.style.left  = minToPct(sh.start) + '%';
+                    shift.style.width = (minToPct(sh.end) - minToPct(sh.start)) + '%';
                     trackEl.appendChild(shift);
 
                     // Drive / load / unload busy markers from segments
-                    // OUTSIDE the onsite window — those still live on the
-                    // employee track since the job card only covers the
-                    // onsite portion.
+                    // OUTSIDE the onsite window. We tag each marker
+                    // with its associated card sid + which side of the
+                    // card it sits on + its order from the card edge.
+                    // A post-render pass uses these tags to switch to
+                    // a fixed-50 px adjacent layout when the card
+                    // hits its min-width clamp.
                     cards.forEach(card => {
                         if (!isAssignedTo(card, row.staff.name, role)) return;
-                        buildSegments(card, role).forEach(seg => {
-                            if (seg.kind === 'stage' ||
-                                seg.kind === 'consult' ||
-                                seg.kind === 'design') return;
+                        const cardEta = timeToOffset(card.dataset.eta || '10:00');
+                        const cardEnd = cardEta + cardDurMin(card);
+                        const allSegs = buildSegments(card, role).filter(s =>
+                            s.kind !== 'stage' && s.kind !== 'consult' &&
+                            s.kind !== 'design');
+                        // Skip segments that fall inside the card range
+                        // (those are visually covered by the card slot
+                        // anyway).
+                        const before = allSegs
+                            .filter(s => s.start + s.dur <= cardEta)
+                            .sort((a, b) => b.start - a.start);
+                        const after  = allSegs
+                            .filter(s => s.start >= cardEnd)
+                            .sort((a, b) => a.start - b.start);
+                        const tag = (seg, side, order) => {
                             const c = clipSegment(seg.start, seg.start + seg.dur);
                             if (c.s1 <= c.s0) return;
                             const block = document.createElement('div');
                             block.className = 'sched-busy kind-' + seg.kind +
                                 (c.clipped ? ' clipped' : '');
-                            const x0 = minToPx(c.s0);
-                            const x1 = minToPx(c.s1);
-                            block.style.left  = x0 + 'px';
-                            block.style.width = (x1 - x0) + 'px';
+                            const x0 = minToPct(c.s0);
+                            const x1 = minToPct(c.s1);
+                            block.style.left  = x0 + '%';
+                            block.style.width = (x1 - x0) + '%';
+                            block.dataset.sid   = card.dataset.sid;
+                            block.dataset.side  = side;
+                            block.dataset.order = String(order);
+                            block.dataset.kind  = seg.kind;
                             block.title = seg.label + ' · ' + (seg.sub || '') +
                                 ' · ' + fmtAbs(seg.start) + '–' + fmtAbs(seg.start + seg.dur) +
                                 (c.clipped ? ' (outside shift)' : '');
                             block.textContent = seg.label;
                             trackEl.appendChild(block);
-                        });
+                        };
+                        before.forEach((s, i) => tag(s, 'before', i));
+                        after.forEach((s, i) => tag(s, 'after',  i));
                     });
                 } else {
                     // Phantom row: blank in column, blank track. Job card
@@ -3836,6 +4264,76 @@ def _client_script(employees, corpus, roster, date_min, date_max):
             grid.appendChild(sec);
         }
 
+        // Auto-size each card header to its content height. Per-day:
+        //   1. Measure each header's natural height (scrollHeight only
+        //      works once the section is in the live document).
+        //   2. If any header would overflow above its reserved phantom
+        //      rows (naturalH > slotTop), add the worst overflow as
+        //      padding-top to the day's nameCol + trackCol, then shift
+        //      every absolutely-positioned card element (header + slots)
+        //      down by the same amount. This pushes the body just far
+        //      enough that the tallest header still fits below the
+        //      sticky hour row.
+        //   3. Bottom-anchor each header at its (shifted) slot top.
+        grid.querySelectorAll('.sched-day').forEach(sec => {
+            const nameCol  = sec.querySelector('.sched-name-col');
+            const trackCol = sec.querySelector('.sched-track-col');
+            const headers  = Array.from(sec.querySelectorAll('.sched-job-header'));
+            const slotsAll = Array.from(sec.querySelectorAll('.sched-job-slots'));
+            if (!headers.length) return;
+            let dayOverflow = 0;
+            const info = headers.map(h => {
+                const slotTop = parseFloat(h.dataset.slotTopPx || '0') || 0;
+                const naturalH = h.scrollHeight || HEADER_PX;
+                if (naturalH > slotTop) {
+                    dayOverflow = Math.max(dayOverflow, naturalH - slotTop);
+                }
+                return { h, slotTop, naturalH };
+            });
+            if (dayOverflow > 0) {
+                if (nameCol)  nameCol.style.paddingTop  = dayOverflow + 'px';
+                if (trackCol) trackCol.style.paddingTop = dayOverflow + 'px';
+                slotsAll.forEach(s => {
+                    const t = parseFloat(s.style.top) || 0;
+                    s.style.top = (t + dayOverflow) + 'px';
+                });
+            }
+            info.forEach(({ h, slotTop, naturalH }) => {
+                h.style.height = naturalH + 'px';
+                h.style.top    = (slotTop + dayOverflow - naturalH) + 'px';
+            });
+
+            // When a card is clamped to its min-width (= time-natural
+            // width is below the floor), position its drive/load
+            // markers as fixed-50 px tiles flush against the card's
+            // visual edges, with "D" / "L" abbreviations. Otherwise
+            // keep the time-proportional placement.
+            const COMPACT_W = 30;
+            const trackWidthPx = trackCol ? trackCol.clientWidth : 0;
+            sec.querySelectorAll('.sched-job-header').forEach(headerEl => {
+                const sid = headerEl.dataset.sid;
+                if (!sid) return;
+                const naturalPx = (parseFloat(headerEl.style.width) / 100) * trackWidthPx;
+                const actualPx  = headerEl.offsetWidth;
+                const isCompact = actualPx > naturalPx + 1;
+                if (!isCompact) return;
+                const cardLeftPx  = headerEl.offsetLeft;
+                const cardRightPx = cardLeftPx + actualPx;
+                trackCol.querySelectorAll(
+                    '.sched-busy[data-sid="' + sid + '"]'
+                ).forEach(b => {
+                    const side  = b.dataset.side;
+                    const order = parseInt(b.dataset.order, 10) || 0;
+                    const x = (side === 'before')
+                        ? cardLeftPx - (order + 1) * COMPACT_W
+                        : cardRightPx + order * COMPACT_W;
+                    b.style.left  = x + 'px';
+                    b.style.width = COMPACT_W + 'px';
+                    b.textContent = b.dataset.kind === 'drive' ? 'D' : 'L';
+                });
+            });
+        });
+
         // Scroll today into view on first render / Today click; otherwise
         // restore where the user was (so drag-drop doesn't yank the page).
         if (scrollEl) {
@@ -3867,24 +4365,28 @@ def _client_script(employees, corpus, roster, date_min, date_max):
         const items = parseInt(card.dataset.items || '0', 10);
         const drv = parseInt(card.dataset.driving || '0', 10) || 30;
 
-        // Onsite duration → card width.
+        // Onsite duration → card width. Card covers the property-side
+        // work only; drive segments appear OUTSIDE the card on either
+        // side (left = drive to property, right = drive back / to
+        // warehouse), so before/after drive bars look symmetric.
         let dur;
         if (kind === 'Staging')           dur = STAGE_ONSITE_STAGER;
-        else if (kind === 'Destage')      dur = Math.max(60, items * 2) * 2;
+        else if (kind === 'Destage')      dur = Math.max(60, items * 2);
         else if (kind === 'Consultation') dur = CONSULT_ONSITE;
         else if (kind === 'Design')       dur = DESIGN_ONSITE;
         else                              dur = 90;
 
         const c = clipSegment(etaMin, etaMin + dur);
-        const leftPx  = minToPx(c.s0);
-        const widthPx = minToPx(c.s1) - leftPx;
+        const leftPct  = minToPct(c.s0);
+        const widthPct = minToPct(c.s1) - leftPct;
 
-        // For split cards, span the row range. For unified cards we use
-        // the slot count directly — no row-alignment needed.
-        const splitIdxs = layout.slotRows.map(s => s.idx).filter(i => i >= 0);
-        const firstRow = splitIdxs.length ? Math.min(...splitIdxs) : 0;
-        const lastRow  = splitIdxs.length ? Math.max(...splitIdxs) : 0;
-        const rowsCovered = splitIdxs.length ? (lastRow - firstRow + 1) : 0;
+        // Slot rows are row-aligned with the employee tracks below; the
+        // card's header sits HEADER_ROWS rows above the card's first
+        // slot row.
+        const slotIdxs = layout.slotRows.map(s => s.idx);
+        const firstSlot = slotIdxs.length ? Math.min(...slotIdxs) : 0;
+        const lastSlot  = slotIdxs.length ? Math.max(...slotIdxs) : 0;
+        const rowsCovered = slotIdxs.length ? (lastSlot - firstSlot + 1) : 0;
 
         const itemsLbl = items + ' item' + (items !== 1 ? 's' : '');
         const driveLbl = drv + 'm drive';
@@ -3892,9 +4394,10 @@ def _client_script(employees, corpus, roster, date_min, date_max):
         const tooltip = kind + ' ' + timeRange + ' · ' + (card.dataset.addr || '') +
             ' · ' + itemsLbl + ' · ' + driveLbl;
 
-        // Header element — top: laneTopPx puts it in the right lane of
-        // the track-col padding-top zone. Drag this to reschedule.
+        // Header element — anchored HEADER_ROWS rows above the card's
+        // first slot row, so it sits directly above the team's slots.
         const isFocused = (_focusedSid === card.dataset.sid);
+        const headerTopPx = (firstSlot - HEADER_ROWS) * ROW_H;
         const header = document.createElement('div');
         header.className = 'sched-job-header kind-' + kind.toLowerCase() +
             (isFocused ? ' focused' : '');
@@ -3902,49 +4405,84 @@ def _client_script(employees, corpus, roster, date_min, date_max):
         header.dataset.sid = card.dataset.sid;
         header.dataset.date = dIso;
         header.dataset.zBase = String(zBase);
-        header.style.top    = laneTopPx + 'px';
-        header.style.left   = leftPx + 'px';
-        header.style.width  = widthPx + 'px';
-        header.style.height = HEADER_PX + 'px';
+        // Initial position — top will be re-anchored after the header
+        // measures its actual content height (so each card auto-sizes
+        // to its content rather than all sharing HEADER_PX).
+        header.style.top    = headerTopPx + 'px';
+        header.style.left   = leftPct + '%';
+        header.style.width  = widthPct + '%';
         header.style.zIndex = isFocused ? 50 : zBase;
         header.title = tooltip;
+        // Edit button — pen icon, opens the universal staging modal.
+        // Design cards use the parent staging's sid (stripped of '_dp').
+        const sidForEdit = (card.dataset.sid || '').replace(/_dp$/, '');
+        const editBtn = sidForEdit
+            ? '<button type="button" class="sched-edit-btn" title="Edit staging" '
+              + 'data-sid="' + sidForEdit + '">'
+              + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+              + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+              + '<path d="M12 20h9"/>'
+              + '<path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>'
+              + '</svg></button>'
+            : '';
+        // Mobile shorthand: "CONSULTATION" → "CONSULT" so it fits on
+        // one line of a narrow card. CSS handles only one of the two
+        // labels via a media query that toggles their display.
+        const kindLabel =
+            '<span class="kind nowrap kind-long">' + kind + '</span>' +
+            (kind === 'Consultation'
+                ? '<span class="kind nowrap kind-short">Consult</span>'
+                : '');
         header.innerHTML =
             '<div class="line first">' +
-                '<span class="kind">' + kind + '</span>' +
-                '<span class="time">' + timeRange + '</span>' +
+                kindLabel +
+                editBtn +
+                '<span class="spacer"></span>' +
             '</div>' +
             '<div class="line addr">' + escapeHtml(card.dataset.addr || '—') + '</div>' +
-            '<div class="line meta">' + itemsLbl + ' · ' + driveLbl + '</div>';
+            '<div class="line meta">' +
+                '<span class="time nowrap">' + timeRange + '</span>' +
+                '<span class="item-drive">' +
+                    '<span class="item nowrap">' + itemsLbl + '</span>' +
+                    '<span class="drive nowrap">' + driveLbl + '</span>' +
+                '</span>' +
+            '</div>';
         wireJobHandleDrag(header, header);
+        wireJobAreaEmployeeDrop(header, card);
         // Click toggles focus — clicking the focused card again unfocuses.
         header.addEventListener('click', e => {
+            // ✎ edit button: stop the focus toggle and open the modal.
+            const editEl = e.target.closest('.sched-edit-btn');
+            if (editEl) {
+                e.stopPropagation();
+                if (window.StagingEditModal) {
+                    StagingEditModal.open(editEl.dataset.sid);
+                }
+                return;
+            }
             focusJobCard(_focusedSid === card.dataset.sid
                 ? null : card.dataset.sid);
         });
         trackCol.appendChild(header);
 
-        // Slots element — for unified cards (no filled slots), anchor
-        // immediately below the header so the whole card reads as one
-        // unit. For split cards, anchor at the team's row offset so the
-        // slot rows line up with their employee tracks.
+        // Slots element — anchored to the card's slot rows in the
+        // row-aligned area. Height covers from firstSlot through
+        // lastSlot inclusive (gaps fill if non-contiguous).
         const slots = document.createElement('div');
         slots.className = 'sched-job-slots kind-' + kind.toLowerCase() +
-            (isFocused ? ' focused' : '') +
-            (meta && meta.isUnified ? ' unified' : '');
+            (isFocused ? ' focused' : '');
         slots.dataset.sid = card.dataset.sid;
         slots.dataset.date = dIso;
         slots.dataset.zBase = String(zBase);
-        if (meta && meta.isUnified) {
-            slots.style.top    = (laneTopPx + HEADER_PX) + 'px';
-            slots.style.height = (layout.slotRows.length * ROW_H) + 'px';
-        } else {
-            slots.style.top    = (totalHeaderPx + firstRow * ROW_H) + 'px';
-            slots.style.height = (rowsCovered * ROW_H) + 'px';
-        }
-        slots.style.left   = leftPx + 'px';
-        slots.style.width  = widthPx + 'px';
+        slots.style.top    = (firstSlot * ROW_H) + 'px';
+        slots.style.height = (rowsCovered * ROW_H) + 'px';
+        slots.style.left   = leftPct + '%';
+        slots.style.width  = widthPct + '%';
         slots.style.zIndex = isFocused ? 50 : zBase;
         slots.title = tooltip;
+        // Drop an employee on the slots-area background (between/over
+        // gap rows) follows the same rules as dropping on the header.
+        wireJobAreaEmployeeDrop(slots, card);
         // Click on the slots area too → toggle focus (so users can grab
         // either piece of a card to focus / unfocus it).
         slots.addEventListener('click', e => {
@@ -3973,8 +4511,20 @@ def _client_script(employees, corpus, roster, date_min, date_max):
                 who.textContent = slot.filled;
                 who.draggable = true;
                 wirePillDrag(who, slotEl);
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'slot-remove';
+                remove.textContent = '×';
+                remove.title = 'Remove ' + slot.filled;
+                remove.addEventListener('click', e => {
+                    e.stopPropagation();
+                    setSlotAssign(dIso, card.dataset.sid,
+                        slot.role, slot.index, null);
+                    renderSchedule();
+                });
                 slotEl.innerHTML = badge;
                 slotEl.appendChild(who);
+                slotEl.appendChild(remove);
             } else {
                 slotEl.innerHTML = badge +
                     '<span class="who">drop staff</span>';
@@ -3982,27 +4532,30 @@ def _client_script(employees, corpus, roster, date_min, date_max):
             wireSlotEmployeeDrop(slotEl);
             return slotEl;
         };
-        if (meta && meta.isUnified) {
-            layout.slotRows.forEach(({ slot }) => slots.appendChild(renderSlot(slot)));
-        } else {
-            const slotMap = new Map(layout.slotRows.map(s => [s.idx, s.slot]));
-            for (let r = firstRow; r <= lastRow; r++) {
-                const slot = slotMap.get(r);
-                if (!slot) {
-                    // gap row — transparent placeholder so total flex
-                    // layout distributes ROW_H rows evenly when slots are
-                    // non-contiguous (rare, shared-employee case).
-                    const gapEl = document.createElement('div');
-                    gapEl.className = 'sched-job-slot empty gap';
-                    gapEl.style.background = 'transparent';
-                    gapEl.style.borderTop = '0';
-                    slots.appendChild(gapEl);
-                    continue;
-                }
-                slots.appendChild(renderSlot(slot));
+        // Render slot rows in row-index order so they line up with
+        // the underlying employee tracks. Gap rows fill any holes when
+        // the same employee is shared across multiple cards and the
+        // current card's slot indices are non-contiguous.
+        const slotMap = new Map(layout.slotRows.map(s => [s.idx, s.slot]));
+        for (let r = firstSlot; r <= lastSlot; r++) {
+            const slot = slotMap.get(r);
+            if (!slot) {
+                const gapEl = document.createElement('div');
+                gapEl.className = 'sched-job-slot empty gap';
+                gapEl.style.background = 'transparent';
+                gapEl.style.borderTop = '0';
+                slots.appendChild(gapEl);
+                continue;
             }
+            slots.appendChild(renderSlot(slot));
         }
         trackCol.appendChild(slots);
+
+        // Stash the slot top in the header so a post-render pass can
+        // bottom-anchor the header to its slot row once the day section
+        // is in the document (scrollHeight is unreliable on detached
+        // subtrees).
+        header.dataset.slotTopPx = String(firstSlot * ROW_H);
     }
 
     // Drag handle at the top of a job card → reschedule (move horizontally
@@ -4029,26 +4582,27 @@ def _client_script(employees, corpus, roster, date_min, date_max):
         });
     }
 
-    // Compute the eta + pixel offset from a track-col + cursor X. Snaps
-    // to the nearest 30-min boundary. Returns the snapped left-px so the
-    // live indicator aligns precisely with the snapped time.
+    // Compute the eta + percentage offset from a track-col + cursor X.
+    // Snaps to the nearest 30-min boundary. Returns the snapped left-%
+    // so the live indicator aligns with the snapped time on the fluid
+    // axis (which scales with the viewport).
     function etaFromLaneX(laneEl, clientX) {
         const rect = laneEl.getBoundingClientRect();
         const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
-        const min = pxToMin(x);
+        const min = rect.width > 0 ? (x / rect.width) * SCHED_DUR : 0;
         const minOff = Math.max(0, Math.min(SCHED_DUR, Math.round(min / 30) * 30));
         const total = SCHED_START_MIN + minOff;
         const h = Math.floor(total / 60);
         const mm = total % 60;
         return {
-            px: minToPx(minOff),
+            pct: minToPct(minOff),
             minOff,
             eta: String(h).padStart(2, '0') + ':' + String(mm).padStart(2, '0'),
         };
     }
 
-    // Show / move the live-time badge on the day's axis at the given px.
-    function showLiveTime(laneEl, px, eta) {
+    // Show / move the live-time badge on the day's axis at the given %.
+    function showLiveTime(laneEl, pct, eta) {
         const tbl = laneEl.parentElement;
         const axis = tbl ? tbl.querySelector('.sched-axis') : null;
         if (!axis) return;
@@ -4058,7 +4612,7 @@ def _client_script(employees, corpus, roster, date_min, date_max):
             ind.className = 'sched-live-time';
             axis.appendChild(ind);
         }
-        ind.style.left = px + 'px';
+        ind.style.left = pct + '%';
         ind.textContent = eta;
         document.querySelectorAll('.sched-live-time').forEach(el => {
             if (el !== ind) el.remove();
@@ -4106,6 +4660,75 @@ def _client_script(employees, corpus, roster, date_min, date_max):
             el.style.zIndex = isThis ? 50 : zb;
         });
         document.querySelectorAll('.sched-day').forEach(day => recomputeOverlaps(day));
+    }
+
+    // Drop an employee onto a card's HEADER or non-slot SLOTS area.
+    //   - First empty slot of a matching role → fill it.
+    //   - Otherwise extend the role array when the card accepts that
+    //     role: stager → Staging/Consultation/Design; mover → Staging/
+    //     Destage. The new slot stays until removed.
+    //   - Otherwise no-op (e.g. dropping a stager on a Destage card).
+    function extendableRoleForKind(role, kind) {
+        if (role === 'mover')  return kind === 'Staging' || kind === 'Destage';
+        if (role === 'stager') return kind === 'Staging' ||
+                                      kind === 'Consultation' ||
+                                      kind === 'Design';
+        return false;
+    }
+    function wireJobAreaEmployeeDrop(areaEl, card) {
+        areaEl.addEventListener('dragover', e => {
+            const p = _schedDragPayload;
+            if (!p || p.type !== 'employee') return;
+            // Only react if the cursor is on the area's own background
+            // (or the header text), not on a child slot — those have
+            // their own drop handler.
+            if (e.target.closest('.sched-job-slot')) return;
+            const kind = card.dataset.kind;
+            const roles = p.roles || [];
+            const empties = unfilledSlots(card)
+                .filter(s => roles.includes(s.role));
+            const canExtend = roles.some(r => extendableRoleForKind(r, kind));
+            if (!empties.length && !canExtend) return;
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'copy';
+            areaEl.classList.add('drop-over');
+        });
+        areaEl.addEventListener('dragleave', e => {
+            if (e.relatedTarget && areaEl.contains(e.relatedTarget)) return;
+            areaEl.classList.remove('drop-over');
+        });
+        areaEl.addEventListener('drop', e => {
+            areaEl.classList.remove('drop-over');
+            const p = _schedDragPayload;
+            if (!p || p.type !== 'employee') return;
+            if (e.target.closest('.sched-job-slot')) return;
+            const kind = card.dataset.kind;
+            const roles = p.roles || [];
+            const dIso = card.dataset.date;
+            const sid = card.dataset.sid;
+            // Prefer filling an empty matching slot.
+            const target = unfilledSlots(card)
+                .find(s => roles.includes(s.role));
+            if (target) {
+                e.preventDefault();
+                e.stopPropagation();
+                setSlotAssign(dIso, sid, target.role, target.index, p.name);
+                renderSchedule();
+                return;
+            }
+            // No empty slot — extend an array. Pick a role the employee
+            // can perform that the card accepts.
+            const extRole = roles.find(r => extendableRoleForKind(r, kind));
+            if (!extRole) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const m = getDayAssign(dIso);
+            const a = m[sid] || {};
+            const arr = (extRole === 'stager') ? readStagers(a) : readMovers(a);
+            setSlotAssign(dIso, sid, extRole, arr.length, p.name);
+            renderSchedule();
+        });
     }
 
     // Drop an employee name onto an empty slot row → assign that exact slot.
@@ -4188,7 +4811,7 @@ def _client_script(employees, corpus, roster, date_min, date_max):
             // Live-time indicator follows the cursor as the user moves
             // over this day's lane — no commit until drop.
             const t = etaFromLaneX(laneEl, e.clientX);
-            showLiveTime(laneEl, t.px, t.eta);
+            showLiveTime(laneEl, t.pct, t.eta);
         });
         laneEl.addEventListener('dragleave', e => {
             // Only clear when leaving the lane itself, not a child.
@@ -4267,6 +4890,9 @@ def _client_script(employees, corpus, roster, date_min, date_max):
         if (sel) sel.value = state.me;
 
         refreshKindButtons();
+        // Pull DB-derived assignments into localStorage before anything
+        // renders — schedule + day-detail both read from tb_assign.
+        seedAssignmentsFromDefaults();
         setView(state.view);
 
         // Calendar scroll → title sync. Throttled to one rAF so dragging
@@ -4282,9 +4908,19 @@ def _client_script(employees, corpus, roster, date_min, date_max):
                 updateTitleFromScroll();
             });
         }, true);
+        // Re-render schedule on resize so HEADER_ROWS / column widths
+        // adjust to the new viewport — debounced so a window-drag
+        // doesn't re-render on every mouse-move.
+        let _resizeTimer = null;
         window.addEventListener('resize', () => {
             sizeWeeks();
             updateTitleFromScroll();
+            HEADER_ROWS = computeHeaderRows();
+            HEADER_PX = HEADER_ROWS * ROW_H;
+            if (state.view === 'schedule') {
+                clearTimeout(_resizeTimer);
+                _resizeTimer = setTimeout(() => renderSchedule(), 120);
+            }
         });
     });
 })();
@@ -4321,6 +4957,164 @@ def _full_page(title, body_children, extra_scripts=()):
     return HTMLResponse(rendered)
 
 
+# -------------------- portal staging modal --------------------
+# Field allowlist for the universal Staging edit modal in
+# static/staging_edit_modal.js. Anything not in this set is rejected on
+# save. Scheduling time fields (Staging_Mover_*_Time, etc.) and Zoho-only
+# workflow triggers (Update_*, Email_Customer_to_*, Refresh, etc.) are
+# deliberately excluded — they belong to the Schedule view or to dedicated
+# action endpoints.
+_STAGING_EDITABLE_FIELDS = frozenset({
+    # General
+    "Staging_Status", "Staging_Furniture_Quality", "Staging_Type",
+    "Staging_Complexity", "Is_Showcase",
+    "Staging_Address", "Property_Type", "Occupancy_Type",
+    "Staging_Date", "Staging_ETA", "Staging_Date_Flexible", "Staging_Term",
+    "Destaging_Date", "Destaging_ETA", "Destaging_Date_Flexible",
+    "Consultation_Type", "Consultation_Date_and_Time", "Consultation_Stager1",
+    "Stager", "Staging_Movers", "Destaging_Movers", "Furniture_Locations",
+    # Customer
+    "Customer_First_Name", "Customer_Last_Name", "Customer_Email",
+    "Customer_Phone", "Customer_Attributes", "Customer_Notes",
+    # Moving
+    "Total_Item_Number", "Driving_Time", "Dock",
+    "Person_To_Provide_Access_for_Staging", "Lockbox_Code_for_Staging",
+    "Elevator_Start_Time", "Elevator_Finish_Time", "Staging_Moving_Instructions",
+    "Person_To_Provide_Access_for_Destaging", "Lockbox_Code_for_Destaging",
+    "Destaging_Moving_Instructions",
+    # Design
+    "General_Notes", "Consultation_Instructions", "Design_Notes",
+    "Staging_Feedback", "Lock_Design", "Show_Design_To_Customer",
+    "Check_Basement_Furniture_Size_Date",
+    "Staging_Furniture_Design_Finish_Date",
+    "Staging_Accessories_Packing_Finish_Date",
+    # Payment
+    "Total_Staging_Fee", "Initial_Staging_Fee", "Photography_Fee",
+    "Moving_Fee", "Monthly_Extension_Fee", "Deposit_Amount",
+    "Security_Deposit", "Pay_by_Cash", "Invoice_Sent_Date",
+    # Listing
+    "MLS", "Listing_Price",
+    "Before_Picture_Upload_Date", "After_Picture_Upload_Date",
+    # Notify
+    "Staging_Item_List", "Seller_To_Do_List", "WhatsApp_Group_Created_Date",
+    "Consultation_Confirmation_Email_Sent_Date", "Next_Steps_Email_Sent_Date",
+    "Extension_Email_Sent_Date", "Destaging_Confirmation_Email_Sent_Date",
+    "Staging_Completion_Confirmation_Sent_Date",
+    "Destaging_Completion_Confirmation_Sent_Date",
+    "Staging_Review_Request_Sent_Date", "Destaging_Review_Request_Sent_Date",
+})
+
+# Columns stored as JSON arrays of {display_value, ID} objects.
+_STAGING_PEOPLE_FIELDS = frozenset({
+    "Stager", "Staging_Movers", "Destaging_Movers", "Consultation_Stager1",
+})
+# Columns stored as JSON {display_value, ID} (single).
+_STAGING_LINK_FIELDS = frozenset({"Staging_Address", "Quote", "Customer_CRM"})
+# Columns stored as JSON arrays of strings (multi-select picklist).
+_STAGING_TAG_FIELDS = frozenset({"Customer_Attributes"})
+
+
+def _serialize_staging_field(key: str, value):
+    """Convert a JSON value from the modal into the textual form Zoho writes
+    to the local SQLite snapshot. Symmetric with the parsers used by the
+    iOS/Android API layer."""
+    if value is None:
+        return ""
+    if key in _STAGING_PEOPLE_FIELDS:
+        if not isinstance(value, list):
+            return ""
+        arr = [_person_json_obj(name) for name in value if name]
+        return json.dumps(arr) if arr else ""
+    if key in _STAGING_TAG_FIELDS:
+        if not isinstance(value, list):
+            return ""
+        return json.dumps(list(value)) if value else ""
+    if key in _STAGING_LINK_FIELDS:
+        # Address is editable; store only display_value (no ID lookup
+        # available locally). Empty string clears it.
+        text = str(value).strip()
+        if not text:
+            return ""
+        return json.dumps({"display_value": text})
+    if key == "Pay_by_Cash":
+        # Stored as "true"/"false" strings in Zoho.
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        s = str(value).strip().lower()
+        return "true" if s in ("true", "1", "yes") else "false"
+    return "" if value == "" else str(value)
+
+
+def _staging_modal_payload(row) -> dict:
+    """Shape returned by GET /portal/staging/<id>.
+
+    Splits the row into context (header strip), values (per-field current
+    values decoded into JS-friendly form), and roster (for the people
+    picker). The schema lives client-side in static/staging_edit_modal.js;
+    this function only needs to surface the raw values + roster.
+    """
+    def col(name):
+        try:
+            return row[name]
+        except Exception:
+            return None
+
+    values = {}
+    for key in _STAGING_EDITABLE_FIELDS:
+        raw = col(key) or ""
+        if key in _STAGING_PEOPLE_FIELDS:
+            people = _parse_people(raw)
+            values[key] = [_display_name(p) for p in people]
+        elif key in _STAGING_TAG_FIELDS:
+            try:
+                arr = json.loads(raw) if raw else []
+                values[key] = arr if isinstance(arr, list) else []
+            except Exception:
+                values[key] = []
+        elif key == "Staging_Address":
+            values[key] = _parse_link(raw) or ""
+        else:
+            values[key] = raw or ""
+
+    # Read-only display fields (rendered as 'readonly' / 'readonly-link' in
+    # the modal — never sent back on save).
+    for key in ("Staging_Display_Name", "Total_Amount", "Paid_Amount",
+                "Owing_Amount", "HST", "Total_Extension_Fee", "Days_On_Market",
+                "Pictures_Folder", "Design_Items_Matched_Date",
+                "Consultation_Notes_Complete_Time", "Customer_Acknowledged_Time"):
+        values[key] = col(key) or ""
+    values["Quote"] = _parse_link(col("Quote") or "") or ""
+    values["Customer_CRM"] = _parse_link(col("Customer_CRM") or "") or ""
+
+    address = _parse_link(col("Staging_Address") or "") or col("Staging_Display_Name") or ""
+    date_str = ""
+    d = _parse_mdy(col("Staging_Date") or "")
+    if d:
+        date_str = d.strftime("%a %b %-d")
+    eta = _fmt_time_short(col("Staging_ETA") or "")
+    stagers = _parse_people(col("Stager") or "")
+    movers = _parse_people(col("Staging_Movers") or "")
+    team_bits = []
+    if stagers:
+        team_bits.append(", ".join(_display_name(p) for p in stagers))
+    if movers:
+        team_bits.append("· " + ", ".join(_display_name(p) for p in movers))
+    context = {
+        "address": address,
+        "staging_date": date_str,
+        "staging_eta": eta,
+        "team": " ".join(team_bits),
+        "status": col("Staging_Status") or "",
+    }
+
+    return {
+        "id": col("ID"),
+        "context": context,
+        "values": values,
+        "roster": _STAFF_ROSTER,
+    }
+
+
 # -------------------- routes --------------------
 
 def register(rt):
@@ -4347,7 +5141,7 @@ def register(rt):
 
         table_view = _build_table(grouped)
         cal_toolbar, cal_scroll, cal_source = _build_calendar_view(rows)
-        sched_toolbar, sched_scroll = _build_schedule_view()
+        sched_chips, sched_scroll = _build_schedule_view()
 
         return _full_page(
             "Staging Task Board",
@@ -4365,7 +5159,7 @@ def register(rt):
                         **{"data-view": "calendar"},
                     ),
                     Div(
-                        sched_toolbar, sched_scroll,
+                        sched_chips, sched_scroll,
                         id="view-schedule", cls="view-pane",
                         **{"data-view": "schedule"},
                     ),
@@ -4377,7 +5171,11 @@ def register(rt):
                 _procedure_modal(),
                 cls="app-shell",
             )],
-            extra_scripts=[_client_script(employees, corpus, roster, date_min, date_max)],
+            extra_scripts=[
+                Script(src="/static/portal_modal.js", defer=True),
+                Script(src="/static/staging_edit_modal.js", defer=True),
+                _client_script(employees, corpus, roster, date_min, date_max),
+            ],
         )
 
     @rt("/staging_task_board/set_date", methods=["POST"])
@@ -4445,6 +5243,113 @@ def register(rt):
                 out[rid] = mins
             c.commit()
         return JSONResponse({"results": out})
+
+    @rt("/staging_task_board/save_assignment", methods=["POST"])
+    async def save_assignment(request: Request):
+        """Persist a schedule-view assignment back to Staging_Report.
+        Local-only — no Zoho push (matches read-only mode in
+        as_webapp/main.py). Synthetic Design+Packing cards (sid ends in
+        '_dp') skip the write because they have no DB row."""
+        form = await request.form()
+        sid = (form.get("sid") or "").strip()
+        kind = (form.get("kind") or "").strip()
+        # Accept legacy single "stager" or array-style "stagers" (pipe-delimited).
+        stagers_raw = (form.get("stagers")
+                       or form.get("stager")
+                       or "").strip()
+        stagers = [s.strip() for s in stagers_raw.split("|") if s.strip()]
+        movers_raw = (form.get("movers") or "").strip()
+        movers = [m.strip() for m in movers_raw.split("|") if m.strip()]
+
+        if not sid or sid.endswith("_dp") or kind == "Design":
+            return JSONResponse({"ok": True, "skipped": True})
+
+        # Map kind → columns. Staging touches both stagers + movers;
+        # destage only movers; consultation only the consult stager(s).
+        stager_col = None
+        movers_col = None
+        if kind == "Staging":
+            stager_col = "Stager"
+            movers_col = "Staging_Movers"
+        elif kind == "Destage":
+            movers_col = "Destaging_Movers"
+        elif kind == "Consultation":
+            stager_col = "Consultation_Stager1"
+        else:
+            return JSONResponse({"ok": True, "skipped": True})
+
+        updates = {}
+        if stager_col is not None:
+            arr = [_person_json_obj(s) for s in stagers]
+            updates[stager_col] = json.dumps(arr)
+        if movers_col is not None:
+            arr = [_person_json_obj(m) for m in movers]
+            updates[movers_col] = json.dumps(arr)
+
+        if not updates:
+            return JSONResponse({"ok": True, "skipped": True})
+
+        sets = ", ".join(f"{col} = ?" for col in updates)
+        params = list(updates.values()) + [sid]
+        with _conn() as c:
+            c.execute(
+                f"UPDATE Staging_Report SET {sets} WHERE ID = ?", params,
+            )
+            c.commit()
+        return JSONResponse({"ok": True, "updated": list(updates.keys())})
+
+    # -------- portal staging modal API (used by static/staging_edit_modal.js) --------
+    # GET returns the editable record + roster. POST applies a diff. Local DB
+    # only — same write model as set_date / save_assignment (no Zoho push).
+
+    @rt("/portal/staging/{staging_id}")
+    def portal_staging_get(staging_id: str):
+        with _conn() as c:
+            row = c.execute(
+                "SELECT * FROM Staging_Report WHERE ID = ?", (staging_id,),
+            ).fetchone()
+        if not row:
+            return JSONResponse({"error": "not found"}, status_code=404)
+        return JSONResponse(_staging_modal_payload(row))
+
+    @rt("/portal/staging/{staging_id}/save", methods=["POST"])
+    async def portal_staging_save(request: Request, staging_id: str):
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse({"error": "invalid json"}, status_code=400)
+        patch = body.get("patch") or {}
+        if not isinstance(patch, dict) or not patch:
+            return JSONResponse({"error": "empty patch"}, status_code=400)
+
+        rejected, updates = [], {}
+        for k, v in patch.items():
+            if k not in _STAGING_EDITABLE_FIELDS:
+                rejected.append(k)
+                continue
+            updates[k] = _serialize_staging_field(k, v)
+        if not updates:
+            return JSONResponse({"error": "no editable fields", "rejected": rejected},
+                                status_code=400)
+
+        sets = ", ".join(f"{col} = ?" for col in updates)
+        params = list(updates.values()) + [staging_id]
+        with _conn() as c:
+            cur = c.execute(
+                f"UPDATE Staging_Report SET {sets} WHERE ID = ?", params,
+            )
+            c.commit()
+            if cur.rowcount == 0:
+                return JSONResponse({"error": "not found"}, status_code=404)
+            row = c.execute(
+                "SELECT * FROM Staging_Report WHERE ID = ?", (staging_id,),
+            ).fetchone()
+        return JSONResponse({
+            "ok": True,
+            "updated": list(updates.keys()),
+            "rejected": rejected,
+            "record": _staging_modal_payload(row),
+        })
 
     @rt("/stub")
     def stub_page(request: Request):
